@@ -57,6 +57,6 @@ pub fn tokenize(mut input: String) -> Result<VecDeque<Token>, String> {
         }
         input = input[len..].parse().unwrap();
     }
-    deque.push_back(Epsilon);
+    deque.push_front(Epsilon);
     Ok(deque)
 }

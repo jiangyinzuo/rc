@@ -32,67 +32,68 @@ impl Calculator {
         }
     }
 
+    /// stmt -> id assign exp1 | exp1
     fn stmt(&mut self) -> Result<String, String> {
-        if let Id(_) = self.tokens.front().unwrap() {
-            if let Assign = self.tokens.get(1).unwrap() {
-                if let Id(id) = self.tokens.pop_front().unwrap() {
-                    self.tokens.pop_front(); // pop Assign
-                    let value = self.exp1()?;
-                    self.variables.insert(id, value);
+        let rvalue = self.exp1()?;
+        if let Assign = self.tokens.back().unwrap() {
+            self.tokens.pop_back();
+            if let Id(_) = self.tokens.back().unwrap() {
+                if let Id(id) = self.tokens.pop_back().unwrap() {
+                    self.variables.insert(id, rvalue);
                     return Ok("".to_string());
                 }
             }
         }
-        Ok(self.exp1()?.to_string())
+        Ok(rvalue.to_string())
     }
 
-    /// exp1 -> exp2 (Add | Sub exp1) | epsilon
+    /// exp1 -> exp1 Add | Sub exp2 | exp2
     fn exp1(&mut self) -> Result<i32, String> {
-        let lvalue = self.exp2()?;
-        match self.tokens.front().unwrap() {
+        let rvalue = self.exp2()?;
+        match self.tokens.back().unwrap() {
             Add => {
-                self.tokens.pop_front(); // pop Add
-                let rvalue = self.exp1()?;
+                self.tokens.pop_back(); // pop Add
+                let lvalue = self.exp1()?;
                 Ok(lvalue + rvalue)
             }
             Sub => {
-                self.tokens.pop_front(); // pop Sub
-                let rvalue = self.exp1()?;
+                self.tokens.pop_back(); // pop Sub
+                let lvalue = self.exp1()?;
                 Ok(lvalue - rvalue)
             }
-            _ => Ok(lvalue)
+            _ => Ok(rvalue)
         }
     }
 
-    /// exp2 -> exp3 (Multi | Div exp2) | epsilon
+    /// exp2 -> exp2 Multi | Div exp3 | exp3
     fn exp2(&mut self) -> Result<i32, String> {
-        let lvalue = self.exp3()?;
-        match self.tokens.front().unwrap() {
+        let rvalue = self.exp3()?;
+        match self.tokens.back().unwrap() {
             Multi => {
-                self.tokens.pop_front(); // pop Multi
-                let rvalue = self.exp2()?;
+                self.tokens.pop_back(); // pop Multi
+                let lvalue = self.exp2()?;
                 Ok(lvalue * rvalue)
             }
             Div => {
-                self.tokens.pop_front(); // pop Div
-                let rvalue = self.exp2()?;
+                self.tokens.pop_back(); // pop Div
                 if rvalue == 0 {
                     Err("DIV ZERO in exp2".to_string())
                 } else {
+                    let lvalue = self.exp2()?;
                     Ok(lvalue / rvalue)
                 }
             }
-            _ => Ok(lvalue)
+            _ => Ok(rvalue)
         }
     }
 
     /// exp3 -> Num | Id | OpenParen exp1 CloseParen
     fn exp3(&mut self) -> Result<i32, String> {
-        match self.tokens.pop_front().unwrap() {
-            OpenParen => {
+        match self.tokens.pop_back().unwrap() {
+            CloseParen => {
                 let value = self.exp1()?;
-                match self.tokens.pop_front().unwrap() {
-                    CloseParen => Ok(value),
+                match self.tokens.pop_back().unwrap() {
+                    OpenParen => Ok(value),
                     _ => Err("unclosed paren in exp3".to_string()),
                 }
             }
