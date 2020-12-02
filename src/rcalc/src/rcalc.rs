@@ -21,14 +21,13 @@ impl Calculator {
         if self.tokens.len() <= 1 {
             return "".to_string();
         }
-        let result = match self.stmt() {
-            Ok(value) => value,
+        match self.stmt() {
+            Ok(value) => if self.tokens.len() != 1 {
+                "invalid statement".to_string()
+            } else {
+                value
+            },
             Err(e) => e
-        };
-        if self.tokens.len() != 1 {
-            "invalid statement".to_string()
-        } else {
-            result
         }
     }
 

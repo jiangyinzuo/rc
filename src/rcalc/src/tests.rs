@@ -33,6 +33,8 @@ mod interpret_test {
             ("6", "b"),
             ("13", "c"),
             ("36", "a-b+c*a"),
+            ("DIV ZERO in exp2", "1/           0"),
+            ("invalid token Add in exp3", "1++")
         ];
         for t in tests.iter() {
             let res = calculator.interpret(t.1.to_string());
