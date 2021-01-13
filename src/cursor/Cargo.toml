@@ -1,5 +1,5 @@
 [package]
-name = "lexer"
+name = "cursor"
 version = "0.1.0"
 authors = ["ChiangYintso <392711804@qq.com>"]
 edition = "2018"

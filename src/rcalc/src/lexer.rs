@@ -1,5 +1,5 @@
 use self::Token::*;
-use lexer::common::*;
+use cursor::common::*;
 use std::error::Error;
 use std::process::id;
 use std::str::Chars;

@@ -1,4 +1,4 @@
 [workspace]
 members = [
-    'src/rcc', 'src/rcalc', 'src/lexer'
+    'src/rcc', 'src/rcalc', 'src/cursor'
 ]
