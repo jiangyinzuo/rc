@@ -12,6 +12,7 @@ mod tests {
         A,
         #[value("hello", "WORLD")]
         B,
+        #[disabled]
         C,
     }
 

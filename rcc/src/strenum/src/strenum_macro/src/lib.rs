@@ -7,4 +7,3 @@ use strenum_core::add_from_str;
 pub fn derive_answer_fn(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     add_from_str(parse_macro_input!(input)).into()
 }
-

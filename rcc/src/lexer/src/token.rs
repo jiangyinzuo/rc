@@ -1,8 +1,6 @@
-use crate::token::TokenKind::{Comment, Plus, While};
-use std::str::FromStr;
 use strenum::EnumFromStr;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Token {
     pub token_kind: TokenKind,
     pub start: usize,
@@ -75,7 +73,9 @@ pub enum TokenKind {
     Identifier,
 
     #[disabled]
-    Literals,
+    Literals {
+        literal_kind: LiteralKind,
+    },
 
     /// symbols
     #[value("+")]
@@ -236,10 +236,10 @@ pub enum TokenKind {
     Unknown,
 }
 
-#[test]
-fn token_kind_test() {
-    let a = TokenKind::from_str("while").unwrap();
-    assert_eq!(While, a);
-    let plus = TokenKind::from_str("+").unwrap();
-    assert_eq!(Plus, plus);
+#[derive(Debug, PartialEq)]
+pub enum LiteralKind {
+    Integer,
+    Float,
+    String,
+    Char,
 }

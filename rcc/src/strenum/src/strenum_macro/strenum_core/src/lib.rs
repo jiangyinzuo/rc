@@ -1,4 +1,4 @@
-use syn::{DeriveInput, DataEnum, Expr, Variant};
+use syn::{DeriveInput, DataEnum, Expr};
 use quote::*;
 use proc_macro2::Ident;
 
@@ -63,9 +63,9 @@ fn add_from_str_test() {
     use quote::quote;
 
     let tokens = quote! {
-        enum Color {
+        enum Color<'a> {
             #[disabled]
-            Red,
+            Red(&'a str),
             Yellow,
             #[value("+")]
             Orange
