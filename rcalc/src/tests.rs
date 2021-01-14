@@ -6,6 +6,7 @@ mod lexer_test {
     #[test]
     fn split_token_test() {
         let mut tokens = tokenize(String::from("hello world")).unwrap();
+        assert_eq!(Epsilon, tokens.pop_front().unwrap());
         assert_eq!(Id(String::from("hello")), tokens.pop_front().unwrap());
         assert_eq!(Id(String::from("world")), tokens.pop_front().unwrap());
         assert!(tokens.is_empty());

@@ -18,7 +18,7 @@ impl Calculator {
                 self.tokens = tokens;
             }
         }
-        if self.tokens.is_empty() {
+        if self.tokens.len() <= 1 {
             return "".to_string();
         }
         match self.stmt() {

@@ -18,6 +18,7 @@ pub enum Token {
     OpenParen,
     CloseParen,
     Unknown,
+    Epsilon
 }
 
 fn advance_token(input: &str) -> (Token, usize) {
@@ -56,5 +57,6 @@ pub fn tokenize(mut input: String) -> Result<VecDeque<Token>, String> {
         }
         input = input[len..].parse().unwrap();
     }
+    deque.push_front(Epsilon);
     Ok(deque)
 }
