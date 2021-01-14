@@ -46,7 +46,7 @@ pub fn add_from_str(ast: syn::DeriveInput) -> proc_macro2::TokenStream {
         }
     }
     quote! (
-        impl std::str::FromStr for #ident {
+        impl#generics std::str::FromStr for #ident#generics {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
@@ -63,9 +63,9 @@ fn add_from_str_test() {
     use quote::quote;
 
     let tokens = quote! {
-        enum Color<'a> {
+        enum Color<'a, T> {
             #[disabled]
-            Red(&'a str),
+            Red(T, &'a str),
             Yellow,
             #[value("+")]
             Orange
