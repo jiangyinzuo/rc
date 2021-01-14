@@ -1,6 +1,6 @@
-use strenum::EnumFromStr;
+use crate::token::TokenKind::{Comment, Plus, While};
 use std::str::FromStr;
-use crate::token::TokenKind::{Plus, Comment};
+use strenum::EnumFromStr;
 
 #[derive(Debug)]
 pub struct Token {
@@ -31,8 +31,13 @@ pub enum TokenKind {
     Mut,
     Ref,
     Return,
+
+    #[value("self")]
     SelfValue,
+
+    #[value("Self")]
     SelfType,
+
     Static,
     Struct,
     True,
@@ -76,115 +81,165 @@ pub enum TokenKind {
     #[value("+")]
     Plus,
 
+    #[value("-")]
     Minus,
 
+    #[value("*")]
     Star,
 
+    #[value("/")]
     Slash,
 
+    #[value("%")]
     Percent,
 
+    #[value("^")]
     Caret,
 
+    #[value("!")]
     Not,
 
+    #[value("&")]
     And,
 
+    #[value("|")]
     Or,
 
+    #[value("&&")]
     AndAnd,
 
+    #[value("||")]
     OrOr,
 
+    #[value("<<")]
     Shl,
 
+    #[value(">>")]
     Shr,
 
+    #[value("+=")]
     PlusEq,
 
+    #[value("-=")]
     MinusEq,
 
+    #[value("*=")]
     StarEq,
 
+    #[value("/=")]
     SlashEq,
 
+    #[value("%=")]
     PercentEq,
 
+    #[value("^=")]
     CaretEq,
 
+    #[value("<<=")]
     ShlEq,
 
+    #[value(">>=")]
     ShrEq,
 
+    #[value("=")]
     Eq,
 
+    #[value("==")]
     EqEq,
 
+    #[value("!=")]
     Ne,
 
+    #[value(">")]
     Gt,
 
+    #[value("<")]
     Lt,
 
+    #[value(">=")]
     Ge,
 
+    #[value("<=")]
     Le,
 
+    #[value("@")]
     At,
 
+    #[value("_")]
     Underscore,
 
+    #[value(".")]
     Dot,
 
+    #[value("..")]
     DotDot,
 
+    #[value("...")]
     DotDotDot,
 
+    #[value("..=")]
     DotDotEq,
 
+    #[value(",")]
     Comma,
 
+    #[value(";")]
     Semi,
 
+    #[value(":")]
     Colon,
 
+    #[value("::")]
     PathSep,
 
+    #[value("->")]
     RArrow,
 
+    #[value("=>")]
     FatArrow,
 
+    #[value("#")]
     Pound,
 
+    #[value("$")]
     Dollar,
 
+    #[value("?")]
     Question,
 
     /// delimiters
-
+    #[value("{")]
     LeftCurlyBraces,
 
+    #[value("}")]
     RightCurlyBraces,
 
+    #[value("[")]
     LeftSquareBrackets,
 
+    #[value("]")]
     RightSquareBrackets,
 
+    #[value("(")]
     LeftParentheses,
 
+    #[value(")")]
     RightParentheses,
 
+    #[disabled]
     WhiteSpace,
 
+    #[disabled]
     Comment,
 
+    #[disabled]
     Unknown,
 }
 
 #[test]
 fn token_kind_test() {
-    let a = TokenKind::from_str("comment").unwrap();
-    assert_eq!(Comment, a);
+    let a = TokenKind::from_str("while").unwrap();
+    assert_eq!(While, a);
     let plus = TokenKind::from_str("+").unwrap();
     assert_eq!(Plus, plus);
 }
