@@ -1,3 +1,7 @@
+use strenum::EnumFromStr;
+use std::str::FromStr;
+use crate::token::TokenKind::{Plus, Comment};
+
 #[derive(Debug)]
 pub struct Token {
     pub token_kind: TokenKind,
@@ -5,7 +9,7 @@ pub struct Token {
     pub len: usize,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, EnumFromStr)]
 pub enum TokenKind {
     /// strict keywords
     As,
@@ -62,12 +66,14 @@ pub enum TokenKind {
     Try,
     Union,
 
+    #[disabled]
     Identifier,
 
+    #[disabled]
     Literals,
 
     /// symbols
-
+    #[value("+")]
     Plus,
 
     Minus,
@@ -173,4 +179,12 @@ pub enum TokenKind {
     Comment,
 
     Unknown,
+}
+
+#[test]
+fn token_kind_test() {
+    let a = TokenKind::from_str("comment").unwrap();
+    assert_eq!(Comment, a);
+    let plus = TokenKind::from_str("+").unwrap();
+    assert_eq!(Plus, plus);
 }

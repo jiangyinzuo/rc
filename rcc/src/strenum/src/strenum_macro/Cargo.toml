@@ -1,5 +1,5 @@
 [package]
-name = "lexer"
+name = "strenum_macro"
 version = "0.1.0"
 authors = ["jiang <392711804@qq.com>"]
 edition = "2018"
@@ -7,6 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cursor = { path = "../../../cursor" }
-strum = "0.19.0"
-strum_macros = "0.19.0"
+syn = { version = "1.0", features = ["full"] }
+strenum_core = {path = "strenum_core" }
+
+[lib]
+proc-macro = true
+path = "src/lib.rs"
