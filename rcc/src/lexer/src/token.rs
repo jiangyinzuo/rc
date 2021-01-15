@@ -79,20 +79,20 @@ pub enum Token {
     U64,
     U128,
     Usize,
-    
+
     #[disabled]
     Identifier(String),
 
     /// Literals
     #[disabled]
     LitInteger(String),
-    
+
     #[disabled]
     LitFloat(String),
-    
+
     #[disabled]
     LitString(String),
-    
+
     #[disabled]
     LitChar(String),
 

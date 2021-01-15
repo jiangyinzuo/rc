@@ -3,28 +3,51 @@ use std::str::Chars;
 pub struct Cursor<'a> {
     chars: Chars<'a>,
     eaten_len: usize,
+    #[cfg(debug_assertions)]
+    prev: char,
 }
 
-const CHAR_EOF: char = '\0';
+const EOF_CHAR: char = '\0';
 
 impl<'a> Cursor<'a> {
     pub fn new(input: &'a str) -> Cursor<'a> {
         Cursor {
             chars: input.chars(),
             eaten_len: 0,
+            #[cfg(debug_assertions)]
+            prev: EOF_CHAR,
+        }
+    }
+
+    /// Returns the last eaten symbol (or `'\0'` in release builds).
+    /// (For debug assertions only.)
+    pub fn prev(&self) -> char {
+        #[cfg(debug_assertions)]
+        {
+            self.prev
+        }
+
+        #[cfg(not(debug_assertions))]
+        {
+            '\0'
         }
     }
 
     pub fn next(&self) -> char {
         match self.chars.clone().next() {
             Some(ch) => ch,
-            None => CHAR_EOF,
+            None => EOF_CHAR,
         }
     }
 
     pub fn bump(&mut self) -> char {
         self.eaten_len += 1;
-        self.chars.next().unwrap()
+        let c = self.chars.next().unwrap();
+        #[cfg(debug_assertions)]
+        {
+            self.prev = c;
+        }
+        c
     }
 
     pub fn eaten_len(&self) -> usize {
@@ -44,8 +67,26 @@ impl<'a> Cursor<'a> {
         self.eat_characters(is_white_space)
     }
 
-    pub fn eat_digit(&mut self) -> usize {
-        self.eat_characters(|c| ('0'..='9').contains(&c))
+    pub fn eat_digits(&mut self, radix: u32) -> usize {
+        debug_assert!(radix == 2 || radix == 8 || radix == 10 || radix == 16);
+        let mut len = 0usize;
+        while self.next().is_digit(radix) {
+            self.bump();
+            len += 1;
+        }
+        len
+    }
+
+    pub fn eat_digits_or_underscore(&mut self, radix: u32) -> (usize, bool) {
+        debug_assert!(radix == 2 || radix == 8 || radix == 10 || radix == 16);
+        let mut len = 0usize;
+        let mut has_digit: bool = false;
+        while self.next().is_digit(radix) || self.next() == '_' {
+            has_digit = self.next() != '_';
+            self.bump();
+            len += 1;
+        }
+        (len, has_digit)
     }
 
     fn eat_characters(&mut self, ch_fn: fn(char) -> bool) -> usize {

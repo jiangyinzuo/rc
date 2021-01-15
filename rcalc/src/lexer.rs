@@ -34,7 +34,7 @@ fn advance_token(input: &str) -> (Token, usize) {
         '=' => (Assign, 1),
         c if is_white_space(c) => (WhiteSpace, cursor.eat_whitespace()),
         '0'..='9' => {
-            let len = cursor.eat_digit();
+            let len = cursor.eat_digits(10);
             let num = input[..=len - 1].parse::<i32>().unwrap();
             (Num(num), len)
         }
