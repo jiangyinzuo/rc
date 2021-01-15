@@ -67,6 +67,15 @@ impl<'a> Cursor<'a> {
         self.eat_characters(is_white_space)
     }
 
+    pub fn eat_if_is_in(&mut self, str: &str) -> bool {
+        if str.contains(self.next()) {
+            self.bump();
+            true
+        } else {
+            false
+        }
+    }
+
     pub fn eat_digits(&mut self, radix: u32) -> usize {
         debug_assert!(radix == 2 || radix == 8 || radix == 10 || radix == 16);
         let mut len = 0usize;
@@ -77,6 +86,7 @@ impl<'a> Cursor<'a> {
         len
     }
 
+    /// (DIGIT|_)*
     pub fn eat_digits_or_underscore(&mut self, radix: u32) -> (usize, bool) {
         debug_assert!(radix == 2 || radix == 8 || radix == 10 || radix == 16);
         let mut len = 0usize;
@@ -87,6 +97,12 @@ impl<'a> Cursor<'a> {
             len += 1;
         }
         (len, has_digit)
+    }
+
+    /// (DIGIT|_)* DIGIT (DIGIT|_)*
+    pub fn eat_digits_with_underscore(&mut self, radix: u32) -> bool {
+        let (digit_len, has_digit) = self.eat_digits_or_underscore(radix);
+        digit_len > 0 && has_digit
     }
 
     fn eat_characters(&mut self, ch_fn: fn(char) -> bool) -> usize {
