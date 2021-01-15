@@ -10,8 +10,9 @@ fn lex_test() {
         Comma,
         Identifier("world".to_string()),
         If,
+        I8
     ];
-    let mut lexer = Lexer::new("hello , world if   ");
+    let mut lexer = Lexer::new("hello , world if  i8 ");
     let res = lexer.tokenize();
     assert_eq!(res, tokens);
 }

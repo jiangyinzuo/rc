@@ -1,8 +1,5 @@
 use self::Token::*;
 use cursor::common::*;
-use std::error::Error;
-use std::process::id;
-use std::str::Chars;
 use std::collections::VecDeque;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -36,7 +33,7 @@ fn advance_token(input: &str) -> (Token, usize) {
         ')' => (CloseParen, 1),
         '=' => (Assign, 1),
         c if is_white_space(c) => (WhiteSpace, cursor.eat_whitespace()),
-        c if '0' <= c && c <= '9' => {
+        '0'..='9' => {
             let len = cursor.eat_digit();
             let num = input[..=len - 1].parse::<i32>().unwrap();
             (Num(num), len)

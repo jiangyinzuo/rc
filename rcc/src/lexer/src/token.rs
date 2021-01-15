@@ -2,7 +2,7 @@ use strenum::EnumFromStr;
 
 #[derive(Debug, PartialEq, EnumFromStr)]
 pub enum Token {
-    /// strict keywords
+    /// Strict keywords
     As,
     Break,
     Const,
@@ -34,7 +34,7 @@ pub enum Token {
     True,
     While,
 
-    /// reserved keywords
+    /// Reserved keywords
     Crate,
     Mod,
     Move,
@@ -62,15 +62,41 @@ pub enum Token {
     Try,
     Union,
 
+    /// Primitive types
+    Bool,
+    Char,
+    F32,
+    F64,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+    
     #[disabled]
     Identifier(String),
 
+    /// Literals
     #[disabled]
-    Literals {
-        literal_kind: LiteralKind,
-    },
+    LitInteger(String),
+    
+    #[disabled]
+    LitFloat(String),
+    
+    #[disabled]
+    LitString(String),
+    
+    #[disabled]
+    LitChar(String),
 
-    /// symbols
+    /// Symbols
     #[value("+")]
     Plus,
 
@@ -230,9 +256,6 @@ pub enum Token {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum LiteralKind {
-    Integer,
-    Float,
-    String,
-    Char,
+pub enum PrefixKind {
+
 }

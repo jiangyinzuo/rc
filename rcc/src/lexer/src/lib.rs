@@ -43,6 +43,7 @@ impl<'a> Lexer<'a> {
                 self.cursor.bump();
                 Token::from_str(&c.to_string()).unwrap()
             }
+            '0'..='9' => self.integer_or_float_literal(),
             _ => {
                 self.cursor.bump();
                 Unknown
@@ -61,5 +62,25 @@ impl<'a> Lexer<'a> {
         } else {
             Identifier(str.to_string())
         }
+    }
+
+    /// TODO
+    fn integer_or_float_literal(&mut self) -> Token {
+        debug_assert!('0' <= self.cursor.next() && self.cursor.next() <= '9');
+        match self.cursor.bump() {
+            '0' => {
+                return match self.cursor.next() {
+                    'b' | 'o' | 'x' => self.integer(),
+                    _ => LitInteger("0".to_string()),
+                }
+            }
+            _ => panic!("must be 0-9"),
+        }
+    }
+
+    /// TODO
+    fn integer(&mut self) -> Token {
+        debug_assert!(matches!(self.cursor.next(), 'b' | 'o' | 'x' | '0'..='9'));
+        LitInteger("0".to_string())
     }
 }
