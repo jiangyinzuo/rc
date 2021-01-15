@@ -2,6 +2,7 @@ use std::str::Chars;
 
 pub struct Cursor<'a> {
     chars: Chars<'a>,
+    eaten_len: usize,
 }
 
 const CHAR_EOF: char = '\0';
@@ -10,6 +11,7 @@ impl<'a> Cursor<'a> {
     pub fn new(input: &'a str) -> Cursor<'a> {
         Cursor {
             chars: input.chars(),
+            eaten_len: 0,
         }
     }
 
@@ -21,7 +23,12 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn bump(&mut self) -> char {
+        self.eaten_len += 1;
         self.chars.next().unwrap()
+    }
+
+    pub fn eaten_len(&self) -> usize {
+        self.eaten_len
     }
 
     pub fn is_eof(&self) -> bool {
@@ -60,7 +67,9 @@ pub fn is_white_space(c: char) -> bool {
     // Note that this set is stable (ie, it doesn't change with different
     // Unicode versions), so it's ok to just hard-code the values.
 
-    matches!(c, '\u{0009}' // \t
+    matches!(
+        c,
+        '\u{0009}' // \t
         | '\u{000A}' // \n
         | '\u{000B}' // vertical tab
         | '\u{000C}' // form feed
@@ -76,7 +85,8 @@ pub fn is_white_space(c: char) -> bool {
 
         // Dedicated whitespace characters from Unicode
         | '\u{2028}' // LINE SEPARATOR
-        | '\u{2029}')
+        | '\u{2029}'
+    )
 }
 
 /// True if `c` is valid as a first character of an identifier.

@@ -2,72 +2,64 @@ use cursor::common::*;
 use std::collections::VecDeque;
 use std::str::FromStr;
 
-use self::token::TokenKind::*;
+use self::token::Token::*;
 use self::token::*;
 
 mod tests;
 pub mod token;
 
-pub fn tokenize(input: &str) -> VecDeque<Token> {
-    let mut tokens = VecDeque::new();
-    let mut lexer = Lexer::new(input);
-
-    while lexer.num_ch_eat < input.len() {
-        let (token_kind, len) = lexer.advance_token();
-        if token_kind != WhiteSpace && token_kind != Comment {
-            tokens.push_back(Token {
-                token_kind,
-                start: lexer.num_ch_eat - len,
-                len,
-            });
-        }
-    }
-    tokens
-}
-
 struct Lexer<'a> {
     cursor: Cursor<'a>,
     input: &'a str,
-    num_ch_eat: usize,
 }
 
 impl<'a> Lexer<'a> {
     fn new(input: &'a str) -> Self {
-        let cursor = Cursor::new(input);
         Lexer {
-            cursor,
+            cursor: Cursor::new(input),
             input,
-            num_ch_eat: 0,
         }
     }
 
-    fn advance_token(&mut self) -> (TokenKind, usize) {
-        let eat_result = match self.cursor.next() {
-            c if is_white_space(c) => (WhiteSpace, self.cursor.eat_whitespace()),
+    pub fn tokenize(&mut self) -> VecDeque<Token> {
+        let mut tokens = VecDeque::new();
+        while !self.cursor.is_eof() {
+            let token_kind = self.advance_token();
+            if token_kind != WhiteSpace && token_kind != Comment {
+                tokens.push_back(token_kind);
+            }
+        }
+        tokens
+    }
+
+    fn advance_token(&mut self) -> Token {
+        match self.cursor.next() {
+            c if is_white_space(c) => {
+                self.cursor.eat_whitespace();
+                WhiteSpace
+            }
             c if is_id_start(c) => self.identifier_or_keyword(),
             c if ";,@#$?{}[]()".contains(c) => {
                 self.cursor.bump();
-                (TokenKind::from_str(&c.to_string()).unwrap(), 1)
+                Token::from_str(&c.to_string()).unwrap()
             }
             _ => {
                 self.cursor.bump();
-                (Unknown, 1)
+                Unknown
             }
-        };
-        self.num_ch_eat += eat_result.1;
-        eat_result
+        }
     }
 
-    fn identifier_or_keyword(&mut self) -> (TokenKind, usize) {
+    fn identifier_or_keyword(&mut self) -> Token {
         let len = self.cursor.eat_id();
         let str = self
             .input
-            .get(self.num_ch_eat..self.num_ch_eat + len)
+            .get(self.cursor.eaten_len() - len..self.cursor.eaten_len())
             .unwrap();
-        if let Ok(token) = TokenKind::from_str(str) {
-            (token, len)
+        if let Ok(token) = Token::from_str(str) {
+            token
         } else {
-            (Identifier, len)
+            Identifier(str.to_string())
         }
     }
 }

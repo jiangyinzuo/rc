@@ -1,14 +1,7 @@
 use strenum::EnumFromStr;
 
-#[derive(Debug, PartialEq)]
-pub struct Token {
-    pub token_kind: TokenKind,
-    pub start: usize,
-    pub len: usize,
-}
-
 #[derive(Debug, PartialEq, EnumFromStr)]
-pub enum TokenKind {
+pub enum Token {
     /// strict keywords
     As,
     Break,
@@ -70,7 +63,7 @@ pub enum TokenKind {
     Union,
 
     #[disabled]
-    Identifier,
+    Identifier(String),
 
     #[disabled]
     Literals {
