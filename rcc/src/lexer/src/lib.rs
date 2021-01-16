@@ -12,7 +12,7 @@ struct Lexer<'a> {
     input: &'a str,
 }
 
-impl<'a> Lexer<'a> {
+impl<'a: 'b, 'b> Lexer<'a> {
     fn new(input: &'a str) -> Self {
         Lexer {
             cursor: Cursor::new(input),
@@ -20,7 +20,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    pub fn tokenize(&mut self) -> Vec<Token> {
+    pub fn tokenize(&'b mut self) -> Vec<Token<'a>> {
         let mut tokens = vec![];
         while !self.cursor.is_eof() {
             tokens.push(self.advance_token());
@@ -28,7 +28,7 @@ impl<'a> Lexer<'a> {
         tokens
     }
 
-    fn advance_token(&mut self) -> Token {
+    fn advance_token(&'b mut self) -> Token<'a> {
         match self.cursor.next() {
             c if is_white_space(c) => {
                 self.cursor.eat_whitespace();
@@ -47,7 +47,7 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn identifier_or_keyword(&mut self) -> Token {
+    fn identifier_or_keyword(&'b mut self) -> Token<'a> {
         let len = self.cursor.eat_id();
         let str = self
             .input
@@ -56,7 +56,7 @@ impl<'a> Lexer<'a> {
         if let Ok(token) = Token::from_str(str) {
             token
         } else {
-            Identifier(str.to_string())
+            Identifier(str)
         }
     }
 
@@ -85,7 +85,7 @@ impl<'a> Lexer<'a> {
     /// INTEGER_SUFFIX :
     ///       u8 | u16 | u32 | u64 | u128 | usize
     ///     | i8 | i16 | i32 | i64 | i128 | isize
-    fn integer_or_float_literal(&mut self) -> Token {
+    fn integer_or_float_literal(&'b mut self) -> Token<'a> {
         debug_assert!('0' <= self.cursor.next() && self.cursor.next() <= '9');
         let start = self.cursor.eaten_len();
         match self.cursor.bump() {
@@ -107,7 +107,7 @@ impl<'a> Lexer<'a> {
 
                     // 001 01.23
                     '0'..='9' => self.decimal_or_float_literal_no_prefix(start),
-                    _ => LitInteger("0".to_string()),
+                    _ => LitInteger("0"),
                 }
             }
             '1'..='9' => self.decimal_or_float_literal_no_prefix(start),
@@ -129,7 +129,7 @@ impl<'a> Lexer<'a> {
     ///
     /// FLOAT_SUFFIX :
     ///     f32 | f64
-    fn decimal_or_float_literal_no_prefix(&mut self, start: usize) -> Token {
+    fn decimal_or_float_literal_no_prefix(&'b mut self, start: usize) -> Token<'a> {
         debug_assert!(self.cursor.prev().is_digit(10));
         // (DEC_DIGIT|_)*
         self.cursor.eat_digits_or_underscore(10);
@@ -161,7 +161,7 @@ impl<'a> Lexer<'a> {
 
     /// FLOAT_EXPONENT :
     ///     (e|E) (+|-)? (DEC_DIGIT|_)* DEC_DIGIT (DEC_DIGIT|_)*
-    fn float_exponent(&mut self, start: usize) -> Token {
+    fn float_exponent(&'b mut self, start: usize) -> Token<'a> {
         debug_assert!(self.cursor.next() == 'e' || self.cursor.next() == 'E');
         self.cursor.bump();
         self.cursor.eat_if_is_in("+-");
@@ -170,11 +170,11 @@ impl<'a> Lexer<'a> {
 
     #[inline]
     fn digits_with_underscore(
-        &mut self,
+        &'b mut self,
         start: usize,
         radix: u32,
-        func: fn(&Self, usize) -> Token,
-    ) -> Token {
+        func: fn(&'b Self, usize) -> Token<'a>,
+    ) -> Token<'a> {
         if self.cursor.eat_digits_with_underscore(radix) {
             func(self, start)
         } else {
@@ -182,13 +182,11 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    #[inline]
-    fn lit_integer(&self, start: usize) -> Token {
-        LitInteger(self.input[start..self.cursor.eaten_len()].to_string())
+    fn lit_integer(&'b self, start: usize) -> Token<'a> {
+        LitInteger(&self.input[start..self.cursor.eaten_len()])
     }
 
-    #[inline]
-    fn lit_float(&self, start: usize) -> Token {
-        LitFloat(self.input[start..self.cursor.eaten_len()].to_string())
+    fn lit_float(&'b self, start: usize) -> Token<'a> {
+        LitFloat(&self.input[start..self.cursor.eaten_len()])
     }
 }

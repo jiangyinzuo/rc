@@ -1,7 +1,7 @@
 use strenum::EnumFromStr;
 
 #[derive(Debug, PartialEq, EnumFromStr)]
-pub enum Token {
+pub enum Token<'a> {
     /// Strict keywords
     As,
     Break,
@@ -81,20 +81,20 @@ pub enum Token {
     Usize,
 
     #[disabled]
-    Identifier(String),
+    Identifier(&'a str),
 
     /// Literals
     #[disabled]
-    LitInteger(String),
+    LitInteger(&'a str),
 
     #[disabled]
-    LitFloat(String),
+    LitFloat(&'a str),
 
     #[disabled]
-    LitString(String),
+    LitString(&'a str),
 
     #[disabled]
-    LitChar(String),
+    LitChar(&'a str),
 
     /// Symbols
     #[value("+")]
@@ -256,6 +256,4 @@ pub enum Token {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum PrefixKind {
-
-}
+pub enum PrefixKind {}

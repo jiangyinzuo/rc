@@ -6,19 +6,19 @@ mod lexer_tests {
     #[test]
     fn lex_test() {
         let tokens = vec![
-            Identifier("hello".to_string()),
+            Identifier("hello"),
             WhiteSpace,
             Comma,
             WhiteSpace,
-            Identifier("world".to_string()),
+            Identifier("world"),
             WhiteSpace,
             If,
             WhiteSpace,
             I8,
             WhiteSpace,
-            LitInteger("0xeffff___fff".to_string()),
+            LitInteger("0xeffff___fff"),
             WhiteSpace,
-            LitInteger("0".to_string()),
+            LitInteger("0"),
             WhiteSpace,
         ];
         let mut lexer = Lexer::new("hello , world if  i8 0xeffff___fff 0 ");
@@ -33,12 +33,12 @@ mod lexer_tests {
             vec![Unknown],
             vec![Unknown],
             vec![
-                LitFloat("12.3".to_string()),
+                LitFloat("12.3"),
                 WhiteSpace,
-                LitFloat("1e9".to_string()),
+                LitFloat("1e9"),
                 WhiteSpace,
-                LitInteger("0x37ff".to_string()),
-                Identifier("hello2".to_string()),
+                LitInteger("0x37ff"),
+                Identifier("hello2"),
             ],
         ];
         for (input, excepted) in inputs.iter().zip(excepteds.iter()) {
