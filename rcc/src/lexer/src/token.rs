@@ -154,6 +154,12 @@ pub enum Token<'a> {
     #[value("^=")]
     CaretEq,
 
+    #[value("&=")]
+    AndEq,
+
+    #[value("|=")]
+    OrEq,
+
     #[value("<<=")]
     ShlEq,
 

@@ -1,10 +1,10 @@
+mod lexer;
 mod rcalc;
 mod tests;
-mod lexer;
 
 use crate::rcalc::Calculator;
-use std::io::{BufRead, BufReader, Read, stdin, Write};
-use std::{fs, io};
+use std::io;
+use std::io::{stdin, Write};
 
 fn main() {
     let mut calculator = Calculator::new();

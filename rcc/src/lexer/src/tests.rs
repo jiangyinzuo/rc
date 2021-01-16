@@ -35,38 +35,82 @@ mod lexer_tests {
     }
     #[test]
     fn number_literal_test() {
-        let inputs = vec!["0o", "0b__", "12.3 1e9 0x37ffhello2"];
-        let excepted_outputs = vec![
-            vec![Unknown],
-            vec![Unknown],
+        validate_tokenize(
+            vec!["0o", "0b__", "12.3 1e9 0x37ffhello2"],
             vec![
-                LitFloat("12.3"),
-                WhiteSpace,
-                LitFloat("1e9"),
-                WhiteSpace,
-                LitInteger("0x37ff"),
-                Identifier("hello2"),
+                vec![Unknown],
+                vec![Unknown],
+                vec![
+                    LitFloat("12.3"),
+                    WhiteSpace,
+                    LitFloat("1e9"),
+                    WhiteSpace,
+                    LitInteger("0x37ff"),
+                    Identifier("hello2"),
+                ],
             ],
-        ];
-        validate_tokenize(inputs, excepted_outputs);
+        );
     }
 
     #[test]
     fn char_literal_test() {
-        let inputs = vec!["'a' '\''", "'\\", r#"'\''"#];
-        let excepted_outputs = vec![
-            vec![LitChar("'a'"), WhiteSpace, Unknown],
-            vec![Unknown],
-            vec![LitChar(r#"'\''"#)],
-        ];
-        validate_tokenize(inputs, excepted_outputs);
+        validate_tokenize(
+            vec!["'a' '\''", "'\\", r#"'\''"#],
+            vec![
+                vec![LitChar("'a'"), WhiteSpace, Unknown],
+                vec![Unknown],
+                vec![LitChar(r#"'\''"#)],
+            ],
+        );
+    }
+
+    #[test]
+    fn and_or_test() {
+        validate_tokenize(
+            vec!["&&& |||", "& |", "&& ||", "&= |=", "1&2"],
+            vec![
+                vec![AndAnd, And, WhiteSpace, OrOr, Or],
+                vec![And, WhiteSpace, Or],
+                vec![AndAnd, WhiteSpace, OrOr],
+                vec![AndEq, WhiteSpace, OrEq],
+                vec![LitInteger("1"), And, LitInteger("2")],
+            ],
+        );
+    }
+
+    #[test]
+    fn slash_test() {
+        validate_tokenize(
+            vec![
+                "/**",
+                "///  ///",
+                "/= / //",
+                "//",
+                r#"/*
+            
+                    /*
+                             */
+                "#,
+                r#"/*
+                ///*/*/
+                *// */*/"#,
+            ],
+            vec![
+                vec![Unknown],
+                vec![Comment],
+                vec![SlashEq, WhiteSpace, Slash, WhiteSpace, Comment],
+                vec![Comment],
+                vec![Unknown],
+                vec![Comment],
+            ],
+        );
     }
 
     #[test]
     fn dot_test() {
         validate_tokenize(
             vec![
-                ".", "..", "...", "..=", "1..2", ".2", "1.", "1.2", "a.1", "a.b", "1.a",
+                ".", "..", "...", "..=", "1..2", ".2", "1.", "1.2", "a.1", "a.b", "1.a", "....",
             ],
             vec![
                 vec![Dot],
@@ -80,6 +124,7 @@ mod lexer_tests {
                 vec![Identifier("a"), Dot, LitInteger("1")],
                 vec![Identifier("a"), Dot, Identifier("b")],
                 vec![LitInteger("1"), Dot, Identifier("a")],
+                vec![DotDotDot, Dot],
             ],
         );
     }
@@ -95,11 +140,14 @@ mod lexer_tests {
     #[test]
     fn lt_gt_test() {
         validate_tokenize(
-            vec!["<  <= << <<= > >= >> >>="],
-            vec![vec![
-                Lt, WhiteSpace, Le, WhiteSpace, Shl, WhiteSpace, ShlEq, WhiteSpace, Gt, WhiteSpace,
-                Ge, WhiteSpace, Shr, WhiteSpace, ShrEq,
-            ]],
+            vec!["<  <= << <<= > >= >> >>=", "<<<"],
+            vec![
+                vec![
+                    Lt, WhiteSpace, Le, WhiteSpace, Shl, WhiteSpace, ShlEq, WhiteSpace, Gt,
+                    WhiteSpace, Ge, WhiteSpace, Shr, WhiteSpace, ShrEq,
+                ],
+                vec![Shl, Lt],
+            ],
         );
     }
 }

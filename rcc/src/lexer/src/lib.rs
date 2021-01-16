@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use self::token::Token::*;
 use self::token::*;
-use std::ops::Deref;
+use std::usize::MAX;
 
 mod tests;
 pub mod token;
@@ -49,43 +49,75 @@ impl<'a: 'b, 'b> Lexer<'a> {
             '\'' => self.char_literal(self.cursor.eaten_len()),
             // TODO
             // '"' => self.string_literal(self.cursor.eaten_len()),
-            // c if "+-*%^!".contains(c) => {}
+            // c if "+*%^!".contains(c) => {}
             // '-' | '=' => {}
-            // c if "&|".contains(c) => {}
-            // '/' => {}
+            c if "&|".contains(c) => {
+                static TABLE: [[Token; 2]; 3] = [[And, Or], [AndAnd, OrOr], [AndEq, OrEq]];
+                let mut i = self.cursor.eat_equals(c, 2) - 1;
+                let j = if c == '&' { 0 } else { 1 };
+                if i == 0 && self.cursor.eat_equals('=', 1) == 1 {
+                    i = 2;
+                }
+                TABLE[i][j].clone()
+            }
+            '/' => {
+                let slash_count = self.cursor.eat_equals('/', MAX);
+                debug_assert!(slash_count >= 1);
+                if slash_count == 1 {
+                    match self.cursor.next() {
+                        '=' => {
+                            self.cursor.bump();
+                            SlashEq
+                        }
+                        '*' => {
+                            self.cursor.bump();
+                            let mut comment_count = 1;
+                            while comment_count > 0 {
+                                match self.cursor.bump() {
+                                    EOF_CHAR => return Unknown,
+                                    '*' => {
+                                        if self.cursor.bump() == '/' {
+                                            comment_count -= 1;
+                                        }
+                                    }
+                                    '/' => {
+                                        if self.cursor.bump() == '*' {
+                                            comment_count += 1;
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Comment
+                        }
+                        _ => Slash,
+                    }
+                } else {
+                    self.cursor.eat_characters(|c| c != '\n' && c != EOF_CHAR);
+                    Comment
+                }
+            }
             c if (c == '<' || c == '>') => {
                 static TABLE: [[Token; 2]; 4] = [[Lt, Shl], [Le, ShlEq], [Gt, Shr], [Ge, ShrEq]];
-                let j = self.cursor.eat_equals(c) - 1;
-                let i: usize = if self.cursor.next() == '=' {
-                    self.cursor.bump();
-                    1
-                } else {
-                    0
-                } + c as usize
-                    - '<' as usize;
-
+                let j = self.cursor.eat_equals(c, 2) - 1;
+                let i = self.cursor.eat_equals('=', 1) + c as usize - '<' as usize;
                 debug_assert!(i <= 3);
                 debug_assert!(j <= 1);
                 TABLE[i][j].clone()
             }
             '.' => {
-                self.cursor.bump();
-                match self.cursor.next() {
-                    '.' => {
-                        self.cursor.bump();
-                        match self.cursor.next() {
-                            '.' => {
-                                self.cursor.bump();
-                                DotDotDot
-                            }
-                            '=' => {
-                                self.cursor.bump();
-                                DotDotEq
-                            }
-                            _ => DotDot,
+                let dot_count = self.cursor.eat_equals('.', 3);
+                match dot_count {
+                    1 => Dot,
+                    2 => {
+                        if self.cursor.eat_equals('=', 1) == 1 {
+                            DotDotEq
+                        } else {
+                            DotDot
                         }
                     }
-                    _ => Dot,
+                    3 => DotDotDot,
+                    _ => Unknown, // unreachable arm
                 }
             }
             ':' => {

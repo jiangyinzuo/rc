@@ -1,4 +1,4 @@
-use std::cmp::min;
+use std::cmp::{max, min};
 use std::str::Chars;
 
 pub struct Cursor<'a> {
@@ -9,7 +9,7 @@ pub struct Cursor<'a> {
     prev: char,
 }
 
-const EOF_CHAR: char = '\0';
+pub const EOF_CHAR: char = '\0';
 
 impl<'a> Cursor<'a> {
     pub fn new(input: &'a str) -> Cursor<'a> {
@@ -129,15 +129,15 @@ impl<'a> Cursor<'a> {
         digit_len > 0 && has_digit
     }
 
-    pub fn eat_equals(&mut self, c: char) -> usize {
+    pub fn eat_equals(&mut self, c: char, max_eat_count: usize) -> usize {
         let mut len = 0usize;
-        while self.next() == c {
+        while self.next() == c && len < max_eat_count {
             self.bump();
             len += 1;
         }
         len
     }
-    
+
     pub fn eat_characters(&mut self, ch_fn: fn(char) -> bool) -> usize {
         let mut len = 0usize;
         while ch_fn(self.next()) {
