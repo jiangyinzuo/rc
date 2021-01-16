@@ -33,6 +33,19 @@ mod lexer_tests {
             assert_eq!(*excepted, res);
         }
     }
+
+    #[test]
+    fn arrow_test() {
+        validate_tokenize(
+            vec!["->=>->==-==-", "---", "==-=="],
+            vec![
+                vec![RArrow, FatArrow, RArrow, EqEq, MinusEq, Eq, Minus],
+                vec![Minus, Minus, Minus],
+                vec![EqEq, MinusEq, Eq],
+            ],
+        );
+    }
+
     #[test]
     fn number_literal_test() {
         validate_tokenize(

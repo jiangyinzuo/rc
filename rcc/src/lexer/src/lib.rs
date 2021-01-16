@@ -50,7 +50,21 @@ impl<'a: 'b, 'b> Lexer<'a> {
             // TODO
             // '"' => self.string_literal(self.cursor.eaten_len()),
             // c if "+*%^!".contains(c) => {}
-            // '-' | '=' => {}
+            '-' | '=' => {
+                let c = self.cursor.bump();
+                let i = if let Some(ch) = self.cursor.eat_if_is_in("=>") {
+                    if ch == '=' {
+                        1
+                    } else {
+                        2
+                    }
+                } else {
+                    0
+                };
+                let j = if c == '-' { 0 } else { 1 };
+                static TABLE: [[Token; 2]; 3] = [[Minus, Eq], [MinusEq, EqEq], [RArrow, FatArrow]];
+                TABLE[i][j].clone()
+            }
             c if "&|".contains(c) => {
                 static TABLE: [[Token; 2]; 3] = [[And, Or], [AndAnd, OrOr], [AndEq, OrEq]];
                 let mut i = self.cursor.eat_equals(c, 2) - 1;

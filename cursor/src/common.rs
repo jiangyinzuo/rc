@@ -91,12 +91,11 @@ impl<'a> Cursor<'a> {
         self.eat_characters(is_white_space)
     }
 
-    pub fn eat_if_is_in(&mut self, str: &str) -> bool {
+    pub fn eat_if_is_in(&mut self, str: &str) -> Option<char> {
         if str.contains(self.next()) {
-            self.bump();
-            true
+            Some(self.bump())
         } else {
-            false
+            None
         }
     }
 
