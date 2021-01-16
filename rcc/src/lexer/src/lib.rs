@@ -1,5 +1,4 @@
 use cursor::common::*;
-use std::collections::VecDeque;
 use std::str::FromStr;
 
 use self::token::Token::*;
@@ -166,7 +165,7 @@ impl<'a> Lexer<'a> {
         debug_assert!(self.cursor.next() == 'e' || self.cursor.next() == 'E');
         self.cursor.bump();
         self.cursor.eat_if_is_in("+-");
-        self.digits_with_underscore(start, 10, Self::lit_integer)
+        self.digits_with_underscore(start, 10, Self::lit_float)
     }
 
     #[inline]

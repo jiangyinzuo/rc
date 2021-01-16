@@ -28,9 +28,19 @@ mod lexer_tests {
 
     #[test]
     fn number_literal_test() {
-        let inputs = ["0o", "0b__"];
-        let excepteds = [vec![Unknown], vec![Unknown]];
-
+        let inputs = ["0o", "0b__", "12.3 1e9 0x37ffhello2"];
+        let excepteds = [
+            vec![Unknown],
+            vec![Unknown],
+            vec![
+                LitFloat("12.3".to_string()),
+                WhiteSpace,
+                LitFloat("1e9".to_string()),
+                WhiteSpace,
+                LitInteger("0x37ff".to_string()),
+                Identifier("hello2".to_string()),
+            ],
+        ];
         for (input, excepted) in inputs.iter().zip(excepteds.iter()) {
             let mut lexer = Lexer::new(input);
             let res = lexer.tokenize();
