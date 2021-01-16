@@ -1,7 +1,9 @@
+use std::cmp::min;
 use std::str::Chars;
 
 pub struct Cursor<'a> {
     chars: Chars<'a>,
+    input: &'a str,
     eaten_len: usize,
     #[cfg(debug_assertions)]
     prev: char,
@@ -13,6 +15,7 @@ impl<'a> Cursor<'a> {
     pub fn new(input: &'a str) -> Cursor<'a> {
         Cursor {
             chars: input.chars(),
+            input,
             eaten_len: 0,
             #[cfg(debug_assertions)]
             prev: EOF_CHAR,
@@ -34,20 +37,41 @@ impl<'a> Cursor<'a> {
     }
 
     pub fn next(&self) -> char {
-        match self.chars.clone().next() {
+        self.nth(0)
+    }
+
+    /// `nth()` start from 0
+    pub fn nth(&self, n: usize) -> char {
+        match self.chars.clone().nth(n) {
             Some(ch) => ch,
             None => EOF_CHAR,
         }
     }
 
-    pub fn bump(&mut self) -> char {
-        self.eaten_len += 1;
-        let c = self.chars.next().unwrap();
-        #[cfg(debug_assertions)]
-        {
-            self.prev = c;
+    /// `bump_n()` start from 0
+    pub fn bump_n(&mut self, n: usize) -> char {
+        match self.chars.nth(n) {
+            Some(c) => {
+                self.eaten_len = min(self.eaten_len + n + 1, self.input.len());
+                #[cfg(debug_assertions)]
+                {
+                    self.prev = c;
+                }
+                c
+            }
+            None => {
+                self.eaten_len = self.input.len();
+                #[cfg(debug_assertions)]
+                {
+                    self.prev = EOF_CHAR;
+                }
+                EOF_CHAR
+            }
         }
-        c
+    }
+
+    pub fn bump(&mut self) -> char {
+        self.bump_n(0)
     }
 
     pub fn eaten_len(&self) -> usize {
@@ -105,7 +129,16 @@ impl<'a> Cursor<'a> {
         digit_len > 0 && has_digit
     }
 
-    fn eat_characters(&mut self, ch_fn: fn(char) -> bool) -> usize {
+    pub fn eat_equals(&mut self, c: char) -> usize {
+        let mut len = 0usize;
+        while self.next() == c {
+            self.bump();
+            len += 1;
+        }
+        len
+    }
+    
+    pub fn eat_characters(&mut self, ch_fn: fn(char) -> bool) -> usize {
         let mut len = 0usize;
         while ch_fn(self.next()) {
             self.bump();

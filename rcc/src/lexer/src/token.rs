@@ -1,6 +1,6 @@
 use strenum::EnumFromStr;
 
-#[derive(Debug, PartialEq, EnumFromStr)]
+#[derive(Clone, Debug, PartialEq, EnumFromStr)]
 pub enum Token<'a> {
     /// Strict keywords
     As,

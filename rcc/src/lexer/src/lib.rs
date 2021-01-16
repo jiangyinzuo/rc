@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use self::token::Token::*;
 use self::token::*;
+use std::ops::Deref;
 
 mod tests;
 pub mod token;
@@ -23,7 +24,12 @@ impl<'a: 'b, 'b> Lexer<'a> {
     pub fn tokenize(&'b mut self) -> Vec<Token<'a>> {
         let mut tokens = vec![];
         while !self.cursor.is_eof() {
-            tokens.push(self.advance_token());
+            let token = self.advance_token();
+            if token == Unknown {
+                tokens.push(Unknown);
+                break;
+            }
+            tokens.push(token);
         }
         tokens
     }
@@ -40,6 +46,57 @@ impl<'a: 'b, 'b> Lexer<'a> {
                 Token::from_str(&c.to_string()).unwrap()
             }
             '0'..='9' => self.integer_or_float_literal(),
+            '\'' => self.char_literal(self.cursor.eaten_len()),
+            // TODO
+            // '"' => self.string_literal(self.cursor.eaten_len()),
+            // c if "+-*%^!".contains(c) => {}
+            // '-' | '=' => {}
+            // c if "&|".contains(c) => {}
+            // '/' => {}
+            c if (c == '<' || c == '>') => {
+                static TABLE: [[Token; 2]; 4] = [[Lt, Shl], [Le, ShlEq], [Gt, Shr], [Ge, ShrEq]];
+                let j = self.cursor.eat_equals(c) - 1;
+                let i: usize = if self.cursor.next() == '=' {
+                    self.cursor.bump();
+                    1
+                } else {
+                    0
+                } + c as usize
+                    - '<' as usize;
+
+                debug_assert!(i <= 3);
+                debug_assert!(j <= 1);
+                TABLE[i][j].clone()
+            }
+            '.' => {
+                self.cursor.bump();
+                match self.cursor.next() {
+                    '.' => {
+                        self.cursor.bump();
+                        match self.cursor.next() {
+                            '.' => {
+                                self.cursor.bump();
+                                DotDotDot
+                            }
+                            '=' => {
+                                self.cursor.bump();
+                                DotDotEq
+                            }
+                            _ => DotDot,
+                        }
+                    }
+                    _ => Dot,
+                }
+            }
+            ':' => {
+                self.cursor.bump();
+                if self.cursor.next() == ':' {
+                    self.cursor.bump();
+                    PathSep
+                } else {
+                    Colon
+                }
+            }
             _ => {
                 self.cursor.bump();
                 Unknown
@@ -135,10 +192,19 @@ impl<'a: 'b, 'b> Lexer<'a> {
         self.cursor.eat_digits_or_underscore(10);
         match self.cursor.next() {
             '.' => {
-                self.cursor.bump();
-                match self.cursor.next() {
+                // self.cursor.bump();
+                match self.cursor.nth(1) {
                     // DEC_LITERAL FLOAT_EXPONENT?
                     '0'..='9' => {
+                        #[cfg(debug_assertions)]
+                        {
+                            assert_eq!(self.cursor.bump(), '.');
+                        }
+                        #[cfg(not(debug_assertions))]
+                        {
+                            self.cursor.bump();
+                        }
+
                         // DEC_LITERAL
                         self.cursor.eat_digits_with_underscore(10);
                         // FLOAT_EXPONENT?
@@ -149,7 +215,19 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         }
                     }
                     // not immediately followed by ., _ or an identifier
-                    c if c != '.' && c != '_' && is_id_start(c) => self.lit_integer(start),
+                    // 1.;
+                    c if !(c == '.' || c == '_' || is_id_start(c)) => {
+                        #[cfg(debug_assertions)]
+                        {
+                            assert_eq!(self.cursor.bump(), '.');
+                        }
+                        #[cfg(not(debug_assertions))]
+                        {
+                            self.cursor.bump();
+                        }
+                        self.lit_float(start)
+                    }
+                    // 1..2  1.a
                     _ => self.lit_integer(start),
                 }
             }
@@ -182,11 +260,45 @@ impl<'a: 'b, 'b> Lexer<'a> {
         }
     }
 
+    fn char_literal(&'b mut self, start: usize) -> Token<'a> {
+        debug_assert!(self.cursor.next() == '\'');
+        self.cursor.bump();
+        match self.cursor.bump() {
+            '\\' => {
+                // '\n'
+                if "nrt\\0'\"".contains(self.cursor.bump()) && self.cursor.bump() == '\'' {
+                    self.lit_char(start)
+                } else {
+                    Unknown
+                }
+            }
+            '\'' => Unknown,
+            _ => {
+                if self.cursor.bump() == '\'' {
+                    self.lit_char(start)
+                } else {
+                    Unknown
+                }
+            }
+        }
+    }
+
+    /// TODO
+    fn string_literal(&'b mut self, start: usize) -> Token<'a> {
+        debug_assert!(self.cursor.next() == '"');
+        // let c = '';
+        Unknown
+    }
+
     fn lit_integer(&'b self, start: usize) -> Token<'a> {
         LitInteger(&self.input[start..self.cursor.eaten_len()])
     }
 
     fn lit_float(&'b self, start: usize) -> Token<'a> {
         LitFloat(&self.input[start..self.cursor.eaten_len()])
+    }
+
+    fn lit_char(&'b self, start: usize) -> Token<'a> {
+        LitChar(&self.input[start..self.cursor.eaten_len()])
     }
 }

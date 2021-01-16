@@ -26,10 +26,17 @@ mod lexer_tests {
         assert_eq!(res, tokens);
     }
 
+    fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
+        for (input, excepted) in inputs.iter().zip(excepted_outputs.iter()) {
+            let mut lexer = Lexer::new(input);
+            let res = lexer.tokenize();
+            assert_eq!(*excepted, res);
+        }
+    }
     #[test]
     fn number_literal_test() {
-        let inputs = ["0o", "0b__", "12.3 1e9 0x37ffhello2"];
-        let excepteds = [
+        let inputs = vec!["0o", "0b__", "12.3 1e9 0x37ffhello2"];
+        let excepted_outputs = vec![
             vec![Unknown],
             vec![Unknown],
             vec![
@@ -41,11 +48,59 @@ mod lexer_tests {
                 Identifier("hello2"),
             ],
         ];
-        for (input, excepted) in inputs.iter().zip(excepteds.iter()) {
-            let mut lexer = Lexer::new(input);
-            let res = lexer.tokenize();
-            assert_eq!(*excepted, res);
-        }
+        validate_tokenize(inputs, excepted_outputs);
+    }
+
+    #[test]
+    fn char_literal_test() {
+        let inputs = vec!["'a' '\''", "'\\", r#"'\''"#];
+        let excepted_outputs = vec![
+            vec![LitChar("'a'"), WhiteSpace, Unknown],
+            vec![Unknown],
+            vec![LitChar(r#"'\''"#)],
+        ];
+        validate_tokenize(inputs, excepted_outputs);
+    }
+
+    #[test]
+    fn dot_test() {
+        validate_tokenize(
+            vec![
+                ".", "..", "...", "..=", "1..2", ".2", "1.", "1.2", "a.1", "a.b", "1.a",
+            ],
+            vec![
+                vec![Dot],
+                vec![DotDot],
+                vec![DotDotDot],
+                vec![DotDotEq],
+                vec![LitInteger("1"), DotDot, LitInteger("2")],
+                vec![Dot, LitInteger("2")],
+                vec![LitFloat("1.")],
+                vec![LitFloat("1.2")],
+                vec![Identifier("a"), Dot, LitInteger("1")],
+                vec![Identifier("a"), Dot, Identifier("b")],
+                vec![LitInteger("1"), Dot, Identifier("a")],
+            ],
+        );
+    }
+
+    #[test]
+    fn colon_test() {
+        validate_tokenize(
+            vec![":", "::", ": :"],
+            vec![vec![Colon], vec![PathSep], vec![Colon, WhiteSpace, Colon]],
+        );
+    }
+
+    #[test]
+    fn lt_gt_test() {
+        validate_tokenize(
+            vec!["<  <= << <<= > >= >> >>="],
+            vec![vec![
+                Lt, WhiteSpace, Le, WhiteSpace, Shl, WhiteSpace, ShlEq, WhiteSpace, Gt, WhiteSpace,
+                Ge, WhiteSpace, Shr, WhiteSpace, ShrEq,
+            ]],
+        );
     }
 }
 
