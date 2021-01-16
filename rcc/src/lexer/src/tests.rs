@@ -35,6 +35,17 @@ mod lexer_tests {
     }
 
     #[test]
+    fn eq_test() {
+        validate_tokenize(
+            vec!["*=+=*=%=^=!=+*%^! = =="],
+            vec![vec![
+                StarEq, PlusEq, StarEq, PercentEq, CaretEq, Ne, Plus, Star, Percent, Caret, Not,
+                WhiteSpace, Eq, WhiteSpace, EqEq,
+            ]],
+        );
+    }
+
+    #[test]
     fn arrow_test() {
         validate_tokenize(
             vec!["->=>->==-==-", "---", "==-=="],

@@ -49,8 +49,18 @@ impl<'a: 'b, 'b> Lexer<'a> {
             '\'' => self.char_literal(self.cursor.eaten_len()),
             // TODO
             // '"' => self.string_literal(self.cursor.eaten_len()),
-            // c if "+*%^!".contains(c) => {}
+            c if "+*%^!".contains(c) => {
+                static TABLE: [[Token; 5]; 2] = [
+                    [Plus, Star, Percent, Caret, Not],
+                    [PlusEq, StarEq, PercentEq, CaretEq, Ne],
+                ];
+                let j = "+*%^!".find(c).unwrap();
+                self.cursor.bump();
+                let i = if self.eat_an_equal() { 1 } else { 0 };
+                TABLE[i][j].clone()
+            }
             '-' | '=' => {
+                static TABLE: [[Token; 2]; 3] = [[Minus, Eq], [MinusEq, EqEq], [RArrow, FatArrow]];
                 let c = self.cursor.bump();
                 let i = if let Some(ch) = self.cursor.eat_if_is_in("=>") {
                     if ch == '=' {
@@ -62,14 +72,13 @@ impl<'a: 'b, 'b> Lexer<'a> {
                     0
                 };
                 let j = if c == '-' { 0 } else { 1 };
-                static TABLE: [[Token; 2]; 3] = [[Minus, Eq], [MinusEq, EqEq], [RArrow, FatArrow]];
                 TABLE[i][j].clone()
             }
             c if "&|".contains(c) => {
                 static TABLE: [[Token; 2]; 3] = [[And, Or], [AndAnd, OrOr], [AndEq, OrEq]];
                 let mut i = self.cursor.eat_equals(c, 2) - 1;
                 let j = if c == '&' { 0 } else { 1 };
-                if i == 0 && self.cursor.eat_equals('=', 1) == 1 {
+                if i == 0 && self.eat_an_equal() {
                     i = 2;
                 }
                 TABLE[i][j].clone()
@@ -124,7 +133,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
                 match dot_count {
                     1 => Dot,
                     2 => {
-                        if self.cursor.eat_equals('=', 1) == 1 {
+                        if self.eat_an_equal() {
                             DotDotEq
                         } else {
                             DotDot
@@ -346,5 +355,9 @@ impl<'a: 'b, 'b> Lexer<'a> {
 
     fn lit_char(&'b self, start: usize) -> Token<'a> {
         LitChar(&self.input[start..self.cursor.eaten_len()])
+    }
+
+    fn eat_an_equal(&mut self) -> bool {
+        self.cursor.eat_equals('=', 1) == 1
     }
 }
