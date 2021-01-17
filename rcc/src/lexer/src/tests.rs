@@ -3,35 +3,121 @@ mod lexer_tests {
     use crate::token::Token::*;
     use crate::Lexer;
 
-    #[test]
-    fn lex_test() {
-        let tokens = vec![
-            Identifier("hello"),
-            WhiteSpace,
-            Comma,
-            WhiteSpace,
-            Identifier("world"),
-            WhiteSpace,
-            If,
-            WhiteSpace,
-            I8,
-            WhiteSpace,
-            LitInteger("0xeffff___fff"),
-            WhiteSpace,
-            LitInteger("0"),
-            WhiteSpace,
-        ];
-        let mut lexer = Lexer::new("hello , world if  i8 0xeffff___fff 0 ");
-        let res = lexer.tokenize();
-        assert_eq!(res, tokens);
-    }
-
     fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
         for (input, excepted) in inputs.iter().zip(excepted_outputs.iter()) {
             let mut lexer = Lexer::new(input);
             let res = lexer.tokenize();
             assert_eq!(*excepted, res);
         }
+    }
+
+    #[test]
+    fn lex_test() {
+        validate_tokenize(
+            vec![
+                "hello , world if  i8 0xeffff___fff 0 ",
+                r#"
+            
+            /// add a to b
+            fn add(a: i32, b: i32) -> i32 {
+                a + b
+            }
+            
+            fn main() {
+                let res = add(2, 3);    
+                printf("%d", res);
+            }
+            
+            "#,
+            ],
+            vec![
+                vec![
+                    Identifier("hello"),
+                    WhiteSpace,
+                    Comma,
+                    WhiteSpace,
+                    Identifier("world"),
+                    WhiteSpace,
+                    If,
+                    WhiteSpace,
+                    I8,
+                    WhiteSpace,
+                    LitInteger("0xeffff___fff"),
+                    WhiteSpace,
+                    LitInteger("0"),
+                    WhiteSpace,
+                ],
+                vec![
+                    WhiteSpace,
+                    Comment,
+                    WhiteSpace,
+                    Fn,
+                    WhiteSpace,
+                    Identifier("add"),
+                    LeftParentheses,
+                    Identifier("a"),
+                    Colon,
+                    WhiteSpace,
+                    I32,
+                    Comma,
+                    WhiteSpace,
+                    Identifier("b"),
+                    Colon,
+                    WhiteSpace,
+                    I32,
+                    RightParentheses,
+                    WhiteSpace,
+                    RArrow,
+                    WhiteSpace,
+                    I32,
+                    WhiteSpace,
+                    LeftCurlyBraces,
+                    WhiteSpace,
+                    Identifier("a"),
+                    WhiteSpace,
+                    Plus,
+                    WhiteSpace,
+                    Identifier("b"),
+                    WhiteSpace,
+                    RightCurlyBraces,
+                    WhiteSpace,
+                    Fn,
+                    WhiteSpace,
+                    Identifier("main"),
+                    LeftParentheses,
+                    RightParentheses,
+                    WhiteSpace,
+                    LeftCurlyBraces,
+                    WhiteSpace,
+                    Let,
+                    WhiteSpace,
+                    Identifier("res"),
+                    WhiteSpace,
+                    Eq,
+                    WhiteSpace,
+                    Identifier("add"),
+                    LeftParentheses,
+                    LitInteger("2"),
+                    Comma,
+                    WhiteSpace,
+                    LitInteger("3"),
+                    RightParentheses,
+                    Semi,
+                    WhiteSpace,
+                    Identifier("printf"),
+                    LeftParentheses,
+                    LitString(r#""%d""#),
+                    Comma,
+                    WhiteSpace,
+                    Identifier("res"),
+                    RightParentheses,
+                    Semi,
+                    WhiteSpace,
+                    RightCurlyBraces,
+                    WhiteSpace,
+                ],
+            ],
+        )
     }
 
     #[test]

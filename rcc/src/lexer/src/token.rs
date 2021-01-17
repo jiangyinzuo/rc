@@ -260,6 +260,3 @@ pub enum Token<'a> {
     #[disabled]
     Unknown,
 }
-
-#[derive(Debug, PartialEq)]
-pub enum PrefixKind {}
