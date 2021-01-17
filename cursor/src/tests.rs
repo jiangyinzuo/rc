@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod cursor_tests {
-    use crate::common::Cursor;
+    use crate::Cursor;
 
     #[test]
     fn bump_test() {

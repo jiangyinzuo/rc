@@ -1,5 +1,5 @@
 use self::Token::*;
-use cursor::common::*;
+use cursor::*;
 use std::collections::VecDeque;
 
 #[derive(Debug, Eq, PartialEq)]
@@ -15,7 +15,7 @@ pub enum Token {
     OpenParen,
     CloseParen,
     Unknown,
-    Epsilon
+    Epsilon,
 }
 
 fn advance_token(input: &str) -> (Token, usize) {
@@ -23,7 +23,7 @@ fn advance_token(input: &str) -> (Token, usize) {
     match cursor.next() {
         c if is_id_start(c) => {
             let len = cursor.eat_id();
-            (Id(String::from(&input[..=len - 1])), len)
+            (Id(input[..=len - 1].to_string()), len)
         }
         '+' => (Add, 1),
         '-' => (Sub, 1),
@@ -48,7 +48,7 @@ pub fn tokenize(mut input: String) -> Result<VecDeque<Token>, String> {
     while !input.is_empty() {
         let (token, len) = advance_token(&input);
         if token == Unknown {
-            return Err(format!("unknown character {}", &input[..len]));
+            return Err(format!("unknown character {}", input[..len].to_string()));
         } else if token != WhiteSpace {
             deque.push_back(token);
         }

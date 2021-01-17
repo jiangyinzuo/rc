@@ -1,5 +1,5 @@
-use std::collections::{HashMap, VecDeque};
 use super::lexer::{tokenize, Token, Token::*};
+use std::collections::{HashMap, VecDeque};
 
 pub struct Calculator {
     variables: HashMap<String, i32>,
@@ -8,10 +8,13 @@ pub struct Calculator {
 
 impl Calculator {
     pub fn new() -> Self {
-        Calculator { variables: HashMap::new(), tokens: VecDeque::new() }
+        Calculator {
+            variables: HashMap::new(),
+            tokens: VecDeque::new(),
+        }
     }
 
-    pub fn interpret(&mut self, input: String) -> String {
+    pub fn interpret(&mut self, mut input: String) -> String {
         match tokenize(input) {
             Err(e) => return e,
             Ok(tokens) => {
@@ -22,12 +25,14 @@ impl Calculator {
             return "".to_string();
         }
         match self.stmt() {
-            Ok(value) => if self.tokens.len() != 1 {
-                "invalid statement".to_string()
-            } else {
-                value
-            },
-            Err(e) => e
+            Ok(value) => {
+                if self.tokens.len() != 1 {
+                    "invalid statement".to_string()
+                } else {
+                    value
+                }
+            }
+            Err(e) => e,
         }
     }
 
@@ -60,7 +65,7 @@ impl Calculator {
                 let lvalue = self.exp1()?;
                 Ok(lvalue - rvalue)
             }
-            _ => Ok(rvalue)
+            _ => Ok(rvalue),
         }
     }
 
@@ -82,7 +87,7 @@ impl Calculator {
                     Ok(lvalue / rvalue)
                 }
             }
-            _ => Ok(rvalue)
+            _ => Ok(rvalue),
         }
     }
 
@@ -104,7 +109,7 @@ impl Calculator {
                     Err(format!("variables '{}' not defined", s))
                 }
             }
-            tk => Err(format!("invalid token {:?} in exp3", tk))
+            tk => Err(format!("invalid token {:?} in exp3", tk)),
         }
     }
 }

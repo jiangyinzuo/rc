@@ -77,13 +77,39 @@ mod lexer_tests {
     }
 
     #[test]
+    fn string_literal_test() {
+        validate_tokenize(
+            vec![
+                r#""hello""#,
+                r#"x = "\n\\\"'\'\0\t\r""#,
+                "\"\"",
+                r#""hello\""#,
+            ],
+            vec![
+                vec![LitString(r#""hello""#)],
+                vec![
+                    Identifier("x"),
+                    WhiteSpace,
+                    Eq,
+                    WhiteSpace,
+                    LitString(r#""\n\\\"'\'\0\t\r""#),
+                ],
+                vec![LitString("\"\"")],
+                vec![Unknown],
+            ],
+        );
+    }
+
+    #[test]
     fn char_literal_test() {
         validate_tokenize(
-            vec!["'a' '\''", "'\\", r#"'\''"#],
+            vec!["'a' '\''", "'\\", r#"'\''"#, "''", "'''"],
             vec![
                 vec![LitChar("'a'"), WhiteSpace, Unknown],
                 vec![Unknown],
                 vec![LitChar(r#"'\''"#)],
+                vec![Unknown],
+                vec![Unknown],
             ],
         );
     }

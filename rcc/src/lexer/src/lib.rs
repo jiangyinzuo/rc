@@ -1,4 +1,4 @@
-use cursor::common::*;
+use cursor::*;
 use std::str::FromStr;
 
 use self::token::Token::*;
@@ -47,8 +47,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
             }
             '0'..='9' => self.integer_or_float_literal(),
             '\'' => self.char_literal(self.cursor.eaten_len()),
-            // TODO
-            // '"' => self.string_literal(self.cursor.eaten_len()),
+            '"' => self.string_literal(self.cursor.eaten_len()),
             c if "+*%^!".contains(c) => {
                 static TABLE: [[Token; 5]; 2] = [
                     [Plus, Star, Percent, Caret, Not],
@@ -214,7 +213,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         } else {
                             16
                         };
-                        self.digits_with_underscore(start, radix, Self::lit_integer)
+                        self.digits_with_underscore(start, radix, LitInteger)
                     }
 
                     // 001 01.23
@@ -266,7 +265,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         if self.cursor.next() == 'e' || self.cursor.next() == 'E' {
                             self.float_exponent(start)
                         } else {
-                            self.lit_float(start)
+                            self.lit(start, LitFloat)
                         }
                     }
                     // not immediately followed by ., _ or an identifier
@@ -280,15 +279,15 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         {
                             self.cursor.bump();
                         }
-                        self.lit_float(start)
+                        self.lit(start, LitFloat)
                     }
                     // 1..2  1.a
-                    _ => self.lit_integer(start),
+                    _ => self.lit(start, LitInteger),
                 }
             }
             // FLOAT_EXPONENT
             'e' | 'E' => self.float_exponent(start),
-            _ => self.lit_integer(start),
+            _ => self.lit(start, LitInteger),
         }
     }
 
@@ -298,7 +297,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         debug_assert!(self.cursor.next() == 'e' || self.cursor.next() == 'E');
         self.cursor.bump();
         self.cursor.eat_if_is_in("+-");
-        self.digits_with_underscore(start, 10, Self::lit_float)
+        self.digits_with_underscore(start, 10, LitFloat)
     }
 
     #[inline]
@@ -306,10 +305,10 @@ impl<'a: 'b, 'b> Lexer<'a> {
         &'b mut self,
         start: usize,
         radix: u32,
-        func: fn(&'b Self, usize) -> Token<'a>,
+        literal_kind: fn(&'a str) -> Token<'a>,
     ) -> Token<'a> {
         if self.cursor.eat_digits_with_underscore(radix) {
-            func(self, start)
+            self.lit(start, literal_kind)
         } else {
             Unknown
         }
@@ -318,43 +317,34 @@ impl<'a: 'b, 'b> Lexer<'a> {
     fn char_literal(&'b mut self, start: usize) -> Token<'a> {
         debug_assert!(self.cursor.next() == '\'');
         self.cursor.bump();
-        match self.cursor.bump() {
-            '\\' => {
-                // '\n'
-                if "nrt\\0'\"".contains(self.cursor.bump()) && self.cursor.bump() == '\'' {
-                    self.lit_char(start)
-                } else {
-                    Unknown
-                }
-            }
-            '\'' => Unknown,
-            _ => {
-                if self.cursor.bump() == '\'' {
-                    self.lit_char(start)
-                } else {
-                    Unknown
-                }
-            }
+
+        // ''
+        if self.cursor.next() == '\'' {
+            Unknown
+        } else if self.cursor.eat_ascii_character() && self.cursor.bump() == '\'' {
+            self.lit(start, LitChar)
+        } else {
+            Unknown
         }
     }
 
-    /// TODO
     fn string_literal(&'b mut self, start: usize) -> Token<'a> {
         debug_assert!(self.cursor.next() == '"');
-        // let c = '';
-        Unknown
+        self.cursor.bump();
+        while self.cursor.next() != '"' && self.cursor.next() != EOF_CHAR {
+            if !self.cursor.eat_ascii_character() {
+                return Unknown;
+            }
+        }
+        if self.cursor.bump() == EOF_CHAR {
+            Unknown
+        } else {
+            self.lit(start, LitString)
+        }
     }
 
-    fn lit_integer(&'b self, start: usize) -> Token<'a> {
-        LitInteger(&self.input[start..self.cursor.eaten_len()])
-    }
-
-    fn lit_float(&'b self, start: usize) -> Token<'a> {
-        LitFloat(&self.input[start..self.cursor.eaten_len()])
-    }
-
-    fn lit_char(&'b self, start: usize) -> Token<'a> {
-        LitChar(&self.input[start..self.cursor.eaten_len()])
+    fn lit(&'b self, start: usize, literal_kind: fn(&'a str) -> Token<'a>) -> Token<'a> {
+        literal_kind(&self.input[start..self.cursor.eaten_len()])
     }
 
     fn eat_an_equal(&mut self) -> bool {

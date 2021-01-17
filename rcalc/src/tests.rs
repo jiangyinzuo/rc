@@ -7,8 +7,8 @@ mod lexer_test {
     fn split_token_test() {
         let mut tokens = tokenize(String::from("hello world")).unwrap();
         assert_eq!(Epsilon, tokens.pop_front().unwrap());
-        assert_eq!(Id(String::from("hello")), tokens.pop_front().unwrap());
-        assert_eq!(Id(String::from("world")), tokens.pop_front().unwrap());
+        assert_eq!(Id("hello".to_string()), tokens.pop_front().unwrap());
+        assert_eq!(Id("world".to_string()), tokens.pop_front().unwrap());
         assert!(tokens.is_empty());
     }
 }
@@ -34,7 +34,7 @@ mod interpret_test {
             ("13", "c"),
             ("36", "a-b+c*a"),
             ("DIV ZERO in exp2", "1/           0"),
-            ("invalid token Add in exp3", "1++")
+            ("invalid token Add in exp3", "1++"),
         ];
         for t in tests.iter() {
             let res = calculator.interpret(t.1.to_string());
