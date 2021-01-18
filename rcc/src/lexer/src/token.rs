@@ -246,10 +246,10 @@ pub enum Token<'a> {
     RightSquareBrackets,
 
     #[value("(")]
-    LeftParentheses,
+    LeftParen,
 
     #[value(")")]
-    RightParentheses,
+    RightParen,
 
     #[disabled]
     WhiteSpace,

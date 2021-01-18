@@ -8,13 +8,13 @@ use std::usize::MAX;
 mod tests;
 pub mod token;
 
-struct Lexer<'a> {
+pub struct Lexer<'a> {
     cursor: Cursor<'a>,
     input: &'a str,
 }
 
 impl<'a: 'b, 'b> Lexer<'a> {
-    fn new(input: &'a str) -> Self {
+    pub fn new(input: &'a str) -> Self {
         Lexer {
             cursor: Cursor::new(input),
             input,
