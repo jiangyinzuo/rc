@@ -3,6 +3,7 @@ use std::str::FromStr;
 
 use self::token::Token::*;
 use self::token::*;
+use crate::token::LiteralKind::*;
 use std::usize::MAX;
 
 mod tests;
@@ -213,12 +214,15 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         } else {
                             16
                         };
-                        self.digits_with_underscore(start, radix, LitInteger)
+                        self.digits_with_underscore(start, radix, Integer)
                     }
 
                     // 001 01.23
                     '0'..='9' => self.decimal_or_float_literal_no_prefix(start),
-                    _ => LitInteger("0"),
+                    _ => Literal {
+                        literal_kind: Integer,
+                        value: "0",
+                    },
                 }
             }
             '1'..='9' => self.decimal_or_float_literal_no_prefix(start),
@@ -265,7 +269,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         if self.cursor.next() == 'e' || self.cursor.next() == 'E' {
                             self.float_exponent(start)
                         } else {
-                            self.lit(start, LitFloat)
+                            self.lit(start, Float)
                         }
                     }
                     // not immediately followed by ., _ or an identifier
@@ -279,15 +283,15 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         {
                             self.cursor.bump();
                         }
-                        self.lit(start, LitFloat)
+                        self.lit(start, Float)
                     }
                     // 1..2  1.a
-                    _ => self.lit(start, LitInteger),
+                    _ => self.lit(start, Integer),
                 }
             }
             // FLOAT_EXPONENT
             'e' | 'E' => self.float_exponent(start),
-            _ => self.lit(start, LitInteger),
+            _ => self.lit(start, Integer),
         }
     }
 
@@ -297,7 +301,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         debug_assert!(self.cursor.next() == 'e' || self.cursor.next() == 'E');
         self.cursor.bump();
         self.cursor.eat_if_is_in("+-");
-        self.digits_with_underscore(start, 10, LitFloat)
+        self.digits_with_underscore(start, 10, Float)
     }
 
     #[inline]
@@ -305,7 +309,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         &'b mut self,
         start: usize,
         radix: u32,
-        literal_kind: fn(&'a str) -> Token<'a>,
+        literal_kind: LiteralKind,
     ) -> Token<'a> {
         if self.cursor.eat_digits_with_underscore(radix) {
             self.lit(start, literal_kind)
@@ -322,7 +326,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         if self.cursor.next() == '\'' {
             Unknown
         } else if self.cursor.eat_ascii_character() && self.cursor.bump() == '\'' {
-            self.lit(start, LitChar)
+            self.lit(start, Char)
         } else {
             Unknown
         }
@@ -339,12 +343,15 @@ impl<'a: 'b, 'b> Lexer<'a> {
         if self.cursor.bump() == EOF_CHAR {
             Unknown
         } else {
-            self.lit(start, LitString)
+            self.lit(start, String)
         }
     }
 
-    fn lit(&'b self, start: usize, literal_kind: fn(&'a str) -> Token<'a>) -> Token<'a> {
-        literal_kind(&self.input[start..self.cursor.eaten_len()])
+    fn lit(&'b self, start: usize, literal_kind: LiteralKind) -> Token<'a> {
+        Literal {
+            literal_kind,
+            value: &self.input[start..self.cursor.eaten_len()],
+        }
     }
 
     fn eat_an_equal(&mut self) -> bool {

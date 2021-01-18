@@ -1,6 +1,6 @@
 mod lexer_tests {
-    use crate::token::Token;
     use crate::token::Token::*;
+    use crate::token::{LiteralKind::*, Token};
     use crate::Lexer;
 
     fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
@@ -40,11 +40,17 @@ mod lexer_tests {
                     WhiteSpace,
                     If,
                     WhiteSpace,
-                    I8,
+                    Identifier("i8"),
                     WhiteSpace,
-                    LitInteger("0xeffff___fff"),
+                    Literal {
+                        literal_kind: Integer,
+                        value: "0xeffff___fff",
+                    },
                     WhiteSpace,
-                    LitInteger("0"),
+                    Literal {
+                        literal_kind: Integer,
+                        value: "0",
+                    },
                     WhiteSpace,
                     Identifier("i81"),
                     WhiteSpace,
@@ -60,18 +66,18 @@ mod lexer_tests {
                     Identifier("a"),
                     Colon,
                     WhiteSpace,
-                    I32,
+                    Identifier("i32"),
                     Comma,
                     WhiteSpace,
                     Identifier("b"),
                     Colon,
                     WhiteSpace,
-                    I32,
+                    Identifier("i32"),
                     RightParen,
                     WhiteSpace,
                     RArrow,
                     WhiteSpace,
-                    I32,
+                    Identifier("i32"),
                     WhiteSpace,
                     LeftCurlyBraces,
                     WhiteSpace,
@@ -99,16 +105,25 @@ mod lexer_tests {
                     WhiteSpace,
                     Identifier("add"),
                     LeftParen,
-                    LitInteger("2"),
+                    Literal {
+                        literal_kind: Integer,
+                        value: "2",
+                    },
                     Comma,
                     WhiteSpace,
-                    LitInteger("3"),
+                    Literal {
+                        literal_kind: Integer,
+                        value: "3",
+                    },
                     RightParen,
                     Semi,
                     WhiteSpace,
                     Identifier("printf"),
                     LeftParen,
-                    LitString(r#""%d""#),
+                    Literal {
+                        literal_kind: String,
+                        value: r#""%d""#,
+                    },
                     Comma,
                     WhiteSpace,
                     Identifier("res"),
@@ -153,11 +168,20 @@ mod lexer_tests {
                 vec![Unknown],
                 vec![Unknown],
                 vec![
-                    LitFloat("12.3"),
+                    Literal {
+                        literal_kind: Float,
+                        value: "12.3",
+                    },
                     WhiteSpace,
-                    LitFloat("1e9"),
+                    Literal {
+                        literal_kind: Float,
+                        value: "1e9",
+                    },
                     WhiteSpace,
-                    LitInteger("0x37ff"),
+                    Literal {
+                        literal_kind: Integer,
+                        value: "0x37ff",
+                    },
                     Identifier("hello2"),
                 ],
             ],
@@ -174,15 +198,24 @@ mod lexer_tests {
                 r#""hello\""#,
             ],
             vec![
-                vec![LitString(r#""hello""#)],
+                vec![Literal {
+                    literal_kind: String,
+                    value: r#""hello""#,
+                }],
                 vec![
                     Identifier("x"),
                     WhiteSpace,
                     Eq,
                     WhiteSpace,
-                    LitString(r#""\n\\\"'\'\0\t\r""#),
+                    Literal {
+                        literal_kind: String,
+                        value: r#""\n\\\"'\'\0\t\r""#,
+                    },
                 ],
-                vec![LitString("\"\"")],
+                vec![Literal {
+                    literal_kind: String,
+                    value: "\"\"",
+                }],
                 vec![Unknown],
             ],
         );
@@ -193,9 +226,19 @@ mod lexer_tests {
         validate_tokenize(
             vec!["'a' '\''", "'\\", r#"'\''"#, "''", "'''"],
             vec![
-                vec![LitChar("'a'"), WhiteSpace, Unknown],
+                vec![
+                    Literal {
+                        literal_kind: Char,
+                        value: "'a'",
+                    },
+                    WhiteSpace,
+                    Unknown,
+                ],
                 vec![Unknown],
-                vec![LitChar(r#"'\''"#)],
+                vec![Literal {
+                    literal_kind: Char,
+                    value: r#"'\''"#,
+                }],
                 vec![Unknown],
                 vec![Unknown],
             ],
@@ -211,7 +254,17 @@ mod lexer_tests {
                 vec![And, WhiteSpace, Or],
                 vec![AndAnd, WhiteSpace, OrOr],
                 vec![AndEq, WhiteSpace, OrEq],
-                vec![LitInteger("1"), And, LitInteger("2")],
+                vec![
+                    Literal {
+                        literal_kind: Integer,
+                        value: "1",
+                    },
+                    And,
+                    Literal {
+                        literal_kind: Integer,
+                        value: "2",
+                    },
+                ],
             ],
         );
     }
@@ -255,13 +308,49 @@ mod lexer_tests {
                 vec![DotDot],
                 vec![DotDotDot],
                 vec![DotDotEq],
-                vec![LitInteger("1"), DotDot, LitInteger("2")],
-                vec![Dot, LitInteger("2")],
-                vec![LitFloat("1.")],
-                vec![LitFloat("1.2")],
-                vec![Identifier("a"), Dot, LitInteger("1")],
+                vec![
+                    Literal {
+                        literal_kind: Integer,
+                        value: "1",
+                    },
+                    DotDot,
+                    Literal {
+                        literal_kind: Integer,
+                        value: "2",
+                    },
+                ],
+                vec![
+                    Dot,
+                    Literal {
+                        literal_kind: Integer,
+                        value: "2",
+                    },
+                ],
+                vec![Literal {
+                    literal_kind: Float,
+                    value: "1.",
+                }],
+                vec![Literal {
+                    literal_kind: Float,
+                    value: "1.2",
+                }],
+                vec![
+                    Identifier("a"),
+                    Dot,
+                    Literal {
+                        literal_kind: Integer,
+                        value: "1",
+                    },
+                ],
                 vec![Identifier("a"), Dot, Identifier("b")],
-                vec![LitInteger("1"), Dot, Identifier("a")],
+                vec![
+                    Literal {
+                        literal_kind: Integer,
+                        value: "1",
+                    },
+                    Dot,
+                    Identifier("a"),
+                ],
                 vec![DotDotDot, Dot],
             ],
         );

@@ -27,5 +27,5 @@ impl<'a> ParseContext<'a> {
 }
 
 pub trait Parse<'a>: Sized {
-    fn parse(cxt: ParseContext<'a>) -> Result<Self, &'static str>;
+    fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str>;
 }

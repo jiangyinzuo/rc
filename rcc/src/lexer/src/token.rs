@@ -62,39 +62,16 @@ pub enum Token<'a> {
     Try,
     Union,
 
-    /// Primitive types
-    Bool,
-    Char,
-    F32,
-    F64,
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    Isize,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    Usize,
-
+    /// Primitive types(i8, bool etc.) are seen as identifiers at this period
     #[disabled]
     Identifier(&'a str),
 
     /// Literals
     #[disabled]
-    LitInteger(&'a str),
-
-    #[disabled]
-    LitFloat(&'a str),
-
-    #[disabled]
-    LitString(&'a str),
-
-    #[disabled]
-    LitChar(&'a str),
+    Literal {
+        literal_kind: LiteralKind,
+        value: &'a str,
+    },
 
     /// Symbols
     #[value("+")]
@@ -259,4 +236,12 @@ pub enum Token<'a> {
 
     #[disabled]
     Unknown,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralKind {
+    Integer,
+    Char,
+    Float,
+    String,
 }

@@ -1,22 +1,28 @@
 #[cfg(test)]
 mod expr_tests {
+
+    use crate::parser::expr::lit_expr::LitExpr;
     use crate::parser::expr::path_expr::PathExpr;
-    use crate::{Parse, ParseContext};
+    use crate::Parse;
+    use crate::ParseContext;
+    use lexer::token::LiteralKind::Integer;
     use lexer::Lexer;
+    use std::fmt::Debug;
 
     fn parse_context(input: &str) -> ParseContext {
         let mut lexer = Lexer::new(input);
         ParseContext::new(lexer.tokenize())
     }
 
-    fn validate_path_expr(
-        inputs: Vec<&str>,
-        excepted_segments: Vec<std::result::Result<Vec<&str>, &'static str>>,
+    fn validate_expr<'a, T: Parse<'a> + Debug + PartialEq>(
+        inputs: std::vec::Vec<&'a str>,
+        excepted_segments: Vec<Result<T, &'static str>>,
     ) {
         for (input, excepted) in inputs.into_iter().zip(excepted_segments) {
-            let result = PathExpr::parse(parse_context(input));
+            let mut cxt = parse_context(input);
+            let result = T::parse(&mut cxt);
             match excepted {
-                Ok(segments) => assert_eq!(Ok(PathExpr { segments }), result),
+                Ok(segments) => assert_eq!(segments, result.unwrap()),
                 Err(s) => assert_eq!(excepted.unwrap_err(), s),
             }
         }
@@ -24,6 +30,35 @@ mod expr_tests {
 
     #[test]
     fn path_expr_test() {
-        validate_path_expr(vec!["a::b::c"], vec![Ok(vec!["a", "b", "c"])]);
+        validate_expr(
+            vec!["a::b::c", "a::", "a", "::", "::a", "i8::i16"],
+            vec![
+                Ok(PathExpr {
+                    segments: vec!["a", "b", "c"],
+                }),
+                Err("invalid path"),
+                Ok(PathExpr {
+                    segments: vec!["a"],
+                }),
+                Err("invalid path"),
+                Ok(PathExpr {
+                    segments: vec!["::", "a"],
+                }),
+                Ok(PathExpr {
+                    segments: vec!["i8", "i16"],
+                }),
+            ],
+        );
+    }
+
+    #[test]
+    fn lit_expr_test() {
+        validate_expr(
+            vec!["123", "'c'", r#""hello""#],
+            vec![Ok(LitExpr {
+                literal_kind: Integer,
+                value: "123",
+            })],
+        );
     }
 }
