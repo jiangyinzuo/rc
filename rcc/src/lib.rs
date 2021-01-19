@@ -2,6 +2,7 @@ use lexer::token::Token;
 use std::result::Result;
 mod parser;
 
+#[derive(Clone)]
 pub struct ParseContext<'a> {
     token_stream: Vec<Token<'a>>,
     token_idx: usize,

@@ -3,8 +3,11 @@ mod expr_tests {
 
     use crate::parser::expr::lit_expr::LitExpr;
     use crate::parser::expr::path_expr::PathExpr;
+    use crate::parser::expr::unary_expr::{UnAryExpr, UnOp};
+    use crate::parser::expr::Expr::*;
     use crate::Parse;
     use crate::ParseContext;
+    use lexer::token::LiteralKind;
     use lexer::token::LiteralKind::Integer;
     use lexer::Lexer;
     use std::fmt::Debug;
@@ -60,5 +63,30 @@ mod expr_tests {
                 value: "123",
             })],
         );
+    }
+
+    #[test]
+    fn unary_expr_test() {
+        validate_expr(
+            vec!["!abc", "--::a::b", ";"],
+            vec![
+                Ok(Unary(UnAryExpr {
+                    op: UnOp::Not,
+                    expr: Box::new(Path(PathExpr {
+                        segments: vec!["abc"],
+                    })),
+                })),
+                Ok(Unary(UnAryExpr {
+                    op: UnOp::Neg,
+                    expr: Box::new(Unary(UnAryExpr {
+                        op: UnOp::Neg,
+                        expr: Box::new(Path(PathExpr {
+                            segments: vec!["::", "a", "b"],
+                        })),
+                    })),
+                })),
+                Ok(Nothing),
+            ],
+        )
     }
 }
