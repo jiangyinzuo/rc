@@ -1,11 +1,9 @@
-use crate::parser::expr::Expr;
-use crate::{Parse, ParseContext};
 use lexer::token::Token::{LeftCurlyBraces, RightCurlyBraces};
 
-#[derive(Debug, PartialEq)]
-pub struct BlockExpr<'a> {
-    pub exprs: Vec<Expr<'a>>
-}
+use crate::ast::expr::BlockExpr;
+use crate::parser::expr::Expr;
+use crate::parser::Parse;
+use crate::parser::ParseContext;
 
 impl<'a> Parse<'a> for BlockExpr<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {

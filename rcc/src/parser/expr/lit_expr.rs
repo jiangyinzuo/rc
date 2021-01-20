@@ -1,14 +1,11 @@
 //! LitExpr -> literal
 
-use crate::{Parse, ParseContext};
 use lexer::token::LiteralKind;
 use lexer::token::Token::Literal;
 
-#[derive(PartialEq, Debug)]
-pub struct LitExpr<'a> {
-    pub literal_kind: LiteralKind<'a>,
-    pub value: &'a str,
-}
+use crate::ast::expr::LitExpr;
+use crate::parser::Parse;
+use crate::parser::ParseContext;
 
 impl<'a> Parse<'a> for LitExpr<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {

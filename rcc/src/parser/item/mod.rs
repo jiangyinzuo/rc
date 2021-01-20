@@ -1,8 +1,10 @@
-pub mod item_fn;
-
-use crate::parser::item::item_fn::ItemFn;
 use lexer::token::Token;
-use crate::{Parse, ParseContext};
+
+use crate::parser::ParseContext;
+use crate::ast::item::ItemFn;
+use crate::parser::Parse;
+
+pub mod item_fn;
 
 #[derive(Debug, PartialEq)]
 pub enum Item<'a> {

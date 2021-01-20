@@ -1,19 +1,11 @@
 //! PathExpr -> ::? Identifier (:: Identifier)*
 //! ## Examples:
 //! `a::b::c`, `::b`
-use crate::{Parse, ParseContext};
 use lexer::token::Token::*;
 
-#[derive(PartialEq, Debug)]
-pub struct PathExpr<'a> {
-    pub segments: Vec<&'a str>,
-}
-
-impl<'a> PathExpr<'a> {
-    pub fn new() -> Self {
-        PathExpr { segments: vec![] }
-    }
-}
+use crate::ast::expr::PathExpr;
+use crate::parser::Parse;
+use crate::parser::ParseContext;
 
 const ERR_INVALID_PATH: Result<PathExpr, &'static str> = Err("invalid path");
 

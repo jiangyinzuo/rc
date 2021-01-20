@@ -1,11 +1,12 @@
 use lexer::token::Token::*;
 
-use crate::{Parse, ParseContext};
+use crate::parser::ParseContext;
+use crate::ast::expr::BlockExpr;
 use crate::parser::expr::Expr::*;
-use crate::parser::expr::lit_expr::LitExpr;
-use crate::parser::expr::path_expr::PathExpr;
-use crate::parser::expr::unary_expr::UnAryExpr;
-use crate::parser::expr::block_expr::BlockExpr;
+use crate::ast::expr::LitExpr;
+use crate::ast::expr::PathExpr;
+use crate::ast::expr::UnAryExpr;
+use crate::parser::Parse;
 
 pub mod lit_expr;
 pub mod path_expr;

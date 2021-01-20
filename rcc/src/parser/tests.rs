@@ -1,5 +1,7 @@
-use crate::{ParseContext, Parse};
 use lexer::Lexer;
+
+use crate::parser::Parse;
+use crate::parser::ParseContext;
 
 fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, &str> {
     let mut lexer = Lexer::new(input);
@@ -9,16 +11,17 @@ fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, &str> {
 
 #[cfg(test)]
 mod expr_tests {
-    use crate::parser::expr::lit_expr::LitExpr;
-    use crate::parser::expr::path_expr::PathExpr;
-    use crate::parser::expr::unary_expr::{UnAryExpr, UnOp};
-    use crate::parser::expr::Expr::*;
-    use crate::Parse;
-    use crate::ParseContext;
+    use std::fmt::Debug;
+
+    use lexer::Lexer;
     use lexer::token::LiteralKind;
     use lexer::token::LiteralKind::Integer;
-    use lexer::Lexer;
-    use std::fmt::Debug;
+
+    use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
+    use crate::ast::expr::PathExpr;
+    use crate::parser::expr::Expr::*;
+    use crate::parser::Parse;
+    use crate::parser::ParseContext;
     use crate::parser::tests::parse_input;
 
     fn validate_expr<'a, T: Parse<'a>>(
@@ -96,11 +99,13 @@ mod expr_tests {
 
 #[cfg(test)]
 mod item_tests {
-    use crate::parser::item::item_fn::ItemFn;
-    use crate::parser::expr::block_expr::BlockExpr;
-    use crate::parser::expr::Expr::Lit;
-    use crate::parser::expr::lit_expr::LitExpr;
     use lexer::token::LiteralKind;
+
+    use crate::ast::expr::BlockExpr;
+    use crate::ast::expr::LitExpr;
+    use crate::ast::item::ItemFn;
+    use crate::parser::expr::Expr::Lit;
+
     use super::parse_input;
 
     #[test]
@@ -118,14 +123,16 @@ mod item_tests {
 
 #[cfg(test)]
 mod file_tests {
-    use super::parse_input;
-    use crate::parser::item::item_fn::ItemFn;
-    use crate::parser::file::File;
-    use crate::parser::expr::block_expr::BlockExpr;
-    use crate::parser::expr::Expr::Lit;
-    use crate::parser::expr::lit_expr::LitExpr;
     use lexer::token::LiteralKind;
+
+    use crate::ast::expr::BlockExpr;
+    use crate::ast::expr::LitExpr;
+    use crate::ast::file::File;
+    use crate::ast::item::ItemFn;
+    use crate::parser::expr::Expr::Lit;
     use crate::parser::item::Item;
+
+    use super::parse_input;
 
     #[test]
     fn file_test() {

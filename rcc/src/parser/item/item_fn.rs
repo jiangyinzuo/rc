@@ -1,18 +1,13 @@
-use crate::parser::Visibility;
-use crate::{Parse, ParseContext};
 use lexer::token::Token;
 use lexer::token::Token::RArrow;
-use crate::parser::type_anno::TypeAnno;
-use crate::parser::type_anno::TypeAnno::Origin;
-use crate::parser::expr::block_expr::BlockExpr;
-use crate::parser::expr::Expr::Block;
 
-#[derive(Debug, PartialEq)]
-pub struct ItemFn<'a> {
-    pub ident: &'a str,
-    pub ret_type: &'a str,
-    pub fn_block: Option<BlockExpr<'a>>
-}
+use crate::ast::item::ItemFn;
+use crate::parser::{Parse, Visibility};
+use crate::ast::expr::BlockExpr;
+use crate::parser::expr::Expr::Block;
+use crate::parser::ParseContext;
+use crate::ast::type_anno::TypeAnno;
+use crate::ast::type_anno::TypeAnno::Origin;
 
 impl<'a> Parse<'a> for ItemFn<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {

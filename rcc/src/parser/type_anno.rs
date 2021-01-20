@@ -1,13 +1,9 @@
-use crate::{Parse, ParseContext};
 use lexer::token::*;
-use crate::parser::type_anno::TypeAnno::Origin;
 
-#[derive(Debug, PartialEq)]
-pub enum  TypeAnno<'a> {
-    Origin(&'a str),
-    Ref(Box<TypeAnno<'a>>),
-    Ptr(Box<TypeAnno<'a>>)
-}
+use crate::ast::type_anno::TypeAnno;
+use crate::ast::type_anno::TypeAnno::Origin;
+use crate::parser::Parse;
+use crate::parser::ParseContext;
 
 impl <'a> Parse<'a> for TypeAnno<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {

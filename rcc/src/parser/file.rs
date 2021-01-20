@@ -1,12 +1,8 @@
 //! File -> Item File | Item
+use crate::ast::file::File;
+use crate::parser::ParseContext;
 use crate::parser::item::Item;
-use crate::{Parse, ParseContext};
-
-#[derive(Debug, PartialEq)]
-pub struct File<'a> {
-    pub items: Vec<Item<'a>>,
-}
-
+use crate::parser::Parse;
 
 impl<'a> Parse<'a> for File<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {
