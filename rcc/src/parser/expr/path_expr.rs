@@ -28,13 +28,11 @@ impl<'a> Parse<'a> for PathExpr<'a> {
 
         let mut path_expr = Self::new();
         let mut state = State::Init;
-        while let Some(tk) = cxt.next_token() {
+        while let Ok(tk) = cxt.next_token() {
             match tk {
                 PathSep => {
-                    if state == State::PathSep {
+                    if state == State::PathSep || state == State::Init {
                         return ERR_INVALID_PATH;
-                    } else if state == State::Init {
-                        path_expr.segments.push("::");
                     }
                     state = State::PathSep;
                 }

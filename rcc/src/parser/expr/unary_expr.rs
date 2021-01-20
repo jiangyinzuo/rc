@@ -44,16 +44,16 @@ impl UnOp {
 
 impl<'a> Parse<'a> for UnAryExpr<'a> {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {
-        if let Some(tk) = cxt.bump_token() {
-            if matches!(tk, Not | Star | Minus) {
-                let op = UnOp::from_token(tk).unwrap();
-                let expr = Expr::parse(cxt)?;
-                return Ok(UnAryExpr {
-                    op,
-                    expr: Box::new(expr),
-                });
-            }
+        let tk = cxt.bump_token()?;
+        if matches!(tk, Not | Star | Minus) {
+            let op = UnOp::from_token(tk).unwrap();
+            let expr = Expr::parse(cxt)?;
+            Ok(UnAryExpr {
+                op,
+                expr: Box::new(expr),
+            })
+        } else {
+            Err("invalid unary expr")
         }
-        Err("invalid unary expr")
     }
 }

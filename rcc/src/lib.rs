@@ -1,5 +1,8 @@
 use lexer::token::Token;
 use std::result::Result;
+use std::fmt::Debug;
+
+mod ir;
 mod parser;
 
 #[derive(Clone)]
@@ -16,17 +19,28 @@ impl<'a> ParseContext<'a> {
         }
     }
 
-    pub fn next_token(&self) -> Option<&Token<'a>> {
-        self.token_stream.get(self.token_idx)
+    pub fn next_token(&self) -> Result<&Token<'a>, &'static str> {
+        match self.token_stream.get(self.token_idx) {
+            Some(tk) => Ok(tk),
+            None => Err("EOF token")
+        }
     }
 
-    pub fn bump_token(&mut self) -> Option<&Token<'a>> {
-        let next_token = self.token_stream.get(self.token_idx);
-        self.token_idx += 1;
-        next_token
+    pub fn bump_token(&mut self) -> Result<&Token<'a>, &'static str> {
+        match self.token_stream.get(self.token_idx) {
+            Some(tk) => {
+                self.token_idx += 1;
+                Ok(tk)
+            }
+            None => Err("EOF token")
+        }
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.token_idx == self.token_stream.len()
     }
 }
 
-pub trait Parse<'a>: Sized {
+pub trait Parse<'a>: Sized + Debug + PartialEq {
     fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str>;
 }

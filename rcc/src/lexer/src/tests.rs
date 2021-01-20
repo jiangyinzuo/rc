@@ -1,6 +1,6 @@
 mod lexer_tests {
     use crate::token::Token::*;
-    use crate::token::{LiteralKind::*, Token};
+    use crate::token::{LiteralKind::*, Token, LiteralKind};
     use crate::Lexer;
 
     fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
@@ -33,91 +33,61 @@ mod lexer_tests {
             vec![
                 vec![
                     Identifier("hello"),
-                    WhiteSpace,
                     Comma,
-                    WhiteSpace,
                     Identifier("world"),
-                    WhiteSpace,
                     If,
-                    WhiteSpace,
                     Identifier("i8"),
-                    WhiteSpace,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
+
                         value: "0xeffff___fff",
                     },
-                    WhiteSpace,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "0",
                     },
-                    WhiteSpace,
                     Identifier("i81"),
-                    WhiteSpace,
                 ],
                 vec![
-                    WhiteSpace,
-                    Comment,
-                    WhiteSpace,
                     Fn,
-                    WhiteSpace,
                     Identifier("add"),
                     LeftParen,
                     Identifier("a"),
                     Colon,
-                    WhiteSpace,
                     Identifier("i32"),
                     Comma,
-                    WhiteSpace,
                     Identifier("b"),
                     Colon,
-                    WhiteSpace,
                     Identifier("i32"),
                     RightParen,
-                    WhiteSpace,
                     RArrow,
-                    WhiteSpace,
                     Identifier("i32"),
-                    WhiteSpace,
                     LeftCurlyBraces,
-                    WhiteSpace,
                     Identifier("a"),
-                    WhiteSpace,
                     Plus,
-                    WhiteSpace,
                     Identifier("b"),
-                    WhiteSpace,
                     RightCurlyBraces,
-                    WhiteSpace,
                     Fn,
-                    WhiteSpace,
                     Identifier("main"),
                     LeftParen,
                     RightParen,
-                    WhiteSpace,
                     LeftCurlyBraces,
-                    WhiteSpace,
                     Let,
-                    WhiteSpace,
                     Identifier("res"),
-                    WhiteSpace,
                     Eq,
-                    WhiteSpace,
                     Identifier("add"),
                     LeftParen,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "2",
                     },
                     Comma,
-                    WhiteSpace,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "3",
                     },
                     RightParen,
                     Semi,
-                    WhiteSpace,
                     Identifier("printf"),
                     LeftParen,
                     Literal {
@@ -125,13 +95,10 @@ mod lexer_tests {
                         value: r#""%d""#,
                     },
                     Comma,
-                    WhiteSpace,
                     Identifier("res"),
                     RightParen,
                     Semi,
-                    WhiteSpace,
                     RightCurlyBraces,
-                    WhiteSpace,
                 ],
             ],
         )
@@ -143,7 +110,7 @@ mod lexer_tests {
             vec!["*=+=*=%=^=!=+*%^! = =="],
             vec![vec![
                 StarEq, PlusEq, StarEq, PercentEq, CaretEq, Ne, Plus, Star, Percent, Caret, Not,
-                WhiteSpace, Eq, WhiteSpace, EqEq,
+                Eq, EqEq,
             ]],
         );
     }
@@ -163,26 +130,28 @@ mod lexer_tests {
     #[test]
     fn number_literal_test() {
         validate_tokenize(
-            vec!["0o", "0b__", "12.3 1e9 0x37ffhello2"],
+            vec!["0o", "0b__", "12.3 1e9 0x37ffhello2  1usize"],
             vec![
                 vec![Unknown],
                 vec![Unknown],
                 vec![
                     Literal {
-                        literal_kind: Float,
+                        literal_kind: LiteralKind::float_no_suffix(),
                         value: "12.3",
                     },
-                    WhiteSpace,
                     Literal {
-                        literal_kind: Float,
+                        literal_kind: LiteralKind::float_no_suffix(),
                         value: "1e9",
                     },
-                    WhiteSpace,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "0x37ff",
                     },
                     Identifier("hello2"),
+                    Literal {
+                        literal_kind: Integer { suffix: "usize" },
+                        value: "1",
+                    }
                 ],
             ],
         );
@@ -204,9 +173,7 @@ mod lexer_tests {
                 }],
                 vec![
                     Identifier("x"),
-                    WhiteSpace,
                     Eq,
-                    WhiteSpace,
                     Literal {
                         literal_kind: String,
                         value: r#""\n\\\"'\'\0\t\r""#,
@@ -231,7 +198,6 @@ mod lexer_tests {
                         literal_kind: Char,
                         value: "'a'",
                     },
-                    WhiteSpace,
                     Unknown,
                 ],
                 vec![Unknown],
@@ -250,18 +216,18 @@ mod lexer_tests {
         validate_tokenize(
             vec!["&&& |||", "& |", "&& ||", "&= |=", "1&2"],
             vec![
-                vec![AndAnd, And, WhiteSpace, OrOr, Or],
-                vec![And, WhiteSpace, Or],
-                vec![AndAnd, WhiteSpace, OrOr],
-                vec![AndEq, WhiteSpace, OrEq],
+                vec![AndAnd, And, OrOr, Or],
+                vec![And, Or],
+                vec![AndAnd, OrOr],
+                vec![AndEq, OrEq],
                 vec![
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "1",
                     },
                     And,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "2",
                     },
                 ],
@@ -288,11 +254,11 @@ mod lexer_tests {
             ],
             vec![
                 vec![Unknown],
-                vec![Comment],
-                vec![SlashEq, WhiteSpace, Slash, WhiteSpace, Comment],
-                vec![Comment],
+                vec![],
+                vec![SlashEq, Slash, ],
+                vec![],
                 vec![Unknown],
-                vec![Comment],
+                vec![],
             ],
         );
     }
@@ -310,42 +276,42 @@ mod lexer_tests {
                 vec![DotDotEq],
                 vec![
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "1",
                     },
                     DotDot,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "2",
                     },
                 ],
                 vec![
                     Dot,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "2",
                     },
                 ],
                 vec![Literal {
-                    literal_kind: Float,
+                    literal_kind: LiteralKind::float_no_suffix(),
                     value: "1.",
                 }],
                 vec![Literal {
-                    literal_kind: Float,
+                    literal_kind: LiteralKind::float_no_suffix(),
                     value: "1.2",
                 }],
                 vec![
                     Identifier("a"),
                     Dot,
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "1",
                     },
                 ],
                 vec![Identifier("a"), Dot, Identifier("b")],
                 vec![
                     Literal {
-                        literal_kind: Integer,
+                        literal_kind: LiteralKind::integer_no_suffix(),
                         value: "1",
                     },
                     Dot,
@@ -360,7 +326,7 @@ mod lexer_tests {
     fn colon_test() {
         validate_tokenize(
             vec![":", "::", ": :"],
-            vec![vec![Colon], vec![PathSep], vec![Colon, WhiteSpace, Colon]],
+            vec![vec![Colon], vec![PathSep], vec![Colon, Colon]],
         );
     }
 
@@ -370,8 +336,8 @@ mod lexer_tests {
             vec!["<  <= << <<= > >= >> >>=", "<<<"],
             vec![
                 vec![
-                    Lt, WhiteSpace, Le, WhiteSpace, Shl, WhiteSpace, ShlEq, WhiteSpace, Gt,
-                    WhiteSpace, Ge, WhiteSpace, Shr, WhiteSpace, ShrEq,
+                    Lt, Le, Shl, ShlEq, Gt,
+                    Ge, Shr, ShrEq,
                 ],
                 vec![Shl, Lt],
             ],

@@ -93,12 +93,22 @@ impl<'a> Cursor<'a> {
         self.eat_characters(is_white_space)
     }
 
-    pub fn eat_if_is_in(&mut self, str: &str) -> Option<char> {
+    pub fn eat_char_if_in(&mut self, str: &str) -> Option<char> {
         if str.contains(self.next()) {
             Some(self.bump())
         } else {
             None
         }
+    }
+
+    pub fn eat_str_if_in(&mut self, str_vec: Vec<&'a str>) -> Option<&'a str> {
+        for s in str_vec {
+            if self.chars.as_str().starts_with(s) {
+                self.bump_n(s.len() - 1);
+                return Some(s);
+            }
+        }
+        None
     }
 
     pub fn eat_digits(&mut self, radix: u32) -> usize {

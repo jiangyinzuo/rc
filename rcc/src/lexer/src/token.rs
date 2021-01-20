@@ -1,4 +1,5 @@
 use strenum::EnumFromStr;
+use crate::token::LiteralKind::{Integer, Float};
 
 #[derive(Clone, Debug, PartialEq, EnumFromStr)]
 pub enum Token<'a> {
@@ -69,7 +70,7 @@ pub enum Token<'a> {
     /// Literals
     #[disabled]
     Literal {
-        literal_kind: LiteralKind,
+        literal_kind: LiteralKind<'a>,
         value: &'a str,
     },
 
@@ -239,9 +240,23 @@ pub enum Token<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum LiteralKind {
-    Integer,
+pub enum LiteralKind<'a> {
+    Integer {
+        suffix: &'a str
+    },
     Char,
-    Float,
+    Float {
+        suffix: &'a str
+    },
     String,
+}
+
+impl<'a> LiteralKind<'a> {
+    pub const fn integer_no_suffix() -> LiteralKind<'a> {
+        Integer { suffix: "" }
+    }
+
+    pub const fn float_no_suffix() -> LiteralKind<'a> {
+        Float {suffix: ""}
+    }
 }

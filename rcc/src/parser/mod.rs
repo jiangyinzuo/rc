@@ -26,35 +26,15 @@
 //!
 //! Static -> static ident TypeAnnotation eq semi
 
-mod expr;
-mod file;
-mod item;
+pub mod expr;
+pub mod file;
+pub mod item;
+pub mod type_anno;
+
+#[cfg(test)]
+mod tests;
 
 pub enum Visibility {
     Pub,
     Priv,
-}
-
-pub struct TypeAnnotation {}
-
-pub enum Type<'a> {
-    UserDefined(&'a str),
-    Unit,
-    Tuple(Vec<Type<'a>>),
-    Bool,
-    Char,
-    F32,
-    F64,
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    Isize,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    Usize,
 }

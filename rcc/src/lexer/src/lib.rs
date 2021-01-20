@@ -26,11 +26,15 @@ impl<'a: 'b, 'b> Lexer<'a> {
         let mut tokens = vec![];
         while !self.cursor.is_eof() {
             let token = self.advance_token();
-            if token == Unknown {
-                tokens.push(Unknown);
-                break;
+
+            match token {
+                Unknown => {
+                    tokens.push(Unknown);
+                    break;
+                }
+                WhiteSpace | Comment => {}
+                _ => tokens.push(token)
             }
-            tokens.push(token);
         }
         tokens
     }
@@ -62,7 +66,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
             '-' | '=' => {
                 static TABLE: [[Token; 2]; 3] = [[Minus, Eq], [MinusEq, EqEq], [RArrow, FatArrow]];
                 let c = self.cursor.bump();
-                let i = if let Some(ch) = self.cursor.eat_if_is_in("=>") {
+                let i = if let Some(ch) = self.cursor.eat_char_if_in("=>") {
                     if ch == '=' {
                         1
                     } else {
@@ -214,13 +218,13 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         } else {
                             16
                         };
-                        self.digits_with_underscore(start, radix, Integer)
+                        self.digits_with_underscore(start, radix, Self::make_integer)
                     }
 
                     // 001 01.23
                     '0'..='9' => self.decimal_or_float_literal_no_prefix(start),
                     _ => Literal {
-                        literal_kind: Integer,
+                        literal_kind: self.make_integer(),
                         value: "0",
                     },
                 }
@@ -255,13 +259,13 @@ impl<'a: 'b, 'b> Lexer<'a> {
                     // DEC_LITERAL FLOAT_EXPONENT?
                     '0'..='9' => {
                         #[cfg(debug_assertions)]
-                        {
-                            assert_eq!(self.cursor.bump(), '.');
-                        }
+                            {
+                                assert_eq!(self.cursor.bump(), '.');
+                            }
                         #[cfg(not(debug_assertions))]
-                        {
-                            self.cursor.bump();
-                        }
+                            {
+                                self.cursor.bump();
+                            }
 
                         // DEC_LITERAL
                         self.cursor.eat_digits_with_underscore(10);
@@ -269,29 +273,42 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         if self.cursor.next() == 'e' || self.cursor.next() == 'E' {
                             self.float_exponent(start)
                         } else {
-                            self.lit(start, Float)
+                            let end = self.cursor.eaten_len();
+                            let literal_kind = self.make_float();
+                            self.lit(start, end, literal_kind)
                         }
                     }
                     // not immediately followed by ., _ or an identifier
                     // 1.;
                     c if !(c == '.' || c == '_' || is_id_start(c)) => {
                         #[cfg(debug_assertions)]
-                        {
-                            assert_eq!(self.cursor.bump(), '.');
-                        }
+                            {
+                                assert_eq!(self.cursor.bump(), '.');
+                            }
                         #[cfg(not(debug_assertions))]
-                        {
-                            self.cursor.bump();
-                        }
-                        self.lit(start, Float)
+                            {
+                                self.cursor.bump();
+                            }
+
+                        let end = self.cursor.eaten_len();
+                        let literal_kind = self.make_float();
+                        self.lit(start, end, literal_kind)
                     }
                     // 1..2  1.a
-                    _ => self.lit(start, Integer),
+                    _ => {
+                        let end = self.cursor.eaten_len();
+                        let literal_kind = self.make_integer();
+                        self.lit(start, end, literal_kind)
+                    }
                 }
             }
             // FLOAT_EXPONENT
             'e' | 'E' => self.float_exponent(start),
-            _ => self.lit(start, Integer),
+            _ => {
+                let end = self.cursor.eaten_len();
+                let literal_kind = self.make_integer();
+                self.lit(start, end, literal_kind)
+            }
         }
     }
 
@@ -300,19 +317,35 @@ impl<'a: 'b, 'b> Lexer<'a> {
     fn float_exponent(&'b mut self, start: usize) -> Token<'a> {
         debug_assert!(self.cursor.next() == 'e' || self.cursor.next() == 'E');
         self.cursor.bump();
-        self.cursor.eat_if_is_in("+-");
-        self.digits_with_underscore(start, 10, Float)
+        self.cursor.eat_char_if_in("+-");
+        self.digits_with_underscore(start, 10, Self::make_float)
     }
 
-    #[inline]
-    fn digits_with_underscore(
-        &'b mut self,
-        start: usize,
-        radix: u32,
-        literal_kind: LiteralKind,
-    ) -> Token<'a> {
+    fn make_integer(&'b mut self) -> LiteralKind<'a> {
+        Integer {
+            suffix: self.cursor.eat_str_if_in(
+                vec!["i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize"])
+                .unwrap_or("")
+        }
+    }
+
+    fn make_float(&'b mut self) -> LiteralKind<'a> {
+        Float {
+            suffix: self.cursor.eat_str_if_in(
+                vec!["f32", "f64"]).unwrap_or("")
+        }
+    }
+
+    fn digits_with_underscore(&'b mut self, start: usize, radix: u32,
+                              func: fn(&'b mut Self) -> LiteralKind<'a>) -> Token<'a> {
         if self.cursor.eat_digits_with_underscore(radix) {
-            self.lit(start, literal_kind)
+            let end = self.cursor.eaten_len();
+            let value = &self.input[start..end];
+            let literal_kind = func(self);
+            Literal {
+                literal_kind,
+                value,
+            }
         } else {
             Unknown
         }
@@ -326,7 +359,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         if self.cursor.next() == '\'' {
             Unknown
         } else if self.cursor.eat_ascii_character() && self.cursor.bump() == '\'' {
-            self.lit(start, Char)
+            self.lit(start, self.cursor.eaten_len(), Char)
         } else {
             Unknown
         }
@@ -343,14 +376,14 @@ impl<'a: 'b, 'b> Lexer<'a> {
         if self.cursor.bump() == EOF_CHAR {
             Unknown
         } else {
-            self.lit(start, String)
+            self.lit(start, self.cursor.eaten_len(), String)
         }
     }
 
-    fn lit(&'b self, start: usize, literal_kind: LiteralKind) -> Token<'a> {
+    fn lit(&'b self, start: usize, end: usize, literal_kind: LiteralKind<'a>) -> Token<'a> {
         Literal {
             literal_kind,
-            value: &self.input[start..self.cursor.eaten_len()],
+            value: &self.input[start..end],
         }
     }
 
