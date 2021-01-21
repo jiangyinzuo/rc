@@ -43,7 +43,7 @@ pub struct Data {
 }
 
 pub struct IRGenContext {
-    basic_blocks: Vec<BasicBlock>,
+    pub basic_blocks: Vec<BasicBlock>,
     data_stack: Vec<Data>,
     quads: Vec<Quad>,
 }

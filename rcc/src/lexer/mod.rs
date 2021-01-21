@@ -25,6 +25,11 @@ impl<'a: 'b, 'b> Lexer<'a> {
         }
     }
 
+    pub fn new_line(&mut self, input: &'a str) {
+        self.cursor = Cursor::new(input);
+        self.input = input;
+    }
+
     pub fn tokenize(&'b mut self) -> Vec<Token<'a>> {
         let mut tokens = vec![];
         while !self.cursor.is_eof() {

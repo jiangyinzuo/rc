@@ -1,8 +1,10 @@
 mod riscv32;
 use crate::code_gen::riscv32::Riscv32CodeGen;
+use std::io::Write;
 use strenum::EnumFromStr;
+use crate::ir::BasicBlock;
 
-#[derive(EnumFromStr)]
+#[derive(EnumFromStr, Debug)]
 pub enum TargetPlatform {
     Riscv32,
 }
@@ -16,5 +18,5 @@ impl TargetPlatform {
 }
 
 pub trait CodeGen {
-    fn generate_code(&self) -> Result<(), String>;
+    fn generate_code(&self, write: &mut dyn Write, basic_blocks: Vec<BasicBlock>) -> Result<(), String>;
 }
