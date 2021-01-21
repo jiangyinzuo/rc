@@ -1,20 +1,56 @@
-use std::fmt::{Debug, Formatter, Write};
 use std::fmt;
+use std::fmt::{Debug, Formatter, Write};
 
-use lexer::token::{LiteralKind, Token};
 use lexer::token::Token::{Minus, Not, Star};
+use lexer::token::{LiteralKind, Token};
 
-use crate::parser::expr::Expr;
+trait Type {
+    fn ret_type(&self) -> String;
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Expr<'a> {
+    Path(PathExpr<'a>),
+    Lit(LitExpr<'a>),
+    Unary(UnAryExpr<'a>),
+    Block(BlockExpr<'a>),
+    Nothing,
+}
+
+impl<'a> Type for Expr<'a> {
+    fn ret_type(&self) -> String {
+        match self {
+            Self::Lit(lit_expr) => lit_expr.ret_type(),
+            _ => unimplemented!(),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct BlockExpr<'a> {
-    pub exprs: Vec<Expr<'a>>
+    pub exprs: Vec<Expr<'a>>,
+}
+
+impl<'a> Type for BlockExpr<'a> {
+    fn ret_type(&self) -> String {
+        if let Some(expr) = self.exprs.last() {
+            expr.ret_type()
+        } else {
+            "()".to_string()
+        }
+    }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct LitExpr<'a> {
-    pub literal_kind: LiteralKind<'a>,
+    pub ret_type: &'a str,
     pub value: &'a str,
+}
+
+impl<'a> Type for LitExpr<'a> {
+    fn ret_type(&self) -> String {
+        self.ret_type.to_string()
+    }
 }
 
 #[derive(PartialEq, Debug)]

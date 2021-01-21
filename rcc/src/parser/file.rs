@@ -1,7 +1,7 @@
 //! File -> Item File | Item
 use crate::ast::file::File;
 use crate::parser::ParseContext;
-use crate::parser::item::Item;
+use crate::ast::item::Item;
 use crate::parser::Parse;
 
 impl<'a> Parse<'a> for File<'a> {

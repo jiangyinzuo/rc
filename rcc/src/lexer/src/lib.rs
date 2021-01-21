@@ -14,6 +14,9 @@ pub struct Lexer<'a> {
     input: &'a str,
 }
 
+const INT_SUFFIX: [&str; 12] = ["i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize"];
+const FLOAT_SUFFIX: [&str; 2] = ["f32", "f64"];
+
 impl<'a: 'b, 'b> Lexer<'a> {
     pub fn new(input: &'a str) -> Self {
         Lexer {
@@ -144,7 +147,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         }
                     }
                     3 => DotDotDot,
-                    _ => Unknown, // unreachable arm
+                    _ => unreachable!("dot count should be less than 3"),
                 }
             }
             ':' => {
@@ -323,8 +326,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
 
     fn make_integer(&'b mut self) -> LiteralKind<'a> {
         Integer {
-            suffix: self.cursor.eat_str_if_in(
-                vec!["i8", "i16", "i32", "i64", "i128", "isize", "u8", "u16", "u32", "u64", "u128", "usize"])
+            suffix: self.cursor.eat_str_if_in(&INT_SUFFIX.iter())
                 .unwrap_or("")
         }
     }
@@ -332,7 +334,21 @@ impl<'a: 'b, 'b> Lexer<'a> {
     fn make_float(&'b mut self) -> LiteralKind<'a> {
         Float {
             suffix: self.cursor.eat_str_if_in(
-                vec!["f32", "f64"]).unwrap_or("")
+                &FLOAT_SUFFIX.iter()).unwrap_or("")
+        }
+    }
+
+    fn make_integer_or_float(&'b mut self) -> LiteralKind<'a> {
+        if let Some(suffix) = self.cursor.eat_str_if_in(&FLOAT_SUFFIX.iter()) {
+            Float {
+                suffix
+            }
+        } else if let Some(suffix) = self.cursor.eat_str_if_in(&INT_SUFFIX.iter()) {
+            Integer {
+                suffix
+            }
+        } else {
+            Integer {suffix: ""}
         }
     }
 

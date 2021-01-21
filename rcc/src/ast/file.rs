@@ -1,4 +1,4 @@
-use crate::parser::item::Item;
+use crate::ast::item::Item;
 
 #[derive(Debug, PartialEq)]
 pub struct File<'a> {

@@ -19,7 +19,7 @@ mod expr_tests {
 
     use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
     use crate::ast::expr::PathExpr;
-    use crate::parser::expr::Expr::*;
+    use crate::ast::expr::Expr::*;
     use crate::parser::Parse;
     use crate::parser::ParseContext;
     use crate::parser::tests::parse_input;
@@ -63,9 +63,7 @@ mod expr_tests {
         validate_expr(
             vec!["123", "'c'", r#""hello""#],
             vec![Ok(LitExpr {
-                literal_kind: Integer {
-                    suffix: ""
-                },
+                ret_type: "i32",
                 value: "123",
             })],
         );
@@ -104,7 +102,7 @@ mod item_tests {
     use crate::ast::expr::BlockExpr;
     use crate::ast::expr::LitExpr;
     use crate::ast::item::ItemFn;
-    use crate::parser::expr::Expr::Lit;
+    use crate::ast::expr::Expr::Lit;
 
     use super::parse_input;
 
@@ -115,7 +113,7 @@ mod item_tests {
             ident: "main",
             ret_type: "i32",
             fn_block: Some(BlockExpr {
-                exprs: vec![Lit(LitExpr { literal_kind: LiteralKind::integer_no_suffix(), value: "0" })]
+                exprs: vec![Lit(LitExpr { ret_type: "i32", value: "0" })]
             }),
         }), result);
     }
@@ -129,8 +127,8 @@ mod file_tests {
     use crate::ast::expr::LitExpr;
     use crate::ast::file::File;
     use crate::ast::item::ItemFn;
-    use crate::parser::expr::Expr::Lit;
-    use crate::parser::item::Item;
+    use crate::ast::expr::Expr::Lit;
+    use crate::ast::item::Item;
 
     use super::parse_input;
 
@@ -142,7 +140,7 @@ mod file_tests {
                 ident: "pi",
                 ret_type: "f64",
                 fn_block: Some(BlockExpr {
-                    exprs: vec![Lit(LitExpr { literal_kind: LiteralKind::Float { suffix: "f64" }, value: "3.14" })]
+                    exprs: vec![Lit(LitExpr { ret_type: "f64", value: "3.14" })]
                 }),
             })]
         });

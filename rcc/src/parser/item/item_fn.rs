@@ -4,7 +4,7 @@ use lexer::token::Token::RArrow;
 use crate::ast::item::ItemFn;
 use crate::parser::{Parse, Visibility};
 use crate::ast::expr::BlockExpr;
-use crate::parser::expr::Expr::Block;
+use crate::ast::expr::Expr::Block;
 use crate::parser::ParseContext;
 use crate::ast::type_anno::TypeAnno;
 use crate::ast::type_anno::TypeAnno::Origin;

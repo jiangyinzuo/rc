@@ -2,6 +2,7 @@ mod tests;
 
 use std::cmp::{max, min};
 use std::str::Chars;
+use std::slice::Iter;
 
 pub struct Cursor<'a> {
     chars: Chars<'a>,
@@ -101,8 +102,8 @@ impl<'a> Cursor<'a> {
         }
     }
 
-    pub fn eat_str_if_in(&mut self, str_vec: Vec<&'a str>) -> Option<&'a str> {
-        for s in str_vec {
+    pub fn eat_str_if_in(&mut self, str_vec: &Iter<&'a str>) -> Option<&'a str> {
+        for s in str_vec.as_slice() {
             if self.chars.as_str().starts_with(s) {
                 self.bump_n(s.len() - 1);
                 return Some(s);

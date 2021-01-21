@@ -1,7 +1,7 @@
 use lexer::token::Token::{LeftCurlyBraces, RightCurlyBraces};
 
 use crate::ast::expr::BlockExpr;
-use crate::parser::expr::Expr;
+use crate::ast::expr::Expr;
 use crate::parser::Parse;
 use crate::parser::ParseContext;
 

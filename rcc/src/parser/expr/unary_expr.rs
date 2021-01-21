@@ -5,7 +5,7 @@ use lexer::token::Token;
 use lexer::token::Token::{Minus, Not, Star};
 
 use crate::ast::expr::{UnAryExpr, UnOp};
-use crate::parser::expr::Expr;
+use crate::ast::expr::Expr;
 use crate::parser::Parse;
 use crate::parser::ParseContext;
 
