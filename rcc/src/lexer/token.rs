@@ -1,5 +1,5 @@
 use strenum::EnumFromStr;
-use crate::token::LiteralKind::{Integer, Float};
+use crate::lexer::token::LiteralKind::{Integer, Float};
 
 #[derive(Clone, Debug, PartialEq, EnumFromStr)]
 pub enum Token<'a> {

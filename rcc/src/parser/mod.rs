@@ -28,7 +28,7 @@
 
 use std::fmt::Debug;
 
-use lexer::token::Token;
+use crate::lexer::token::Token;
 
 pub mod expr;
 pub mod file;

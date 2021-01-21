@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 
-use lexer::token::Token::{Minus, Not, Star};
-use lexer::token::{LiteralKind, Token};
+use crate::lexer::token::Token::{Minus, Not, Star};
+use crate::lexer::token::{LiteralKind, Token};
 
 trait Type {
     fn ret_type(&self) -> String;

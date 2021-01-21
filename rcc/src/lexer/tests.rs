@@ -1,7 +1,7 @@
 mod lexer_tests {
-    use crate::token::Token::*;
-    use crate::token::{LiteralKind::*, Token, LiteralKind};
-    use crate::Lexer;
+    use crate::lexer::token::Token::*;
+    use crate::lexer::token::{LiteralKind::*, Token, LiteralKind};
+    use crate::lexer::Lexer;
 
     fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
         for (input, excepted) in inputs.iter().zip(excepted_outputs.iter()) {
@@ -346,8 +346,8 @@ mod lexer_tests {
 }
 
 mod token_tests {
-    use crate::token::Token;
-    use crate::token::Token::*;
+    use crate::lexer::token::Token;
+    use crate::lexer::token::Token::*;
     use std::str::FromStr;
 
     #[test]

@@ -1,4 +1,4 @@
-use lexer::token::Token;
+use crate::lexer::token::Token;
 
 use crate::ast::item::{Item, ItemFn};
 use crate::parser::Parse;

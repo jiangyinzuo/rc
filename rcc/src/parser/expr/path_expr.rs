@@ -1,7 +1,7 @@
 //! PathExpr -> ::? Identifier (:: Identifier)*
 //! ## Examples:
 //! `a::b::c`, `::b`
-use lexer::token::Token::*;
+use crate::lexer::token::Token::*;
 
 use crate::ast::expr::PathExpr;
 use crate::parser::Parse;

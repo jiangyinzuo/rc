@@ -3,7 +3,7 @@ use std::str::FromStr;
 
 use self::token::Token::*;
 use self::token::*;
-use crate::token::LiteralKind::*;
+use self::token::LiteralKind::*;
 use std::usize::MAX;
 
 mod tests;

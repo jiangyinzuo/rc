@@ -1,4 +1,4 @@
-use lexer::Lexer;
+use crate::lexer::Lexer;
 
 use crate::parser::Parse;
 use crate::parser::ParseContext;
@@ -13,9 +13,9 @@ fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, &str> {
 mod expr_tests {
     use std::fmt::Debug;
 
-    use lexer::Lexer;
-    use lexer::token::LiteralKind;
-    use lexer::token::LiteralKind::Integer;
+    use crate::lexer::Lexer;
+    use crate::lexer::token::LiteralKind;
+    use crate::lexer::token::LiteralKind::Integer;
 
     use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
     use crate::ast::expr::PathExpr;
@@ -97,7 +97,7 @@ mod expr_tests {
 
 #[cfg(test)]
 mod item_tests {
-    use lexer::token::LiteralKind;
+    use crate::lexer::token::LiteralKind;
 
     use crate::ast::expr::BlockExpr;
     use crate::ast::expr::LitExpr;
@@ -121,7 +121,7 @@ mod item_tests {
 
 #[cfg(test)]
 mod file_tests {
-    use lexer::token::LiteralKind;
+    use crate::lexer::token::LiteralKind;
 
     use crate::ast::expr::BlockExpr;
     use crate::ast::expr::LitExpr;

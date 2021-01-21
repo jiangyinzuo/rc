@@ -1,4 +1,4 @@
-use lexer::token::Token::{LeftCurlyBraces, RightCurlyBraces};
+use crate::lexer::token::Token::{LeftCurlyBraces, RightCurlyBraces};
 
 use crate::ast::expr::BlockExpr;
 use crate::ast::expr::Expr;

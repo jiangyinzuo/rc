@@ -1,4 +1,4 @@
-use lexer::token::Token::*;
+use crate::lexer::token::Token::*;
 
 use crate::ast::expr::{BlockExpr, Expr};
 use crate::ast::expr::Expr::*;

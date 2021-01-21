@@ -1,4 +1,4 @@
-use lexer::token::*;
+use crate::lexer::token::*;
 
 use crate::ast::type_anno::TypeAnno;
 use crate::ast::type_anno::TypeAnno::Origin;

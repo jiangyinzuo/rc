@@ -1,8 +1,8 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 
-use lexer::token::Token;
-use lexer::token::Token::{Minus, Not, Star};
+use crate::lexer::token::Token;
+use crate::lexer::token::Token::{Minus, Not, Star};
 
 use crate::ast::expr::{UnAryExpr, UnOp};
 use crate::ast::expr::Expr;

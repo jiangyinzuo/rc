@@ -1,7 +1,7 @@
 //! LitExpr -> literal
 
-use lexer::token::LiteralKind::*;
-use lexer::token::Token::Literal;
+use crate::lexer::token::LiteralKind::*;
+use crate::lexer::token::Token::Literal;
 
 use crate::ast::expr::LitExpr;
 use crate::parser::Parse;

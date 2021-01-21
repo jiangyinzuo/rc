@@ -34,7 +34,7 @@ pub struct BasicBlock {
 }
 
 pub trait IRGen {
-    fn generate(&self, cxt: &mut IRGenContext);
+    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String>;
 }
 
 pub struct Data {
