@@ -23,20 +23,20 @@ impl<'a> Parse<'a> for PathExpr {
             match tk {
                 PathSep => {
                     if state == State::PathSep || state == State::Init {
-                        return  Err("invalid path".into());
+                        return Err("invalid path".into());
                     }
                     state = State::PathSep;
                 }
                 Identifier(s) => {
                     if state == State::Segment {
-                        return  Err("invalid path".into());
+                        return Err("invalid path".into());
                     }
                     state = State::Segment;
                     path_expr.segments.push(s.to_string());
                 }
                 _ => break,
             }
-            cxt.bump_token();
+            cxt.bump_token()?;
         }
         if state == State::Segment {
             Ok(path_expr)

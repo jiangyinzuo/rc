@@ -29,9 +29,9 @@
 use std::fmt::Debug;
 
 use crate::ast::Visibility;
-use crate::lexer::token::Token;
-use std::error::Error;
+use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
+use std::error::Error;
 
 pub mod expr;
 pub mod file;
@@ -79,7 +79,17 @@ impl<'a> ParseCursor<'a> {
     pub fn eat_identifier(&mut self) -> Result<&'a str, RccError> {
         match self.bump_token()? {
             Token::Identifier(s) => Ok(s),
-            _ => Err(self.err("identifier".to_string()).into())
+            _ => Err(self.err("identifier".to_string()).into()),
+        }
+    }
+
+    pub fn eat_literal(&mut self) -> Result<(LiteralKind, String), RccError> {
+        match self.bump_token()? {
+            Token::Literal {
+                literal_kind,
+                value,
+            } => Ok((literal_kind.clone(), value.to_string())),
+            _ => Err(self.err("literal".to_string()).into()),
         }
     }
 
@@ -89,6 +99,16 @@ impl<'a> ParseCursor<'a> {
         } else {
             Ok(())
         }
+    }
+
+    pub fn eat_token_in(&mut self, tks: &[Token]) -> Result<&Token, RccError> {
+        let next_token = self.next_token()?;
+        for tk in tks {
+            if next_token == tk {
+                return Ok(self.bump_token()?);
+            }
+        }
+        Err(self.err(format!("{:?}", tks)).into())
     }
 
     fn err(&self, expect: String) -> String {

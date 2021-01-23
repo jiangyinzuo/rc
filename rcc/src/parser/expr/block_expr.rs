@@ -7,16 +7,13 @@ use crate::parser::ParseCursor;
 use crate::rcc::RccError;
 
 impl<'a> Parse<'a> for BlockExpr {
-    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        if cxt.bump_token()? == &LeftCurlyBraces {
-            let mut block_expr = BlockExpr { exprs: vec![] };
-            while cxt.next_token()? != &RightCurlyBraces {
-                block_expr.exprs.push(Expr::parse(cxt)?);
-            }
-            cxt.bump_token();
-            Ok(block_expr)
-        } else {
-            Err("invalid block_expr".into())
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        cursor.eat_token(LeftCurlyBraces)?;
+        let mut block_expr = BlockExpr { exprs: vec![] };
+        while cursor.next_token()? != &RightCurlyBraces {
+            block_expr.exprs.push(Expr::parse(cursor)?);
         }
+        cursor.eat_token(RightCurlyBraces)?;
+        Ok(block_expr)
     }
 }

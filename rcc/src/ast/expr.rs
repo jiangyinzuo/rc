@@ -3,7 +3,6 @@ use std::fmt::{Debug, Formatter, Write};
 
 use crate::lexer::token::Token::{Minus, Not, Star};
 use crate::lexer::token::{Token};
-use crate::ast::types::Type;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
