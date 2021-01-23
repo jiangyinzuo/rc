@@ -1,7 +1,7 @@
-use strenum::EnumFromStr;
+use strenum::StrEnum;
 use crate::lexer::token::LiteralKind::{Integer, Float};
 
-#[derive(Clone, Debug, PartialEq, EnumFromStr)]
+#[derive(Clone, Debug, PartialEq, StrEnum)]
 pub enum Token<'a> {
     /// Strict keywords
     As,
@@ -21,13 +21,14 @@ pub enum Token<'a> {
     Loop,
     Match,
     Mut,
+    Pub,
     Ref,
     Return,
 
-    #[value("self")]
+    #[strenum("self")]
     SelfValue,
 
-    #[value("Self")]
+    #[strenum("Self")]
     SelfType,
 
     Static,
@@ -64,178 +65,178 @@ pub enum Token<'a> {
     Union,
 
     /// Primitive types(i8, bool etc.) are seen as identifiers at this period
-    #[disabled]
+    #[strenum(disabled)]
     Identifier(&'a str),
 
     /// Literals
-    #[disabled]
+    #[strenum(disabled)]
     Literal {
         literal_kind: LiteralKind<'a>,
         value: &'a str,
     },
 
     /// Symbols
-    #[value("+")]
+    #[strenum("+")]
     Plus,
 
-    #[value("-")]
+    #[strenum("-")]
     Minus,
 
-    #[value("*")]
+    #[strenum("*")]
     Star,
 
-    #[value("/")]
+    #[strenum("/")]
     Slash,
 
-    #[value("%")]
+    #[strenum("%")]
     Percent,
 
-    #[value("^")]
+    #[strenum("^")]
     Caret,
 
-    #[value("!")]
+    #[strenum("!")]
     Not,
 
-    #[value("&")]
+    #[strenum("&")]
     And,
 
-    #[value("|")]
+    #[strenum("|")]
     Or,
 
-    #[value("&&")]
+    #[strenum("&&")]
     AndAnd,
 
-    #[value("||")]
+    #[strenum("||")]
     OrOr,
 
-    #[value("<<")]
+    #[strenum("<<")]
     Shl,
 
-    #[value(">>")]
+    #[strenum(">>")]
     Shr,
 
-    #[value("+=")]
+    #[strenum("+=")]
     PlusEq,
 
-    #[value("-=")]
+    #[strenum("-=")]
     MinusEq,
 
-    #[value("*=")]
+    #[strenum("*=")]
     StarEq,
 
-    #[value("/=")]
+    #[strenum("/=")]
     SlashEq,
 
-    #[value("%=")]
+    #[strenum("%=")]
     PercentEq,
 
-    #[value("^=")]
+    #[strenum("^=")]
     CaretEq,
 
-    #[value("&=")]
+    #[strenum("&=")]
     AndEq,
 
-    #[value("|=")]
+    #[strenum("|=")]
     OrEq,
 
-    #[value("<<=")]
+    #[strenum("<<=")]
     ShlEq,
 
-    #[value(">>=")]
+    #[strenum(">>=")]
     ShrEq,
 
-    #[value("=")]
+    #[strenum("=")]
     Eq,
 
-    #[value("==")]
+    #[strenum("==")]
     EqEq,
 
-    #[value("!=")]
+    #[strenum("!=")]
     Ne,
 
-    #[value(">")]
+    #[strenum(">")]
     Gt,
 
-    #[value("<")]
+    #[strenum("<")]
     Lt,
 
-    #[value(">=")]
+    #[strenum(">=")]
     Ge,
 
-    #[value("<=")]
+    #[strenum("<=")]
     Le,
 
-    #[value("@")]
+    #[strenum("@")]
     At,
 
-    #[value("_")]
+    #[strenum("_")]
     Underscore,
 
-    #[value(".")]
+    #[strenum(".")]
     Dot,
 
-    #[value("..")]
+    #[strenum("..")]
     DotDot,
 
-    #[value("...")]
+    #[strenum("...")]
     DotDotDot,
 
-    #[value("..=")]
+    #[strenum("..=")]
     DotDotEq,
 
-    #[value(",")]
+    #[strenum(",")]
     Comma,
 
-    #[value(";")]
+    #[strenum(";")]
     Semi,
 
-    #[value(":")]
+    #[strenum(":")]
     Colon,
 
-    #[value("::")]
+    #[strenum("::")]
     PathSep,
 
-    #[value("->")]
+    #[strenum("->")]
     RArrow,
 
-    #[value("=>")]
+    #[strenum("=>")]
     FatArrow,
 
-    #[value("#")]
+    #[strenum("#")]
     Pound,
 
-    #[value("$")]
+    #[strenum("$")]
     Dollar,
 
-    #[value("?")]
+    #[strenum("?")]
     Question,
 
     /// delimiters
-    #[value("{")]
+    #[strenum("{")]
     LeftCurlyBraces,
 
-    #[value("}")]
+    #[strenum("}")]
     RightCurlyBraces,
 
-    #[value("[")]
+    #[strenum("[")]
     LeftSquareBrackets,
 
-    #[value("]")]
+    #[strenum("]")]
     RightSquareBrackets,
 
-    #[value("(")]
+    #[strenum("(")]
     LeftParen,
 
-    #[value(")")]
+    #[strenum(")")]
     RightParen,
 
-    #[disabled]
+    #[strenum(disabled)]
     WhiteSpace,
 
-    #[disabled]
+    #[strenum(disabled)]
     Comment,
 
-    #[disabled]
+    #[strenum(disabled)]
     Unknown,
 }
 

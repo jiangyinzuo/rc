@@ -1,57 +1,85 @@
-use syn::{DeriveInput, DataEnum, Expr};
-use quote::*;
 use proc_macro2::Ident;
+use proc_macro2::Span;
+use quote::*;
+use syn::spanned::Spanned;
+use syn::{DataEnum, DeriveInput, Expr};
+use std::fmt::Formatter;
 
+const STR_ENUM: &str = "strenum";
 const DISABLED: &str = "disabled";
 
-fn add_kv(key: &mut Vec<String>, value: &mut Vec<Ident>, expr: &Expr, ident: Ident) {
-    let lit = syn::parse2::<syn::LitStr>(expr.to_token_stream()).unwrap();
-    key.push(lit.value());
-    value.push(ident);
-}
-
-pub fn add_from_str(ast: syn::DeriveInput) -> proc_macro2::TokenStream {
+/// add `from_str` and `fmt` method for deriving enum
+pub fn add_impl_items(ast: syn::DeriveInput) -> proc_macro2::TokenStream {
+    let mut strs: Vec<String> = vec![];
+    let mut enums: Vec<Ident> = vec![];
     let DeriveInput {
-        attrs,
-        ident,
         generics,
         data,
+        attrs,
+        ident,
         vis,
     } = ast;
 
-    let mut key: Vec<String> = vec![];
-    let mut value: Vec<Ident> = vec![];
-
-    if let syn::Data::Enum(DataEnum { variants, .. }) = data {
-        for v in variants {
-            if v.attrs.is_empty() {
-                key.push(v.ident.to_string().to_lowercase());
-                value.push(format_ident!("{}", v.ident));
-            } else {
-                for attr in v.attrs {
-                    let path = attr.path.get_ident().unwrap();
-                    if path != DISABLED {
-                        let tks = attr.tokens;
-                        if let Ok(res) = syn::parse2::<syn::ExprTuple>(tks.clone()) {
-                            for expr in res.elems.iter() {
-                                add_kv(&mut key, &mut value, expr, v.ident.clone());
+    match data {
+        syn::Data::Enum(DataEnum { variants, .. }) => {
+            for v in variants {
+                if v.attrs.is_empty() {
+                    strs.push(v.ident.to_string().to_lowercase());
+                    enums.push(format_ident!("{}", v.ident));
+                } else {
+                    for attr in v.attrs {
+                        let path = attr.path.get_ident().unwrap();
+                        if path == STR_ENUM {
+                            let tks = attr.tokens;
+                            if let Ok(res) = syn::parse2::<syn::ExprParen>(tks) {
+                                let expr = res.expr.as_ref();
+                                let tks = expr.to_token_stream();
+                                if let Ok(ident) = syn::parse2::<syn::Ident>(tks.clone()) {
+                                    if ident.to_string() != DISABLED {
+                                        let span = Span::call_site();
+                                        return quote_spanned! {
+                                            span => compiler_error!("ident must be disabled");
+                                        };
+                                    }
+                                } else if let Ok(str_literal) = syn::parse2::<syn::LitStr>(tks) {
+                                    strs.push(str_literal.value());
+                                    enums.push(format_ident!("{}", v.ident));
+                                } else {
+                                    let span = Span::call_site();
+                                    return quote_spanned! {
+                                        span => compiler_error!("must be disabled or string literal");
+                                    };
+                                }
                             }
-                        } else if let Ok(res) = syn::parse2::<syn::ExprParen>(tks) {
-                            let expr = res.expr.as_ref();
-                            add_kv(&mut key, &mut value, expr, v.ident.clone());
                         }
                     }
                 }
             }
         }
+        _ => {
+            let span = Span::call_site();
+            return quote_spanned! {
+                span => compiler_error!("must be enum");
+            };
+        }
     }
+
     quote! (
         impl#generics std::str::FromStr for #ident#generics {
             type Err = ();
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
-                    #( #key => Ok(Self::#value), )*
+                    #( #strs => Ok(Self::#enums), )*
                     _ => Err(()),
+                }
+            }
+        }
+
+        impl#generics std::fmt::Display for #ident#generics {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    #( Self::#enums => write!(f, "{}", #strs), )*
+                    _ => Err(std::fmt::Error {})
                 }
             }
         }
@@ -64,13 +92,25 @@ fn add_from_str_test() {
 
     let tokens = quote! {
         enum Color<'a, T> {
-            #[disabled]
+            #[strenum(disabled)]
             Red(T, &'a str),
             Yellow,
-            #[value("+")]
+            #[strenum("+")]
             Orange
         }
     };
-    let tokens = add_from_str(syn::parse2(tokens).unwrap());
+    let tokens = add_impl_items(syn::parse2(tokens).unwrap());
+    println!("{}", tokens);
+}
+
+#[test]
+fn bar_test() {
+    let tokens = quote! {
+        struct Foo {
+            id: i32,
+            name: String
+        }
+    };
+    let tokens = add_impl_items(syn::parse2(tokens).unwrap());
     println!("{}", tokens);
 }

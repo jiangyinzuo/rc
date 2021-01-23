@@ -1,12 +1,12 @@
 use crate::ast::file::File;
 use crate::code_gen::{CodeGen, TargetPlatform};
-use crate::ir::{IRGen, IRGenContext, BasicBlock};
+use crate::ir::{BasicBlock, IRGen, IRGenContext};
 use crate::lexer::Lexer;
-use crate::parser::{Parse, ParseContext};
+use crate::parser::{Parse, ParseCursor};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
-use std::ops::Deref;
 use std::io::{BufReader, BufWriter, Read, Write};
+use std::ops::Deref;
 
 pub struct RcCompiler<R: Read, W: Write> {
     code_gen: Box<dyn CodeGen>,
@@ -14,12 +14,8 @@ pub struct RcCompiler<R: Read, W: Write> {
     output: BufWriter<W>,
 }
 
-impl <R: Read, W: Write> RcCompiler<R, W> {
-    pub fn new(
-        target_platform: TargetPlatform,
-        input: R,
-        output: W,
-    ) -> Self {
+impl<R: Read, W: Write> RcCompiler<R, W> {
+    pub fn new(target_platform: TargetPlatform, input: R, output: W) -> Self {
         let code_gen = target_platform.get_code_gen();
         RcCompiler {
             code_gen: Box::new(code_gen),
@@ -37,19 +33,21 @@ impl <R: Read, W: Write> RcCompiler<R, W> {
         let token_stream = lexer.tokenize();
 
         // parse
-        let mut cxt = ParseContext::new(token_stream);
+        let mut cxt = ParseCursor::new(token_stream);
         let ast_file = File::parse(&mut cxt)?;
 
         // generate ir
         let mut ir_gen_cxt = IRGenContext::new();
         ast_file.generate(&mut ir_gen_cxt)?;
         // generate target asm
-        self.code_gen.deref().generate_code(&mut self.output, ir_gen_cxt.basic_blocks)?;
+        self.code_gen
+            .deref()
+            .generate_code(&mut self.output, ir_gen_cxt.basic_blocks)?;
         Ok(())
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct RccError(pub String);
 
 impl Display for RccError {
@@ -59,3 +57,15 @@ impl Display for RccError {
 }
 
 impl Error for RccError {}
+
+impl From<String> for RccError {
+    fn from(s: String) -> Self {
+        RccError(s)
+    }
+}
+
+impl From<&str> for RccError {
+    fn from(s: &str) -> Self {
+        RccError(s.to_string())
+    }
+}

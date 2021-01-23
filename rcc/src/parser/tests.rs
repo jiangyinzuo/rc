@@ -1,11 +1,12 @@
 use crate::lexer::Lexer;
 
 use crate::parser::Parse;
-use crate::parser::ParseContext;
+use crate::parser::ParseCursor;
+use crate::rcc::RccError;
 
-fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, &str> {
+fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, RccError> {
     let mut lexer = Lexer::new(input);
-    let mut cxt = ParseContext::new(lexer.tokenize());
+    let mut cxt = ParseCursor::new(lexer.tokenize());
     T::parse(&mut cxt)
 }
 
@@ -13,16 +14,17 @@ fn parse_input<'a, T: Parse<'a>>(input: &'a str) -> Result<T, &str> {
 mod expr_tests {
     use std::fmt::Debug;
 
-    use crate::lexer::Lexer;
     use crate::lexer::token::LiteralKind;
     use crate::lexer::token::LiteralKind::Integer;
+    use crate::lexer::Lexer;
 
-    use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
-    use crate::ast::expr::PathExpr;
     use crate::ast::expr::Expr::*;
-    use crate::parser::Parse;
-    use crate::parser::ParseContext;
+    use crate::ast::expr::PathExpr;
+    use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
+    use crate::ast::types::Type;
     use crate::parser::tests::parse_input;
+    use crate::parser::Parse;
+    use crate::parser::ParseCursor;
 
     fn validate_expr<'a, T: Parse<'a>>(
         inputs: std::vec::Vec<&'a str>,
@@ -43,16 +45,16 @@ mod expr_tests {
             vec!["a::b::c", "a::", "a", "::", "::a", "i8::i16"],
             vec![
                 Ok(PathExpr {
-                    segments: vec!["a", "b", "c"],
+                    segments: vec!["a".into(), "b".into(), "c".into()],
                 }),
                 Err("invalid path"),
                 Ok(PathExpr {
-                    segments: vec!["a"],
+                    segments: vec!["a".into()],
                 }),
                 Err("invalid path"),
                 Err("invalid path"),
                 Ok(PathExpr {
-                    segments: vec!["i8", "i16"],
+                    segments: vec!["i8".into(), "i16".into()],
                 }),
             ],
         );
@@ -63,8 +65,8 @@ mod expr_tests {
         validate_expr(
             vec!["123", "'c'", r#""hello""#],
             vec![Ok(LitExpr {
-                ret_type: "i32",
-                value: "123",
+                ret_type: "i32".into(),
+                value: "123".to_string(),
             })],
         );
     }
@@ -77,7 +79,7 @@ mod expr_tests {
                 Ok(Unary(UnAryExpr {
                     op: UnOp::Not,
                     expr: Box::new(Path(PathExpr {
-                        segments: vec!["abc"],
+                        segments: vec!["abc".into()],
                     })),
                 })),
                 Ok(Unary(UnAryExpr {
@@ -85,7 +87,7 @@ mod expr_tests {
                     expr: Box::new(Unary(UnAryExpr {
                         op: UnOp::Neg,
                         expr: Box::new(Path(PathExpr {
-                            segments: vec!["cc", "a", "b"],
+                            segments: vec!["cc".into(), "a".into(), "b".into()],
                         })),
                     })),
                 })),
@@ -100,22 +102,29 @@ mod item_tests {
     use crate::lexer::token::LiteralKind;
 
     use crate::ast::expr::BlockExpr;
+    use crate::ast::expr::Expr::Lit;
     use crate::ast::expr::LitExpr;
     use crate::ast::item::ItemFn;
-    use crate::ast::expr::Expr::Lit;
 
     use super::parse_input;
+    use crate::ast::types::Type;
 
     #[test]
     fn item_fn_test() {
         let result = parse_input::<ItemFn>("fn main() -> i32 {0}");
-        assert_eq!(Ok(ItemFn {
-            ident: "main",
-            ret_type: "i32",
-            fn_block: Some(BlockExpr {
-                exprs: vec![Lit(LitExpr { ret_type: "i32", value: "0" })]
+        assert_eq!(
+            Ok(ItemFn {
+                name: "main".into(),
+                ret_type: Type::Identifier("i32".into()),
+                fn_block: Some(BlockExpr {
+                    exprs: vec![Lit(LitExpr {
+                        ret_type: "i32".into(),
+                        value: "0".into()
+                    })]
+                }),
             }),
-        }), result);
+            result
+        );
     }
 }
 
@@ -124,28 +133,34 @@ mod file_tests {
     use crate::lexer::token::LiteralKind;
 
     use crate::ast::expr::BlockExpr;
+    use crate::ast::expr::Expr::Lit;
     use crate::ast::expr::LitExpr;
     use crate::ast::file::File;
-    use crate::ast::item::ItemFn;
-    use crate::ast::expr::Expr::Lit;
-    use crate::ast::item::Item;
+    use crate::ast::item::VisItem;
+    use crate::ast::item::{InnerItem, ItemFn};
 
     use super::parse_input;
+    use crate::ast::Visibility::Priv;
+    use crate::ast::types::Type;
 
     #[test]
     fn file_test() {
         let result = parse_input::<File>("fn pi() -> f64 {3.14f64}");
         let excepted = Ok(File {
-            items: vec![Item::Fn(ItemFn {
-                ident: "pi",
-                ret_type: "f64",
-                fn_block: Some(BlockExpr {
-                    exprs: vec![Lit(LitExpr { ret_type: "f64", value: "3.14" })]
+            items: vec![VisItem::new(
+                Priv,
+                InnerItem::Fn(ItemFn {
+                    name: "pi".into(),
+                    ret_type: Type::Identifier("f64".into()),
+                    fn_block: Some(BlockExpr {
+                        exprs: vec![Lit(LitExpr {
+                            ret_type:"f64".into(),
+                            value: "3.14".into(),
+                        })],
+                    }),
                 }),
-            })]
+            )],
         });
         assert_eq!(excepted, result);
     }
 }
-
-

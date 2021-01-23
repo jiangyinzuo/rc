@@ -5,10 +5,12 @@ use crate::lexer::token::Token::Literal;
 
 use crate::ast::expr::LitExpr;
 use crate::parser::Parse;
-use crate::parser::ParseContext;
+use crate::parser::ParseCursor;
+use crate::rcc::RccError;
+use crate::ast::types::Type;
 
-impl<'a> Parse<'a> for LitExpr<'a> {
-    fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {
+impl<'a> Parse<'a> for LitExpr {
+    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
         if let Literal { literal_kind, value } = cxt.bump_token()? {
             Ok(LitExpr {
                 ret_type: {
@@ -35,12 +37,12 @@ impl<'a> Parse<'a> for LitExpr<'a> {
                                 suffix
                             }
                         }
-                    }
+                    }.into()
                 },
-                value,
+                value: value.to_string(),
             })
         } else {
-            Err("invalid lit expr")
+            Err("invalid lit expr".into())
         }
     }
 }

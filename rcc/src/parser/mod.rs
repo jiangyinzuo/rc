@@ -28,57 +28,86 @@
 
 use std::fmt::Debug;
 
+use crate::ast::Visibility;
 use crate::lexer::token::Token;
+use std::error::Error;
+use crate::rcc::RccError;
 
 pub mod expr;
 pub mod file;
 pub mod item;
-pub mod type_anno;
 
 #[cfg(test)]
 mod tests;
-
-pub enum Visibility {
-    Pub,
-    Priv,
-}
+mod types;
 
 pub trait Parse<'a>: Sized + Debug + PartialEq {
-    fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str>;
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError>;
 }
 
 #[derive(Clone)]
-pub struct ParseContext<'a> {
+pub struct ParseCursor<'a> {
     token_stream: Vec<Token<'a>>,
     token_idx: usize,
 }
 
-impl<'a> ParseContext<'a> {
+impl<'a> ParseCursor<'a> {
     pub fn new(token_stream: Vec<Token<'a>>) -> Self {
-        ParseContext {
+        ParseCursor {
             token_stream,
             token_idx: 0,
         }
     }
 
-    pub fn next_token(&self) -> Result<&Token<'a>, &'static str> {
+    pub fn next_token(&self) -> Result<&Token<'a>, RccError> {
         match self.token_stream.get(self.token_idx) {
             Some(tk) => Ok(tk),
-            None => Err("EOF token")
+            None => Err("EOF token".into()),
         }
     }
 
-    pub fn bump_token(&mut self) -> Result<&Token<'a>, &'static str> {
+    pub fn bump_token(&mut self) -> Result<&Token<'a>, RccError> {
         match self.token_stream.get(self.token_idx) {
             Some(tk) => {
                 self.token_idx += 1;
                 Ok(tk)
             }
-            None => Err("EOF token")
+            None => Err("EOF token".into()),
         }
+    }
+
+    pub fn eat_identifier(&mut self) -> Result<&'a str, RccError> {
+        match self.bump_token()? {
+            Token::Identifier(s) => Ok(s),
+            _ => Err(self.err("identifier".to_string()).into())
+        }
+    }
+
+    pub fn eat_token(&mut self, tk: Token) -> Result<(), RccError> {
+        if self.bump_token()? != &tk {
+            Err(self.err(tk.to_string()).into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn err(&self, expect: String) -> String {
+        format!("error in parsing: except {}", expect)
     }
 
     pub fn is_eof(&self) -> bool {
         self.token_idx == self.token_stream.len()
+    }
+}
+
+impl<'a> Parse<'a> for Visibility {
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        match cursor.next_token()? {
+            Token::Pub => {
+                cursor.bump_token()?;
+                Ok(Visibility::Pub)
+            }
+            _ => Ok(Visibility::Priv),
+        }
     }
 }

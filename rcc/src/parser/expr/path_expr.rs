@@ -5,12 +5,11 @@ use crate::lexer::token::Token::*;
 
 use crate::ast::expr::PathExpr;
 use crate::parser::Parse;
-use crate::parser::ParseContext;
+use crate::parser::ParseCursor;
+use crate::rcc::RccError;
 
-const ERR_INVALID_PATH: Result<PathExpr, &'static str> = Err("invalid path");
-
-impl<'a> Parse<'a> for PathExpr<'a> {
-    fn parse(cxt: &mut ParseContext<'a>) -> Result<Self, &'static str> {
+impl<'a> Parse<'a> for PathExpr {
+    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
         #[derive(PartialEq)]
         enum State {
             Init,
@@ -24,16 +23,16 @@ impl<'a> Parse<'a> for PathExpr<'a> {
             match tk {
                 PathSep => {
                     if state == State::PathSep || state == State::Init {
-                        return ERR_INVALID_PATH;
+                        return  Err("invalid path".into());
                     }
                     state = State::PathSep;
                 }
                 Identifier(s) => {
                     if state == State::Segment {
-                        return ERR_INVALID_PATH;
+                        return  Err("invalid path".into());
                     }
                     state = State::Segment;
-                    path_expr.segments.push(s);
+                    path_expr.segments.push(s.to_string());
                 }
                 _ => break,
             }
@@ -42,7 +41,7 @@ impl<'a> Parse<'a> for PathExpr<'a> {
         if state == State::Segment {
             Ok(path_expr)
         } else {
-            ERR_INVALID_PATH
+            Err("invalid path".into())
         }
     }
 }

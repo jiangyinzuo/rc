@@ -1,10 +1,10 @@
 mod riscv32;
 use crate::code_gen::riscv32::Riscv32CodeGen;
 use std::io::Write;
-use strenum::EnumFromStr;
+use strenum::StrEnum;
 use crate::ir::BasicBlock;
 
-#[derive(EnumFromStr, Debug)]
+#[derive(StrEnum, Debug)]
 pub enum TargetPlatform {
     Riscv32,
 }

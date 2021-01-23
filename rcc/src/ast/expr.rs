@@ -2,72 +2,44 @@ use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 
 use crate::lexer::token::Token::{Minus, Not, Star};
-use crate::lexer::token::{LiteralKind, Token};
-
-trait Type {
-    fn ret_type(&self) -> String;
-}
+use crate::lexer::token::{Token};
+use crate::ast::types::Type;
 
 #[derive(Debug, PartialEq)]
-pub enum Expr<'a> {
-    Path(PathExpr<'a>),
-    Lit(LitExpr<'a>),
-    Unary(UnAryExpr<'a>),
-    Block(BlockExpr<'a>),
+pub enum Expr {
+    Path(PathExpr),
+    Lit(LitExpr),
+    Unary(UnAryExpr),
+    Block(BlockExpr),
     Nothing,
 }
 
-impl<'a> Type for Expr<'a> {
-    fn ret_type(&self) -> String {
-        match self {
-            Self::Lit(lit_expr) => lit_expr.ret_type(),
-            _ => unimplemented!(),
-        }
-    }
-}
-
 #[derive(Debug, PartialEq)]
-pub struct BlockExpr<'a> {
-    pub exprs: Vec<Expr<'a>>,
-}
-
-impl<'a> Type for BlockExpr<'a> {
-    fn ret_type(&self) -> String {
-        if let Some(expr) = self.exprs.last() {
-            expr.ret_type()
-        } else {
-            "()".to_string()
-        }
-    }
+pub struct BlockExpr {
+    pub exprs: Vec<Expr>,
 }
 
 #[derive(PartialEq, Debug)]
-pub struct LitExpr<'a> {
-    pub ret_type: &'a str,
-    pub value: &'a str,
-}
-
-impl<'a> Type for LitExpr<'a> {
-    fn ret_type(&self) -> String {
-        self.ret_type.to_string()
-    }
+pub struct LitExpr {
+    pub ret_type: String,
+    pub value: String,
 }
 
 #[derive(PartialEq, Debug)]
-pub struct PathExpr<'a> {
-    pub segments: Vec<&'a str>,
+pub struct PathExpr {
+    pub segments: Vec<String>,
 }
 
-impl<'a> PathExpr<'a> {
+impl PathExpr {
     pub fn new() -> Self {
         PathExpr { segments: vec![] }
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub struct UnAryExpr<'a> {
+pub struct UnAryExpr {
     pub op: UnOp,
-    pub expr: Box<Expr<'a>>,
+    pub expr: Box<Expr>,
 }
 
 #[derive(PartialEq)]

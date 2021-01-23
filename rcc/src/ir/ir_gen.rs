@@ -1,11 +1,12 @@
 use crate::ast::expr::Expr;
 use crate::ast::expr::{BlockExpr, LitExpr};
 use crate::ast::file::File;
-use crate::ast::item::{Item, ItemFn};
+use crate::ast::item::{InnerItem, ItemFn, VisItem};
 use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
+use crate::ast::types::Type;
 
-impl<'a> IRGen for File<'a> {
-    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String>{
+impl IRGen for File {
+    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         for item in self.items.as_slice() {
             item.generate(cxt)?;
         }
@@ -13,7 +14,13 @@ impl<'a> IRGen for File<'a> {
     }
 }
 
-impl<'a> IRGen for Item<'a> {
+impl IRGen for VisItem {
+    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
+        self.inner_item.generate(cxt)
+    }
+}
+
+impl IRGen for InnerItem {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         match self {
             Self::Fn(item_fn) => item_fn.generate(cxt)?,
@@ -23,15 +30,15 @@ impl<'a> IRGen for Item<'a> {
     }
 }
 
-impl<'a> IRGen for ItemFn<'a> {
+impl IRGen for ItemFn {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
-        let name = self.ident;
+        let name = self.name.clone();
         if let Some(block_expr) = self.fn_block.as_ref() {
             block_expr.generate(cxt);
             if let Some(ret_data) = cxt.pop_data() {
                 if self.ret_type != ret_data._type {
                     return Err(format!(
-                        "invalid type: expect {}, found {}",
+                        "invalid type: expect {:#?}, found {:#?}",
                         self.ret_type, ret_data._type
                     ));
                 }
@@ -51,7 +58,7 @@ impl<'a> IRGen for ItemFn<'a> {
     }
 }
 
-impl<'a> IRGen for BlockExpr<'a> {
+impl IRGen for BlockExpr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         for expr in self.exprs.as_slice() {
             expr.generate(cxt)?;
@@ -60,23 +67,23 @@ impl<'a> IRGen for BlockExpr<'a> {
     }
 }
 
-impl<'a> IRGen for LitExpr<'a> {
+impl IRGen for LitExpr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         cxt.push_data(self.to_data());
         Ok(())
     }
 }
 
-impl<'a> LitExpr<'a> {
+impl LitExpr {
     fn to_data(&self) -> Data {
         Data {
-            _type: self.ret_type.to_string(),
+            _type: Type::Identifier(self.ret_type.clone()),
             value: self.value.to_string(),
         }
     }
 }
 
-impl<'a> IRGen for Expr<'a> {
+impl IRGen for Expr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         match self {
             Self::Lit(lit_expr) => lit_expr.generate(cxt)?,
