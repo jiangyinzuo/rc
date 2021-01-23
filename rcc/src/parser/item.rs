@@ -3,7 +3,6 @@ use crate::ast::item::{InnerItem, ItemFn, ItemStruct, StructField, TupleField, T
 use crate::ast::types::Type;
 use crate::ast::Visibility;
 use crate::lexer::token::Token;
-use crate::lexer::token::Token::{Identifier, RArrow, Semi};
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 use std::string::ToString;
@@ -53,7 +52,7 @@ impl<'a> Parse<'a> for ItemStruct {
         debug_assert!(cursor.next_token()? == &Token::Struct);
         cursor.bump_token();
         let ident = cursor.bump_token()?;
-        if let Identifier(struct_name) = ident {
+        if let Token::Identifier(struct_name) = ident {
             let type_struct = Self::new(struct_name.to_string());
             match cursor.next_token()? {
                 // struct Foo;
@@ -63,7 +62,7 @@ impl<'a> Parse<'a> for ItemStruct {
                     let tuple_fields = Vec::<TupleField>::parse(cursor)?;
                     // eat semicolon
                     let tk = cursor.bump_token()?;
-                    if tk == &Semi {
+                    if tk == &Token::Semi {
                         Ok(type_struct.tuple_fields(tuple_fields))
                     } else {
                         Err("invalid struct definition(consider adding ';' after ')')".into())
@@ -90,25 +89,22 @@ impl<'a> Parse<'a> for TypeEnum {
 
 impl<'a> Parse<'a> for ItemFn {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        if cursor.bump_token()? != &Token::Fn {
-            return Err(RccError::from("invalid fn: except keyword 'fn'"));
-        }
-
+        cursor.eat_token(Token::Fn)?;
         let fn_name = cursor.eat_identifier()?;
         cursor.eat_token(Token::LeftParen)?;
         cursor.eat_token(Token::RightParen)?;
         match cursor.next_token()? {
-            RArrow => {
+            Token::RArrow => {
                 cursor.bump_token()?;
-                let ret_type = cursor.eat_identifier()?;
+                let ret_type = Type::parse(cursor)?;
                 let fn_block = BlockExpr::parse(cursor)?;
                 Ok(ItemFn::new(
                     fn_name.to_string(),
-                    Type::Identifier(ret_type.into()),
+                    ret_type,
                     fn_block,
                 ))
             }
-            Semi => unimplemented!("fn declaration without block not implemented"),
+            Token::Semi => unimplemented!("fn declaration without block not implemented"),
             Token::LeftCurlyBraces => {
                 let fn_block = BlockExpr::parse(cursor)?;
                 Ok(ItemFn::new(fn_name.to_string(), Type::unit(), fn_block))

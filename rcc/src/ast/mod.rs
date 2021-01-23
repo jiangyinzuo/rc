@@ -8,3 +8,7 @@ pub enum Visibility {
     Pub,
     Priv,
 }
+
+pub trait NamedASTNode {
+    fn ident_name(&self) -> &str;
+}

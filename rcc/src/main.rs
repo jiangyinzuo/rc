@@ -11,6 +11,7 @@ mod ir;
 mod lexer;
 mod parser;
 mod rcc;
+mod analyser;
 
 #[derive(Clap)]
 struct Opts {

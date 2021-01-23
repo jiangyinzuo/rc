@@ -1,21 +1,27 @@
 use crate::ast::expr::BlockExpr;
-use crate::ast::types::{Type};
-use crate::ast::Visibility;
+use crate::ast::types::Type;
+use crate::ast::{NamedASTNode, Visibility};
 
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
     pub name: String,
     pub ret_type: Type,
-    pub fn_block: Option<BlockExpr>
+    pub fn_block: Option<BlockExpr>,
 }
 
 impl ItemFn {
-    pub  fn new(name: String, ret_type: Type, fn_block: BlockExpr) ->Self {
+    pub fn new(name: String, ret_type: Type, fn_block: BlockExpr) -> Self {
         ItemFn {
             name,
             ret_type,
-            fn_block: Some(fn_block)
+            fn_block: Some(fn_block),
         }
+    }
+}
+
+impl NamedASTNode for ItemFn {
+    fn ident_name(&self) -> &str {
+        &self.name
     }
 }
 
@@ -27,10 +33,13 @@ pub struct VisItem {
 
 impl VisItem {
     pub fn new(vis: Visibility, inner_item: InnerItem) -> Self {
-        VisItem {
-            vis,
-            inner_item
-        }
+        VisItem { vis, inner_item }
+    }
+}
+
+impl NamedASTNode for VisItem {
+    fn ident_name(&self) -> &str {
+        self.inner_item.ident_name()
     }
 }
 
@@ -53,6 +62,15 @@ pub enum InnerItem {
 
     /// impl Foo { ... }
     Impl,
+}
+
+impl NamedASTNode for InnerItem {
+    fn ident_name(&self) -> &str {
+        match self {
+            Self::Fn(item_fn) => item_fn.ident_name(),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 /// # Examples
@@ -82,7 +100,6 @@ impl ItemStruct {
         self
     }
 }
-
 
 /// enum Identity {
 ///     Student { name: String },
@@ -121,5 +138,5 @@ pub struct StructField {
 #[derive(Debug, PartialEq)]
 pub struct TupleField {
     pub vis: Visibility,
-    pub _type: Type
+    pub _type: Type,
 }
