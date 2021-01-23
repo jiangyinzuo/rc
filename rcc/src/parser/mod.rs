@@ -31,7 +31,6 @@ use std::fmt::Debug;
 use crate::ast::Visibility;
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
-use std::error::Error;
 
 pub mod expr;
 pub mod file;
