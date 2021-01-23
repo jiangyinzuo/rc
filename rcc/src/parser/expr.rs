@@ -26,6 +26,97 @@ impl<'a> Parse<'a> for Expr {
     }
 }
 
+/// PathExpr -> identifier (:: identifier)*
+/// # Examples
+/// `a::b::c`, `a`
+impl<'a> Parse<'a> for PathExpr {
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        #[derive(PartialEq)]
+        enum State {
+            Init,
+            PathSep,
+            Segment,
+        }
+
+        let mut path_expr = Self::new();
+        let mut state = State::Init;
+        while let Ok(tk) = cursor.next_token() {
+            match tk {
+                Token::PathSep => {
+                    if state == State::PathSep || state == State::Init {
+                        return Err("invalid path".into());
+                    }
+                    state = State::PathSep;
+                }
+                Token::Identifier(s) => {
+                    if state == State::Segment {
+                        return Err("invalid path".into());
+                    }
+                    state = State::Segment;
+                    path_expr.segments.push(s.to_string());
+                }
+                _ => break,
+            }
+            cursor.bump_token()?;
+        }
+        if state == State::Segment {
+            Ok(path_expr)
+        } else {
+            Err("invalid path".into())
+        }
+    }
+}
+
+/// LitExpr -> literal
+impl<'a> Parse<'a> for LitExpr {
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        let (literal_kind, value) = cursor.eat_literal()?;
+        Ok(LitExpr {
+            ret_type: {
+                match literal_kind {
+                    Char => "char",
+                    String => "&str",
+                    Integer { suffix } => {
+                        if suffix.is_empty() {
+                            if value.parse::<i32>().is_ok() {
+                                "i32"
+                            } else if value.parse::<i64>().is_ok() {
+                                "i64"
+                            } else {
+                                "i128"
+                            }
+                        } else {
+                            suffix
+                        }
+                    }
+                    Float { suffix } => {
+                        if suffix.is_empty() {
+                            "f64"
+                        } else {
+                            suffix
+                        }
+                    }
+                }
+                .into()
+            },
+            value,
+        })
+    }
+}
+
+/// UnAryExpr -> (`!` | `*` | `-`) Expr
+impl<'a> Parse<'a> for UnAryExpr {
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        let tk = cursor.eat_token_in(&[Token::Not, Token::Star, Token::Minus])?;
+        let op = UnOp::from_token(tk).unwrap();
+        let expr = Expr::parse(cursor)?;
+        Ok(UnAryExpr {
+            op,
+            expr: Box::new(expr),
+        })
+    }
+}
+
 /// BlockExpr -> `{` Expr* `}`
 impl<'a> Parse<'a> for BlockExpr {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
@@ -67,81 +158,9 @@ impl<'a> Parse<'a> for BorrowExpr {
     }
 }
 
-/// LitExpr -> literal
-impl<'a> Parse<'a> for LitExpr {
+impl<'a> Parse<'a> for BinOpExpr {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        let (literal_kind, value) = cursor.eat_literal()?;
-        Ok(LitExpr {
-            ret_type: {
-                match literal_kind {
-                    Char => "char",
-                    String => "&str",
-                    Integer { suffix } => {
-                        if suffix.is_empty() {
-                            if value.parse::<i32>().is_ok() {
-                                "i32"
-                            } else if value.parse::<i64>().is_ok() {
-                                "i64"
-                            } else {
-                                "i128"
-                            }
-                        } else {
-                            suffix
-                        }
-                    }
-                    Float { suffix } => {
-                        if suffix.is_empty() {
-                            "f64"
-                        } else {
-                            suffix
-                        }
-                    }
-                }
-                .into()
-            },
-            value,
-        })
-    }
-}
-
-/// PathExpr -> identifier (:: identifier)*
-/// # Examples
-/// `a::b::c`, `a`
-impl<'a> Parse<'a> for PathExpr {
-    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        #[derive(PartialEq)]
-        enum State {
-            Init,
-            PathSep,
-            Segment,
-        }
-
-        let mut path_expr = Self::new();
-        let mut state = State::Init;
-        while let Ok(tk) = cxt.next_token() {
-            match tk {
-                Token::PathSep => {
-                    if state == State::PathSep || state == State::Init {
-                        return Err("invalid path".into());
-                    }
-                    state = State::PathSep;
-                }
-                Token::Identifier(s) => {
-                    if state == State::Segment {
-                        return Err("invalid path".into());
-                    }
-                    state = State::Segment;
-                    path_expr.segments.push(s.to_string());
-                }
-                _ => break,
-            }
-            cxt.bump_token()?;
-        }
-        if state == State::Segment {
-            Ok(path_expr)
-        } else {
-            Err("invalid path".into())
-        }
+        unimplemented!()
     }
 }
 
@@ -151,18 +170,5 @@ impl<'a> Parse<'a> for ReturnExpr {
         cursor.eat_token(Token::Return)?;
         let expr = Expr::parse(cursor)?;
         Ok(ReturnExpr(Box::new(expr)))
-    }
-}
-
-/// UnAryExpr -> (`!` | `*` | `-`) Expr
-impl<'a> Parse<'a> for UnAryExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        let tk = cursor.eat_token_in(&[Token::Not, Token::Star, Token::Minus])?;
-        let op = UnOp::from_token(tk).unwrap();
-        let expr = Expr::parse(cursor)?;
-        Ok(UnAryExpr {
-            op,
-            expr: Box::new(expr),
-        })
     }
 }
