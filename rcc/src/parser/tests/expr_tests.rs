@@ -1,32 +1,26 @@
 use crate::ast::expr::Expr::*;
-use crate::ast::expr::PathExpr;
+use crate::ast::expr::{BlockExpr, BorrowExpr, PathExpr, ReturnExpr};
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
-use crate::parser::{tests};
+use crate::parser::tests::parse_validate;
 
 #[test]
 fn path_expr_test() {
-    tests::parse_validate(
+    parse_validate(
         vec!["a::b::c", "a::", "a", "::", "::a", "i8::i16"],
         vec![
-            Ok(PathExpr {
-                segments: vec!["a".into(), "b".into(), "c".into()],
-            }),
+            Ok(PathExpr::from(vec!["a", "b", "c"])),
             Err("invalid path"),
-            Ok(PathExpr {
-                segments: vec!["a".into()],
-            }),
+            Ok(vec!["a"].into()),
             Err("invalid path"),
             Err("invalid path"),
-            Ok(PathExpr {
-                segments: vec!["i8".into(), "i16".into()],
-            }),
-        ],
+            Ok(vec!["i8", "i16"].into())
+        ]
     );
 }
 
 #[test]
 fn lit_expr_test() {
-    tests::parse_validate(
+    parse_validate(
         vec!["123", "'c'", r#""hello""#],
         vec![Ok(LitExpr {
             ret_type: "i32".into(),
@@ -37,25 +31,49 @@ fn lit_expr_test() {
 
 #[test]
 fn unary_expr_test() {
-    tests::parse_validate(
+    parse_validate(
         vec!["!abc", "--cc::a::b", ";"],
         vec![
             Ok(Unary(UnAryExpr {
                 op: UnOp::Not,
-                expr: Box::new(Path(PathExpr {
-                    segments: vec!["abc".into()],
-                })),
+                expr: Box::new(Path(vec!["abc"].into())),
             })),
             Ok(Unary(UnAryExpr {
                 op: UnOp::Neg,
                 expr: Box::new(Unary(UnAryExpr {
                     op: UnOp::Neg,
-                    expr: Box::new(Path(PathExpr {
-                        segments: vec!["cc".into(), "a".into(), "b".into()],
-                    })),
+                    expr: Box::new(Path(vec!["cc", "a", "b"].into())),
                 })),
             })),
             Ok(Nothing),
         ],
     )
+}
+
+#[test]
+fn return_expr_test() {
+    parse_validate(
+        vec!["{ return 0;}"],
+        vec![Ok(Block(BlockExpr {
+            exprs: vec![
+                Return(ReturnExpr(Box::new(Lit(LitExpr {
+                    ret_type: "i32".into(),
+                    value: "0".into(),
+                })))),
+                Nothing,
+            ],
+        }))],
+    );
+}
+
+#[test]
+fn borrow_expr_test() {
+    parse_validate(
+        vec!["&&&&mut a"],
+        vec![Ok(Borrow(BorrowExpr {
+            borrow_cnt: 4,
+            is_mut: true,
+            expr: Box::new(Path(vec!["a"].into())),
+        }))],
+    );
 }

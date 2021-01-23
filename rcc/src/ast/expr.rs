@@ -27,7 +27,7 @@ pub enum Expr {
     Range,
     If,
     Match,
-    Return,
+    Return(ReturnExpr),
     Nothing,
 }
 
@@ -50,6 +50,20 @@ pub struct PathExpr {
 impl PathExpr {
     pub fn new() -> Self {
         PathExpr { segments: vec![] }
+    }
+}
+
+impl From<Vec<String>> for PathExpr {
+    fn from(segments: Vec<String>) -> Self {
+        PathExpr { segments }
+    }
+}
+
+impl From<Vec<&str>> for PathExpr {
+    fn from(segments: Vec<&str>) -> Self {
+        PathExpr {
+            segments: segments.iter().map(|s| s.to_string()).collect(),
+        }
     }
 }
 
@@ -91,21 +105,21 @@ impl UnOp {
 }
 
 #[derive(Debug, PartialEq)]
-struct BorrowExpr {
-    borrow_cnt: u32,
-    is_mut: bool,
-    expr: Box<Expr>,
+pub struct BorrowExpr {
+    pub borrow_cnt: u32,
+    pub is_mut: bool,
+    pub expr: Box<Expr>,
 }
 
 #[derive(Debug, PartialEq)]
-struct BinOpExpr {
+pub struct BinOpExpr {
     lhs: Box<Expr>,
     bin_op: BinOp,
     rhs: Box<Expr>,
 }
 
 #[derive(StrEnum, Debug, PartialEq)]
-enum BinOp {
+pub enum BinOp {
     /// Arithmetic or logical operators
     #[strenum("+")]
     Plus,
@@ -208,27 +222,30 @@ enum BinOp {
 
 /// GroupExpr -> `(` Expr `)`
 #[derive(Debug, PartialEq)]
-struct GroupExpr(Box<Expr>);
+pub struct GroupExpr(Box<Expr>);
 
 #[derive(Debug, PartialEq)]
-struct ArrayExpr {
+pub struct ArrayExpr {
     // TODO
 }
 
 #[derive(Debug, PartialEq)]
-struct ArrayIndexExpr {
+pub struct ArrayIndexExpr {
     // TODO
 }
 
 #[derive(Debug, PartialEq)]
-struct TupleExpr {
+pub struct TupleExpr {
     // TODO
 }
 
 #[derive(Debug, PartialEq)]
-struct TupleIndexExpr {
+pub struct TupleIndexExpr {
     // TODO
 }
 
 #[derive(Debug, PartialEq)]
 struct StructExpr;
+
+#[derive(Debug, PartialEq)]
+pub struct ReturnExpr(pub Box<Expr>);

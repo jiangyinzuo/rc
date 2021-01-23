@@ -110,6 +110,16 @@ impl<'a> ParseCursor<'a> {
         Err(self.err(format!("{:?}", tks)).into())
     }
 
+    pub fn eat_token_if(&mut self, tk: Token) -> bool {
+        if let Ok(next_tk) = self.next_token() {
+            if next_tk == &tk {
+                self.bump_token();
+                return true;
+            }
+        }
+        false
+    }
+
     fn err(&self, expect: String) -> String {
         format!("error in parsing: except {}", expect)
     }
