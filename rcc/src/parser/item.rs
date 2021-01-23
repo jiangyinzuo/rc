@@ -96,13 +96,14 @@ impl<'a> Parse<'a> for ItemFn {
         match cursor.next_token()? {
             Token::RArrow => {
                 cursor.bump_token()?;
-                let ret_type = Type::parse(cursor)?;
+                let ret_type = if cursor.next_token()? == &Token::LeftCurlyBraces {
+                    Type::unit()
+                } else {
+                    Type::parse(cursor)?
+                };
+
                 let fn_block = BlockExpr::parse(cursor)?;
-                Ok(ItemFn::new(
-                    fn_name.to_string(),
-                    ret_type,
-                    fn_block,
-                ))
+                Ok(ItemFn::new(fn_name.to_string(), ret_type, fn_block))
             }
             Token::Semi => unimplemented!("fn declaration without block not implemented"),
             Token::LeftCurlyBraces => {

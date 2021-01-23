@@ -1,4 +1,4 @@
-use crate::ast::types::Type::Tuple;
+use crate::ast::types::Type::{Tuple, Identifier};
 use std::fmt::{Debug, Formatter};
 
 #[derive(PartialEq)]
@@ -21,6 +21,17 @@ pub enum Type {
     FnPtr(TypeFnPtr),
 
     Ptr(TypePtr),
+}
+
+impl From<String> for Type {
+    fn from(s: String) -> Self {
+        Identifier(s)
+    }
+}
+impl From<&str> for Type {
+    fn from(s: &str) -> Self {
+        Identifier(s.into())
+    }
 }
 
 impl Debug for Type {

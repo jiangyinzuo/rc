@@ -36,6 +36,14 @@ pub struct BlockExpr {
     pub exprs: Vec<Expr>,
 }
 
+impl BlockExpr {
+    pub fn new() -> Self {
+        BlockExpr {
+            exprs: vec![]
+        }
+    }
+}
+
 #[derive(PartialEq, Debug)]
 pub struct LitExpr {
     pub ret_type: String,

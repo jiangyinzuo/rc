@@ -21,7 +21,7 @@ impl<'a> Parse<'a> for TypeArrayOrSlice {
 
 impl<'a> Parse<'a> for Type {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        match cursor.next_token()? {
+        match cursor.bump_token()? {
             Token::Identifier(s) => Ok(Self::Identifier(s.to_string())),
             Token::LeftParen => Ok(Self::Tuple(TypeTuple::parse(cursor)?)),
             Token::LeftSquareBrackets => {
