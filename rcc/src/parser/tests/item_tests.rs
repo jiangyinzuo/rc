@@ -15,7 +15,7 @@ fn item_fn_test() {
                 "main".into(),
                 "i32".into(),
                 vec![Stmt::ExprStmt(Lit(LitExpr {
-                    ret_type: "i32".into(),
+                    ret_type: LitExpr::EMPTY_INT_TYPE.into(),
                     value: "0".into(),
                 }))]
                 .into(),

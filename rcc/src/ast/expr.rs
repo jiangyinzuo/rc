@@ -4,8 +4,9 @@ use strenum::StrEnum;
 
 use crate::ast::stmt::Stmt;
 use crate::ast::TokenStart;
-use crate::lexer::token::Token;
+use crate::lexer::token::LiteralKind::{Char, Integer};
 use crate::lexer::token::Token::{Minus, Not, Star};
+use crate::lexer::token::{LiteralKind, Token};
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -17,14 +18,14 @@ pub enum Expr {
     Assign(AssignExpr),
     Range(RangeExpr),
     BinOp(BinOpExpr),
-    Group(GroupExpr),
+    Grouped(GroupedExpr),
     Array(ArrayExpr),
     ArrayIndex(ArrayIndexExpr),
     Tuple(TupleExpr),
     TupleIndex(TupleIndexExpr),
     Struct(StructExpr),
     EnumVariant,
-    Call,
+    Call(CallExpr),
     MethodCall,
     FieldAccess,
     Loop(LoopExpr),
@@ -41,7 +42,7 @@ impl TokenStart for Expr {
             Token::If | Token::Match | Token::Return
         ) || UnAryExpr::is_token_start(tk)
             || BorrowExpr::is_token_start(tk)
-        || LoopExpr::is_token_start(tk)
+            || LoopExpr::is_token_start(tk)
     }
 }
 
@@ -58,9 +59,7 @@ impl BlockExpr {
 
 impl From<Vec<Stmt>> for BlockExpr {
     fn from(stmts: Vec<Stmt>) -> Self {
-        BlockExpr {
-            stmts
-        }
+        BlockExpr { stmts }
     }
 }
 
@@ -71,10 +70,24 @@ pub struct LitExpr {
 }
 
 impl LitExpr {
-    pub fn lit_i32(value: &str) -> Self {
+    pub const EMPTY_INT_TYPE: &'static str = "#i";
+    pub const EMPTY_FLOAT_TYPE: &'static str = "#f";
+}
+
+impl From<i32> for LitExpr {
+    fn from(num: i32) -> Self {
         LitExpr {
-            ret_type: "i32".into(),
-            value: value.into(),
+            ret_type: Self::EMPTY_INT_TYPE.to_string(),
+            value: num.to_string(),
+        }
+    }
+}
+
+impl From<char> for LitExpr {
+    fn from(c: char) -> Self {
+        LitExpr {
+            ret_type: "char".to_string(),
+            value: format!("'{}'", c),
         }
     }
 }
@@ -366,8 +379,7 @@ pub enum BinOp {
 }
 
 /// GroupExpr -> `(` Expr `)`
-#[derive(Debug, PartialEq)]
-pub struct GroupExpr(Box<Expr>);
+pub type GroupedExpr = Box<Expr>;
 
 #[derive(Debug, PartialEq)]
 pub struct ArrayExpr {
@@ -380,9 +392,7 @@ pub struct ArrayIndexExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct TupleExpr {
-    // TODO
-}
+pub struct TupleExpr(pub Vec<Expr>);
 
 #[derive(Debug, PartialEq)]
 pub struct TupleIndexExpr {
@@ -394,6 +404,21 @@ pub struct StructExpr;
 
 #[derive(Debug, PartialEq)]
 pub struct ReturnExpr(pub Box<Expr>);
+
+#[derive(Debug, PartialEq)]
+pub struct CallExpr {
+    pub expr: Box<Expr>,
+    pub call_params: Vec<Expr>,
+}
+
+impl CallExpr {
+    pub fn new(expr: Expr) -> Self {
+        CallExpr {
+            expr: Box::new(expr),
+            call_params: vec![],
+        }
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct LoopExpr;

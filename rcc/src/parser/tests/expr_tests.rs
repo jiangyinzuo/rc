@@ -1,7 +1,8 @@
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::{
-    AssignExpr, AssignOp, BlockExpr, BorrowExpr, PathExpr, RangeExpr, ReturnExpr,
+    AssignExpr, AssignOp, BlockExpr, BorrowExpr, GroupedExpr, PathExpr, RangeExpr, ReturnExpr,
+    TupleExpr,
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
@@ -27,7 +28,7 @@ fn lit_expr_test() {
     parse_validate(
         vec!["123", "'c'", r#""hello""#],
         vec![Ok(LitExpr {
-            ret_type: "i32".into(),
+            ret_type: LitExpr::EMPTY_INT_TYPE.into(),
             value: "123".to_string(),
         })],
     );
@@ -60,7 +61,7 @@ fn return_expr_test() {
         vec![Ok(Block(BlockExpr {
             stmts: vec![
                 Stmt::ExprStmt(Return(ReturnExpr(Box::new(Lit(LitExpr {
-                    ret_type: "i32".into(),
+                    ret_type: LitExpr::EMPTY_INT_TYPE.into(),
                     value: "0".into(),
                 }))))),
                 Stmt::Semi,
@@ -106,17 +107,22 @@ fn range_test() {
     parse_validate(
         vec!["1..3", "..=2", "3.."],
         vec![
-            Ok(Range(
-                RangeExpr::new(DotDot)
-                    .lhs(Lit(LitExpr::lit_i32("1")))
-                    .rhs(Lit(LitExpr::lit_i32("3"))),
-            )),
-            Ok(Range(
-                RangeExpr::new(DotDotEq).rhs(Lit(LitExpr::lit_i32("2"))),
-            )),
-            Ok(Range(
-                RangeExpr::new(DotDot).lhs(Lit(LitExpr::lit_i32("3"))),
-            )),
+            Ok(Range(RangeExpr::new(DotDot).lhs(Lit(1.into())).rhs(Lit(3.into())))),
+            Ok(Range(RangeExpr::new(DotDotEq).rhs(Lit(2.into())))),
+            Ok(Range(RangeExpr::new(DotDot).lhs(Lit(3.into())))),
+        ],
+    );
+}
+
+#[test]
+fn left_paren_test() {
+    parse_validate(
+        vec!["('1',)", "(1)", "(1,2)", "(1,22,)"],
+        vec![
+            Ok(Tuple(TupleExpr(vec![Lit('1'.into())]))),
+            Ok(Grouped(GroupedExpr::new(Lit(1.into())))),
+            Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(2.into())]))),
+            Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(22.into())]))),
         ],
     );
 }
