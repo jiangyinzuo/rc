@@ -4,6 +4,7 @@ use crate::ast::file::File;
 use crate::ast::item::{InnerItem, ItemFn, VisItem};
 use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
 use crate::ast::types::Type;
+use crate::ast::stmt::Stmt;
 
 impl IRGen for File {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
@@ -58,9 +59,18 @@ impl IRGen for ItemFn {
     }
 }
 
+impl IRGen for Stmt {
+    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
+        match self {
+            Self::ExprStmt(expr) => expr.generate(cxt),
+            _ => unimplemented!(),
+        }
+    }
+}
+
 impl IRGen for BlockExpr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
-        for expr in self.exprs.as_slice() {
+        for expr in self.stmts.as_slice() {
             expr.generate(cxt)?;
         }
         Ok(())

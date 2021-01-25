@@ -1,5 +1,6 @@
 use strenum::StrEnum;
 use crate::lexer::token::LiteralKind::{Integer, Float};
+use crate::lexer::token::Token::True;
 
 #[derive(Clone, Debug, PartialEq, StrEnum)]
 pub enum Token<'a> {
@@ -238,6 +239,12 @@ pub enum Token<'a> {
 
     #[strenum(disabled)]
     Unknown,
+}
+
+impl Token<'_> {
+    pub fn is_range_op(&self) -> bool {
+        matches!(self, Self::DotDot | Self::DotDotEq)
+    }    
 }
 
 #[derive(Clone, Debug, PartialEq)]

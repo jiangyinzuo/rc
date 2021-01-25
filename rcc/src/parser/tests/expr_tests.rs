@@ -1,6 +1,10 @@
 use crate::ast::expr::Expr::*;
-use crate::ast::expr::{BlockExpr, BorrowExpr, PathExpr, ReturnExpr, AssignExpr, AssignOp};
+use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
+use crate::ast::expr::{
+    AssignExpr, AssignOp, BlockExpr, BorrowExpr, PathExpr, RangeExpr, ReturnExpr,
+};
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
+use crate::ast::stmt::Stmt;
 use crate::parser::tests::parse_validate;
 
 #[test]
@@ -13,8 +17,8 @@ fn path_expr_test() {
             Ok(vec!["a"].into()),
             Err("invalid path"),
             Err("invalid path"),
-            Ok(vec!["i8", "i16"].into())
-        ]
+            Ok(vec!["i8", "i16"].into()),
+        ],
     );
 }
 
@@ -32,7 +36,7 @@ fn lit_expr_test() {
 #[test]
 fn unary_expr_test() {
     parse_validate(
-        vec!["!abc", "--cc::a::b", ";"],
+        vec!["!abc", "--cc::a::b"],
         vec![
             Ok(Unary(UnAryExpr {
                 op: UnOp::Not,
@@ -45,7 +49,6 @@ fn unary_expr_test() {
                     expr: Box::new(Path(vec!["cc", "a", "b"].into())),
                 })),
             })),
-            Ok(Nothing),
         ],
     )
 }
@@ -55,12 +58,12 @@ fn return_expr_test() {
     parse_validate(
         vec!["{ return 0;}"],
         vec![Ok(Block(BlockExpr {
-            exprs: vec![
-                Return(ReturnExpr(Box::new(Lit(LitExpr {
+            stmts: vec![
+                Stmt::ExprStmt(Return(ReturnExpr(Box::new(Lit(LitExpr {
                     ret_type: "i32".into(),
                     value: "0".into(),
-                })))),
-                Nothing,
+                }))))),
+                Stmt::Semi,
             ],
         }))],
     );
@@ -80,11 +83,40 @@ fn borrow_expr_test() {
 
 #[test]
 fn assign_op_test() {
-    parse_validate(vec!["a = b = c &= d"], vec![Ok(Assign(AssignExpr::new(
-        Path("a".into()), AssignOp::Eq, Assign(AssignExpr::new(
-            Path("b".into()), AssignOp::Eq, Assign(AssignExpr::new(
-                Path("c".into()), AssignOp::AndEq, Path("d".into())
-            ))
-        ))
-    )))]);
+    parse_validate(
+        vec!["a = b = c &= d"],
+        vec![Ok(Assign(AssignExpr::new(
+            Path("a".into()),
+            AssignOp::Eq,
+            Assign(AssignExpr::new(
+                Path("b".into()),
+                AssignOp::Eq,
+                Assign(AssignExpr::new(
+                    Path("c".into()),
+                    AssignOp::AndEq,
+                    Path("d".into()),
+                )),
+            )),
+        )))],
+    );
+}
+
+#[test]
+fn range_test() {
+    parse_validate(
+        vec!["1..3", "..=2", "3.."],
+        vec![
+            Ok(Range(
+                RangeExpr::new(DotDot)
+                    .lhs(Lit(LitExpr::lit_i32("1")))
+                    .rhs(Lit(LitExpr::lit_i32("3"))),
+            )),
+            Ok(Range(
+                RangeExpr::new(DotDotEq).rhs(Lit(LitExpr::lit_i32("2"))),
+            )),
+            Ok(Range(
+                RangeExpr::new(DotDot).lhs(Lit(LitExpr::lit_i32("3"))),
+            )),
+        ],
+    );
 }

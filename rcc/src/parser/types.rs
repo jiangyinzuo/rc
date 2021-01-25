@@ -13,14 +13,14 @@ enum TypeArrayOrSlice {
     Slice(TypeSlice),
 }
 
-impl<'a> Parse<'a> for TypeArrayOrSlice {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypeArrayOrSlice {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for Type {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for Type {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.bump_token()? {
             Token::Identifier(s) => Ok(Self::Identifier(s.to_string())),
             Token::LeftParen => Ok(Self::Tuple(TypeTuple::parse(cursor)?)),
@@ -38,38 +38,38 @@ impl<'a> Parse<'a> for Type {
     }
 }
 
-impl<'a> Parse<'a> for TypeTuple {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypeTuple {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for TypeArray {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypeArray {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for TypeFnPtr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypeFnPtr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for TypePtr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypePtr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for Vec<StructField> {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for Vec<StructField> {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for Vec<TupleField> {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for Vec<TupleField> {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         if cursor.bump_token()? != &LeftParen {
             return Err("invalid tuple field: except '('".into());
         }

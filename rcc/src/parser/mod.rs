@@ -31,7 +31,7 @@ use std::fmt::Debug;
 use crate::ast::Visibility;
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
-use crate::ast::expr::AssignOp;
+use crate::ast::expr::{AssignOp, RangeOp, FromToken};
 
 pub mod expr;
 pub mod file;
@@ -40,9 +40,10 @@ pub mod item;
 #[cfg(test)]
 mod tests;
 mod types;
+mod stmt;
 
-pub trait Parse<'a>: Sized + Debug + PartialEq {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError>;
+pub trait Parse: Sized + Debug + PartialEq {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError>;
 }
 
 #[derive(Clone)]
@@ -132,9 +133,9 @@ impl<'a> ParseCursor<'a> {
         None
     }
 
-    pub fn eat_assign_op(&mut self) -> Option<AssignOp> {
+    pub fn eat_if_from_token<T: FromToken>(&mut self) -> Option<T> {
         if let Ok(tk) = self.next_token() {
-            let op = AssignOp::from_token(tk.clone());
+            let op = T::from_token(tk.clone());
             if op.is_some() && self.bump_token().is_err() {
                 return None;
             }
@@ -153,8 +154,8 @@ impl<'a> ParseCursor<'a> {
     }
 }
 
-impl<'a> Parse<'a> for Visibility {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for Visibility {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.next_token()? {
             Token::Pub => {
                 cursor.bump_token()?;

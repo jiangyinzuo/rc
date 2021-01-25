@@ -1,9 +1,7 @@
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::*;
-use std::fmt::Formatter;
-use syn::spanned::Spanned;
-use syn::{parse2, DataEnum, DeriveInput, Expr};
+use syn::{DataEnum, DeriveInput, Expr, ExprRange};
 
 const STR_ENUM: &str = "strenum";
 const DISABLED: &str = "disabled";
@@ -35,7 +33,7 @@ pub fn add_impl_items(ast: syn::DeriveInput) -> proc_macro2::TokenStream {
                                 let expr = res.expr.as_ref();
                                 let tks = expr.to_token_stream();
                                 if let Ok(ident) = syn::parse2::<syn::Ident>(tks.clone()) {
-                                    if ident.to_string() != DISABLED {
+                                    if ident != DISABLED {
                                         let span = Span::call_site();
                                         return quote_spanned! {
                                             span => compiler_error!("ident must be disabled");

@@ -8,6 +8,7 @@ use crate::ast::item::{InnerItem, ItemFn};
 use super::parse_input;
 use crate::ast::types::Type;
 use crate::ast::Visibility::Priv;
+use crate::ast::stmt::Stmt;
 
 #[test]
 fn file_test() {
@@ -18,12 +19,11 @@ fn file_test() {
             InnerItem::Fn(ItemFn {
                 name: "pi".into(),
                 ret_type: Type::Identifier("f64".into()),
-                fn_block: Some(BlockExpr {
-                    exprs: vec![Lit(LitExpr {
+                fn_block: Some(vec![Stmt::ExprStmt(Lit(LitExpr {
                         ret_type: "f64".into(),
                         value: "3.14".into(),
-                    })],
-                }),
+                    }))].into(),
+                ),
             }),
         )],
     });

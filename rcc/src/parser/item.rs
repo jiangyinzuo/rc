@@ -7,8 +7,8 @@ use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 use std::string::ToString;
 
-impl<'a> Parse<'a> for VisItem {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for VisItem {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.next_token()? {
             Token::Pub => {
                 cursor.bump_token()?;
@@ -31,8 +31,8 @@ impl<'a> Parse<'a> for VisItem {
     }
 }
 
-impl<'a> Parse<'a> for InnerItem {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for InnerItem {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.next_token()? {
             Token::Fn => Ok(Self::Fn(ItemFn::parse(cursor)?)),
             Token::Struct => Ok(Self::Struct(ItemStruct::parse(cursor)?)),
@@ -47,8 +47,8 @@ impl<'a> Parse<'a> for InnerItem {
 
 /// Parse struct definition
 /// ItemStruct -> struct Identifier ; | TupleField ; | StructField
-impl<'a> Parse<'a> for ItemStruct {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for ItemStruct {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         debug_assert!(cursor.next_token()? == &Token::Struct);
         cursor.bump_token()?;
         let ident = cursor.bump_token()?;
@@ -81,14 +81,14 @@ impl<'a> Parse<'a> for ItemStruct {
     }
 }
 
-impl<'a> Parse<'a> for TypeEnum {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for TypeEnum {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
-impl<'a> Parse<'a> for ItemFn {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for ItemFn {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         cursor.eat_token(Token::Fn)?;
         let fn_name = cursor.eat_identifier()?;
         cursor.eat_token(Token::LeftParen)?;

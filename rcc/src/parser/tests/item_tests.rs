@@ -2,6 +2,7 @@ use crate::ast::expr::BlockExpr;
 use crate::ast::expr::Expr::Lit;
 use crate::ast::expr::LitExpr;
 use crate::ast::item::ItemFn;
+use crate::ast::stmt::Stmt;
 use crate::ast::types::Type;
 use crate::parser::tests::parse_validate;
 
@@ -13,12 +14,11 @@ fn item_fn_test() {
             Ok(ItemFn::new(
                 "main".into(),
                 "i32".into(),
-                BlockExpr {
-                    exprs: vec![Lit(LitExpr {
-                        ret_type: "i32".into(),
-                        value: "0".into(),
-                    })],
-                },
+                vec![Stmt::ExprStmt(Lit(LitExpr {
+                    ret_type: "i32".into(),
+                    value: "0".into(),
+                }))]
+                .into(),
             )),
             Ok(ItemFn::new("oops".into(), Type::unit(), BlockExpr::new())),
         ],

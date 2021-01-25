@@ -1,6 +1,7 @@
 use crate::ast::expr::BlockExpr;
 use crate::ast::types::Type;
-use crate::ast::{NamedASTNode, Visibility};
+use crate::ast::{NamedASTNode, TokenStart, Visibility};
+use crate::lexer::token::Token;
 
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
@@ -37,6 +38,12 @@ impl VisItem {
     }
 }
 
+impl TokenStart for VisItem {
+    fn is_token_start(tk: &Token) -> bool {
+        tk == &Token::Pub || InnerItem::is_token_start(tk) 
+    }
+}
+
 impl NamedASTNode for VisItem {
     fn ident_name(&self) -> &str {
         self.inner_item.ident_name()
@@ -62,6 +69,21 @@ pub enum InnerItem {
 
     /// impl Foo { ... }
     Impl,
+}
+
+impl TokenStart for InnerItem {
+    fn is_token_start(tk: &Token) -> bool {
+        matches!(
+            tk,
+            Token::Priv
+                | Token::Fn
+                | Token::Const
+                | Token::Static
+                | Token::Struct
+                | Token::Enum
+                | Token::Impl
+        )
+    }
 }
 
 impl NamedASTNode for InnerItem {

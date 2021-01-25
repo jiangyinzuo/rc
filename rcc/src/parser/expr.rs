@@ -1,42 +1,80 @@
-use crate::ast::expr::Expr::{Block, Borrow, Lit, Nothing, Path, Unary, Assign};
+use crate::ast::expr::Expr::{Assign, Block, Borrow, Lit, Path, Range, Unary};
+use crate::ast::stmt::Stmt;
 use crate::ast::expr::*;
 use crate::lexer::token::LiteralKind::*;
 use crate::lexer::token::Token;
+use crate::lexer::token::Token::Unknown;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 
-impl<'a> Parse<'a> for Expr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        let lhs = match cursor.next_token()? {
-            Token::Not | Token::Star | Token::Minus => Unary(UnAryExpr::parse(cursor)?),
-            Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
-            Token::Literal { .. } => Lit(LitExpr::parse(cursor)?),
-            Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
-            Token::And | Token::AndAnd => Borrow(BorrowExpr::parse(cursor)?),
-            Token::Semi => {
-                cursor.bump_token()?;
-                Nothing
+impl Parse for Expr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+        let a = {let b = 3; };
+        range_expr(cursor)
+    }
+}
+
+/// RangeExpr -> AssignExpr
+///            | AssignExpr? RangeOp AssignExpr?
+/// (Associativity: Require parentheses)
+fn range_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
+    let mut lhs = assign_expr(cursor)?;
+
+    if let Some(range_op) = cursor.eat_if_from_token() {
+        if let Ok(_assign_expr) = assign_expr(cursor) {
+            if cursor.next_token().unwrap_or(&Unknown).is_range_op() {
+                return Err("range operators require parentheses".into());
             }
-            Token::Return => Expr::Return(ReturnExpr::parse(cursor)?),
-            _ => unimplemented!(),
-        };
-
-        // AssignExpr -> Expr AssignOp Expr
-        // (Associativity: right to left)
-        if let Some(assign_op) = cursor.eat_assign_op() {
-            let rhs = Expr::parse(cursor)?;
-            return Ok(Assign(AssignExpr::new(lhs, assign_op, rhs)));
+            lhs = Range(RangeExpr::new(range_op).lhs(lhs).rhs(_assign_expr));
+        } else {
+            lhs = Range(RangeExpr::new(range_op).lhs(lhs));
         }
+    }
+    Ok(lhs)
+}
 
-        Ok(lhs)
+/// AssignExpr -> PrimitiveExpr
+///             | PrimitiveExpr AssignOp AssignExpr
+/// (Associativity: right to left)
+fn assign_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
+    let mut lhs = primitive_expr(cursor)?;
+
+    if let Some(assign_op) = cursor.eat_if_from_token() {
+        let rhs = Expr::parse(cursor)?;
+        lhs = Assign(AssignExpr::new(lhs, assign_op, rhs));
+    }
+    Ok(lhs)
+}
+
+fn primitive_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
+    Ok(match cursor.next_token()? {
+        Token::Not | Token::Star | Token::Minus => Unary(UnAryExpr::parse(cursor)?),
+        Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
+        Token::Literal { .. } => Lit(LitExpr::parse(cursor)?),
+        Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
+        Token::And | Token::AndAnd => Borrow(BorrowExpr::parse(cursor)?),
+        Token::DotDot | Token::DotDotEq => Range(RangeExpr::parse_without_lhs(cursor)?),
+        Token::Return => Expr::Return(ReturnExpr::parse(cursor)?),
+        _ => unreachable!(),
+    })
+}
+
+impl RangeExpr {
+    pub fn parse_without_lhs(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+        if let Some(op) = cursor.eat_if_from_token::<RangeOp>() {
+            let _assign_expr = assign_expr(cursor)?;
+            Ok(Self::new(op).rhs(_assign_expr))
+        } else {
+            Err("expect '..' or '..='".into())
+        }
     }
 }
 
 /// PathExpr -> identifier (:: identifier)*
 /// # Examples
 /// `a::b::c`, `a`
-impl<'a> Parse<'a> for PathExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for PathExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         #[derive(PartialEq)]
         enum State {
             Init,
@@ -74,8 +112,8 @@ impl<'a> Parse<'a> for PathExpr {
 }
 
 /// LitExpr -> literal
-impl<'a> Parse<'a> for LitExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for LitExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         let (literal_kind, value) = cursor.eat_literal()?;
         Ok(LitExpr {
             ret_type: {
@@ -111,8 +149,8 @@ impl<'a> Parse<'a> for LitExpr {
 }
 
 /// UnAryExpr -> (`!` | `*` | `-`) Expr
-impl<'a> Parse<'a> for UnAryExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for UnAryExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         let tk = cursor.eat_token_in(&[Token::Not, Token::Star, Token::Minus])?;
         let op = UnOp::from_token(tk).unwrap();
         let expr = Expr::parse(cursor)?;
@@ -124,12 +162,12 @@ impl<'a> Parse<'a> for UnAryExpr {
 }
 
 /// BlockExpr -> `{` Expr* `}`
-impl<'a> Parse<'a> for BlockExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for BlockExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         cursor.eat_token(Token::LeftCurlyBraces)?;
-        let mut block_expr = BlockExpr { exprs: vec![] };
+        let mut block_expr = BlockExpr { stmts: vec![] };
         while cursor.next_token()? != &Token::RightCurlyBraces {
-            block_expr.exprs.push(Expr::parse(cursor)?);
+            block_expr.stmts.push(Stmt::parse(cursor)?);
         }
         cursor.eat_token(Token::RightCurlyBraces)?;
         Ok(block_expr)
@@ -137,8 +175,8 @@ impl<'a> Parse<'a> for BlockExpr {
 }
 
 /// BorrowExpr -> `&`+ `mut`? Expr
-impl<'a> Parse<'a> for BorrowExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for BorrowExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         let mut borrow_cnt = 0u32;
         loop {
             match cursor.next_token()? {
@@ -164,15 +202,15 @@ impl<'a> Parse<'a> for BorrowExpr {
     }
 }
 
-impl<'a> Parse<'a> for BinOpExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for BinOpExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
 /// ReturnExpr -> `return` Expr
-impl<'a> Parse<'a> for ReturnExpr {
-    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+impl Parse for ReturnExpr {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         cursor.eat_token(Token::Return)?;
         let expr = Expr::parse(cursor)?;
         Ok(ReturnExpr(Box::new(expr)))
