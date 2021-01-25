@@ -31,6 +31,7 @@ use std::fmt::Debug;
 use crate::ast::Visibility;
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
+use crate::ast::expr::AssignOp;
 
 pub mod expr;
 pub mod file;
@@ -129,6 +130,18 @@ impl<'a> ParseCursor<'a> {
             }
         }
         None
+    }
+
+    pub fn eat_assign_op(&mut self) -> Option<AssignOp> {
+        if let Ok(tk) = self.next_token() {
+            let op = AssignOp::from_token(tk.clone());
+            if op.is_some() && self.bump_token().is_err() {
+                return None;
+            }
+            op
+        } else {
+            None
+        }
     }
 
     fn err(&self, expect: String) -> String {

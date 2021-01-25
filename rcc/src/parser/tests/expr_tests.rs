@@ -1,5 +1,5 @@
 use crate::ast::expr::Expr::*;
-use crate::ast::expr::{BlockExpr, BorrowExpr, PathExpr, ReturnExpr};
+use crate::ast::expr::{BlockExpr, BorrowExpr, PathExpr, ReturnExpr, AssignExpr, AssignOp};
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::parser::tests::parse_validate;
 
@@ -76,4 +76,15 @@ fn borrow_expr_test() {
             expr: Box::new(Path(vec!["a"].into())),
         }))],
     );
+}
+
+#[test]
+fn assign_op_test() {
+    parse_validate(vec!["a = b = c &= d"], vec![Ok(Assign(AssignExpr::new(
+        Path("a".into()), AssignOp::Eq, Assign(AssignExpr::new(
+            Path("b".into()), AssignOp::Eq, Assign(AssignExpr::new(
+                Path("c".into()), AssignOp::AndEq, Path("d".into())
+            ))
+        ))
+    )))]);
 }

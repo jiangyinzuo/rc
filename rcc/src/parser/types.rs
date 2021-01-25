@@ -1,4 +1,4 @@
-use crate::ast::item::{ItemStruct, StructField, TupleField, TypeEnum};
+use crate::ast::item::{StructField, TupleField, TypeEnum};
 use crate::ast::types::{Type, TypeArray, TypeFnPtr, TypePtr, TypeSlice, TypeTuple};
 use crate::ast::Visibility;
 use crate::lexer::token::Token;

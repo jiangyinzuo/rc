@@ -1,4 +1,4 @@
-use crate::ast::expr::Expr::{Block, Borrow, Lit, Nothing, Path, Unary};
+use crate::ast::expr::Expr::{Block, Borrow, Lit, Nothing, Path, Unary, Assign};
 use crate::ast::expr::*;
 use crate::lexer::token::LiteralKind::*;
 use crate::lexer::token::Token;
@@ -7,12 +7,9 @@ use crate::rcc::RccError;
 
 impl<'a> Parse<'a> for Expr {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        Ok(match cursor.next_token()? {
+        let lhs = match cursor.next_token()? {
             Token::Not | Token::Star | Token::Minus => Unary(UnAryExpr::parse(cursor)?),
-            Token::Identifier(_) | Token::PathSep => {
-                let path = Path(PathExpr::parse(cursor)?);
-                path
-            }
+            Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
             Token::Literal { .. } => Lit(LitExpr::parse(cursor)?),
             Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
             Token::And | Token::AndAnd => Borrow(BorrowExpr::parse(cursor)?),
@@ -22,7 +19,16 @@ impl<'a> Parse<'a> for Expr {
             }
             Token::Return => Expr::Return(ReturnExpr::parse(cursor)?),
             _ => unimplemented!(),
-        })
+        };
+
+        // AssignExpr -> Expr AssignOp Expr
+        // (Associativity: right to left)
+        if let Some(assign_op) = cursor.eat_assign_op() {
+            let rhs = Expr::parse(cursor)?;
+            return Ok(Assign(AssignExpr::new(lhs, assign_op, rhs)));
+        }
+
+        Ok(lhs)
     }
 }
 

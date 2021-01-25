@@ -12,6 +12,7 @@ pub enum Expr {
     Unary(UnAryExpr),
     Block(BlockExpr),
     Borrow(BorrowExpr),
+    Assign(AssignExpr),
     BinOp(BinOpExpr),
     Group(GroupExpr),
     Array(ArrayExpr),
@@ -38,9 +39,7 @@ pub struct BlockExpr {
 
 impl BlockExpr {
     pub fn new() -> Self {
-        BlockExpr {
-            exprs: vec![]
-        }
+        BlockExpr { exprs: vec![] }
     }
 }
 
@@ -71,6 +70,14 @@ impl From<Vec<&str>> for PathExpr {
     fn from(segments: Vec<&str>) -> Self {
         PathExpr {
             segments: segments.iter().map(|s| s.to_string()).collect(),
+        }
+    }
+}
+
+impl From<&str> for PathExpr {
+    fn from(s: &str) -> Self {
+        PathExpr {
+            segments: s.split("::").map(|s| s.to_string()).collect(),
         }
     }
 }
@@ -120,10 +127,84 @@ pub struct BorrowExpr {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct AssignExpr {
+    pub lhs: Box<Expr>,
+    pub assign_op: AssignOp,
+    pub rhs: Box<Expr>,
+}
+
+impl AssignExpr {
+    pub fn new(lhs: Expr, assign_op: AssignOp, rhs: Expr) -> Self {
+        AssignExpr {
+            lhs: Box::new(lhs),
+            assign_op,
+            rhs: Box::new(rhs),
+        }
+    }
+}
+
+#[derive(StrEnum, Debug, PartialEq)]
+pub enum AssignOp {
+    /// Compound assignment operators
+    #[strenum("+=")]
+    PlusEq,
+
+    #[strenum("-=")]
+    MinusEq,
+
+    #[strenum("*=")]
+    StarEq,
+
+    #[strenum("/=")]
+    SlashEq,
+
+    #[strenum("%=")]
+    PercentEq,
+
+    #[strenum("^=")]
+    CaretEq,
+
+    #[strenum("&=")]
+    AndEq,
+
+    #[strenum("|=")]
+    OrEq,
+
+    #[strenum("<<=")]
+    ShlEq,
+
+    #[strenum(">>=")]
+    ShrEq,
+
+    /// Assignment operators
+    #[strenum("=")]
+    Eq,
+}
+
+#[derive(Debug, PartialEq)]
 pub struct BinOpExpr {
     lhs: Box<Expr>,
     bin_op: BinOp,
     rhs: Box<Expr>,
+}
+
+impl AssignOp {
+    pub fn from_token(tk: Token) -> Option<Self> {
+        match tk {
+            Token::PlusEq => Some(Self::PlusEq),
+            Token::MinusEq => Some(Self::MinusEq),
+            Token::StarEq => Some(Self::StarEq),
+            Token::SlashEq => Some(Self::SlashEq),
+            Token::PercentEq => Some(Self::PercentEq),
+            Token::CaretEq => Some(Self::CaretEq),
+            Token::AndEq => Some(Self::AndEq),
+            Token::OrEq => Some(Self::OrEq),
+            Token::ShlEq => Some(Self::ShlEq),
+            Token::ShrEq => Some(Self::ShrEq),
+            Token::Eq => Some(Self::Eq),
+            _ => None,
+        }
+    }
 }
 
 #[derive(StrEnum, Debug, PartialEq)]
@@ -168,41 +249,6 @@ pub enum BinOp {
 
     /// Type cast operator
     As,
-
-    /// Compound assignment operators
-    #[strenum("+=")]
-    PlusEq,
-
-    #[strenum("-=")]
-    MinusEq,
-
-    #[strenum("*=")]
-    StarEq,
-
-    #[strenum("/=")]
-    SlashEq,
-
-    #[strenum("%=")]
-    PercentEq,
-
-    #[strenum("^=")]
-    CaretEq,
-
-    #[strenum("&=")]
-    AndEq,
-
-    #[strenum("|=")]
-    OrEq,
-
-    #[strenum("<<=")]
-    ShlEq,
-
-    #[strenum(">>=")]
-    ShrEq,
-
-    /// Assignment operators
-    #[strenum("=")]
-    Eq,
 
     /// Comparison operators
     #[strenum("==")]

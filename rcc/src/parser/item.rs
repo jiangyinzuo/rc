@@ -8,13 +8,13 @@ use crate::rcc::RccError;
 use std::string::ToString;
 
 impl<'a> Parse<'a> for VisItem {
-    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        match cxt.next_token()? {
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        match cursor.next_token()? {
             Token::Pub => {
-                cxt.bump_token()?;
+                cursor.bump_token()?;
                 Ok(VisItem {
                     vis: Visibility::Pub,
-                    inner_item: InnerItem::parse(cxt)?,
+                    inner_item: InnerItem::parse(cursor)?,
                 })
             }
             Token::Fn
@@ -24,7 +24,7 @@ impl<'a> Parse<'a> for VisItem {
             | Token::Static
             | Token::Impl => Ok(VisItem {
                 vis: Visibility::Priv,
-                inner_item: InnerItem::parse(cxt)?,
+                inner_item: InnerItem::parse(cursor)?,
             }),
             _ => Err("invalid vis item".into()),
         }
@@ -32,11 +32,11 @@ impl<'a> Parse<'a> for VisItem {
 }
 
 impl<'a> Parse<'a> for InnerItem {
-    fn parse(cxt: &mut ParseCursor<'a>) -> Result<Self, RccError> {
-        match cxt.next_token()? {
-            Token::Fn => Ok(Self::Fn(ItemFn::parse(cxt)?)),
-            Token::Struct => Ok(Self::Struct(ItemStruct::parse(cxt)?)),
-            Token::Enum => Ok(Self::Enum(TypeEnum::parse(cxt)?)),
+    fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
+        match cursor.next_token()? {
+            Token::Fn => Ok(Self::Fn(ItemFn::parse(cursor)?)),
+            Token::Struct => Ok(Self::Struct(ItemStruct::parse(cursor)?)),
+            Token::Enum => Ok(Self::Enum(TypeEnum::parse(cursor)?)),
             Token::Static => unimplemented!(),
             Token::Const => unimplemented!(),
             Token::Impl => unimplemented!(),
@@ -50,7 +50,7 @@ impl<'a> Parse<'a> for InnerItem {
 impl<'a> Parse<'a> for ItemStruct {
     fn parse(cursor: &mut ParseCursor<'a>) -> Result<Self, RccError> {
         debug_assert!(cursor.next_token()? == &Token::Struct);
-        cursor.bump_token();
+        cursor.bump_token()?;
         let ident = cursor.bump_token()?;
         if let Token::Identifier(struct_name) = ident {
             let type_struct = Self::new(struct_name.to_string());

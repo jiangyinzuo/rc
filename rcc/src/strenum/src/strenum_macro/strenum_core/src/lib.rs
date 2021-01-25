@@ -1,9 +1,9 @@
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::*;
-use syn::spanned::Spanned;
-use syn::{DataEnum, DeriveInput, Expr};
 use std::fmt::Formatter;
+use syn::spanned::Spanned;
+use syn::{parse2, DataEnum, DeriveInput, Expr};
 
 const STR_ENUM: &str = "strenum";
 const DISABLED: &str = "disabled";
