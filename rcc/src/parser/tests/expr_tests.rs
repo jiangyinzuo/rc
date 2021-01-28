@@ -1,11 +1,12 @@
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
+use crate::ast::expr::UnOp::{Borrow, BorrowMut};
 use crate::ast::expr::{
-    AssignExpr, AssignOp, BlockExpr, BorrowExpr, GroupedExpr, PathExpr, RangeExpr, ReturnExpr,
-    TupleExpr,
+    AssignExpr, AssignOp, BlockExpr, GroupedExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
+use crate::ast::types::Type::Identifier;
 use crate::parser::tests::parse_validate;
 
 #[test]
@@ -74,11 +75,16 @@ fn return_expr_test() {
 fn borrow_expr_test() {
     parse_validate(
         vec!["&&&&mut a"],
-        vec![Ok(Borrow(BorrowExpr {
-            borrow_cnt: 4,
-            is_mut: true,
-            expr: Box::new(Path(vec!["a"].into())),
-        }))],
+        vec![Ok(Unary(UnAryExpr::new(
+            Borrow,
+            Unary(UnAryExpr::new(
+                Borrow,
+                Unary(UnAryExpr::new(
+                    Borrow,
+                    Unary(UnAryExpr::new(BorrowMut, Path("a".into()))),
+                )),
+            )),
+        )))],
     );
 }
 
@@ -107,7 +113,9 @@ fn range_test() {
     parse_validate(
         vec!["1..3", "..=2", "3.."],
         vec![
-            Ok(Range(RangeExpr::new(DotDot).lhs(Lit(1.into())).rhs(Lit(3.into())))),
+            Ok(Range(
+                RangeExpr::new(DotDot).lhs(Lit(1.into())).rhs(Lit(3.into())),
+            )),
             Ok(Range(RangeExpr::new(DotDotEq).rhs(Lit(2.into())))),
             Ok(Range(RangeExpr::new(DotDot).lhs(Lit(3.into())))),
         ],

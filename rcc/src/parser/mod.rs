@@ -94,7 +94,7 @@ impl<'a> ParseCursor<'a> {
         }
     }
 
-    pub fn eat_token(&mut self, tk: Token) -> Result<(), RccError> {
+    pub fn eat_token_eq(&mut self, tk: Token) -> Result<(), RccError> {
         if self.bump_token()? != &tk {
             Err(self.err(tk.to_string()).into())
         } else {
@@ -112,7 +112,7 @@ impl<'a> ParseCursor<'a> {
         Err(self.err(format!("{:?}", tks)).into())
     }
 
-    pub fn eat_token_if(&mut self, tk: Token) -> bool {
+    pub fn eat_token_if_eq(&mut self, tk: Token) -> bool {
         if let Ok(next_tk) = self.next_token() {
             if next_tk == &tk {
                 self.bump_token();
@@ -133,7 +133,7 @@ impl<'a> ParseCursor<'a> {
         None
     }
 
-    pub fn eat_if_from_token<T: FromToken>(&mut self) -> Option<T> {
+    pub fn eat_token_if_from<T: FromToken>(&mut self) -> Option<T> {
         if let Ok(tk) = self.next_token() {
             let op = T::from_token(tk.clone());
             if op.is_some() && self.bump_token().is_err() {

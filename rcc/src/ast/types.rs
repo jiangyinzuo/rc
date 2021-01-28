@@ -21,6 +21,9 @@ pub enum Type {
     FnPtr(TypeFnPtr),
 
     Ptr(TypePtr),
+
+    /// !
+    Never,
 }
 
 impl From<String> for Type {
@@ -43,6 +46,7 @@ impl Debug for Type {
             Self::Slice(ts) => write!(f, "[{:?}]", ts),
             Self::FnPtr(fptr) => write!(f, "{:?}", fptr),
             Self::Ptr(ptr) => write!(f, "{:?}", ptr),
+            Self::Never => write!(f, "!")
         }
     }
 }

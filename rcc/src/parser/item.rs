@@ -89,10 +89,10 @@ impl Parse for TypeEnum {
 
 impl Parse for ItemFn {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        cursor.eat_token(Token::Fn)?;
+        cursor.eat_token_eq(Token::Fn)?;
         let fn_name = cursor.eat_identifier()?;
-        cursor.eat_token(Token::LeftParen)?;
-        cursor.eat_token(Token::RightParen)?;
+        cursor.eat_token_eq(Token::LeftParen)?;
+        cursor.eat_token_eq(Token::RightParen)?;
         match cursor.next_token()? {
             Token::RArrow => {
                 cursor.bump_token()?;

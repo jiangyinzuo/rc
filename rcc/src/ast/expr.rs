@@ -1,12 +1,39 @@
 use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 use strenum::StrEnum;
-
 use crate::ast::stmt::Stmt;
 use crate::ast::TokenStart;
 use crate::lexer::token::LiteralKind::{Char, Integer};
+use crate::lexer::token::Token;
 use crate::lexer::token::Token::{Minus, Not, Star};
-use crate::lexer::token::{LiteralKind, Token};
+use std::cmp::Ordering;
+
+macro_rules! from_token {
+    (
+        #[$($attrs_pub:tt)*]
+        pub enum $name:ident {
+            $(
+              $(#[$($attrs:tt)*])*
+              $variant:ident,)*
+        }
+    ) => {
+        #[$($attrs_pub)*]
+        pub enum $name {
+            $(
+              $(#[$($attrs)*])*
+              $variant,)*
+        }
+
+       impl FromToken for BinOperator {
+           fn from_token(tk: Token) -> Option<Self> {
+               match tk {
+                   $(Token::$variant => Some(Self::$variant),)*
+                   _ => None,
+               }
+           }
+       }
+    };
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -14,7 +41,6 @@ pub enum Expr {
     Lit(LitExpr),
     Unary(UnAryExpr),
     Block(BlockExpr),
-    Borrow(BorrowExpr),
     Assign(AssignExpr),
     Range(RangeExpr),
     BinOp(BinOpExpr),
@@ -27,11 +53,34 @@ pub enum Expr {
     EnumVariant,
     Call(CallExpr),
     MethodCall,
-    FieldAccess,
+    FieldAccess(FieldAccessExpr),
     Loop(LoopExpr),
     If,
     Match,
     Return(ReturnExpr),
+    Break(BreakExpr),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ConstantExpr<V> {
+    expr: Option<Box<Expr>>,
+    const_value: Option<V>,
+}
+
+impl<V> ConstantExpr<V> {
+    pub fn const_value(value: V) -> ConstantExpr<V> {
+        ConstantExpr {
+            expr: None,
+            const_value: Some(value),
+        }
+    }
+
+    pub fn expr(expr: Expr) -> ConstantExpr<V> {
+        ConstantExpr {
+            expr: Some(Box::new(expr)),
+            const_value: None,
+        }
+    }
 }
 
 impl TokenStart for Expr {
@@ -41,7 +90,7 @@ impl TokenStart for Expr {
             Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
             Token::If | Token::Match | Token::Return
         ) || UnAryExpr::is_token_start(tk)
-            || BorrowExpr::is_token_start(tk)
+            || RangeExpr::is_token_start(tk)
             || LoopExpr::is_token_start(tk)
     }
 }
@@ -131,9 +180,18 @@ pub struct UnAryExpr {
     pub expr: Box<Expr>,
 }
 
+impl UnAryExpr {
+    pub fn new(op: UnOp, expr: Expr) -> Self {
+        UnAryExpr {
+            op,
+            expr: Box::new(expr),
+        }
+    }
+}
+
 impl TokenStart for UnAryExpr {
     fn is_token_start(tk: &Token) -> bool {
-        matches!(tk, Token::Not | Token::Star | Token::Minus)
+        matches!(tk, Token::Not | Token::Star | Token::Minus | Token::And | Token::AndAnd)
     }
 }
 
@@ -145,40 +203,37 @@ pub enum UnOp {
     Not,
     /// The `-` operator for negation
     Neg,
+    /// `&`
+    Borrow,
+    /// `& mut`
+    BorrowMut,
 }
 
 impl Debug for UnOp {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_char(match self {
-            Self::Deref => '*',
-            Self::Not => '!',
-            Self::Neg => '-',
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Deref => "*",
+                Self::Not => "!",
+                Self::Neg => "-",
+                Self::Borrow => "&",
+                Self::BorrowMut => "& mut",
+            }
+        )
     }
 }
 
-impl UnOp {
-    pub fn from_token(tk: &Token) -> Option<Self> {
+impl FromToken for UnOp {
+    fn from_token(tk: Token) -> Option<Self> {
         match tk {
-            Minus => Some(Self::Neg),
-            Star => Some(Self::Deref),
-            Not => Some(Self::Not),
+            Token::Minus => Some(Self::Neg),
+            Token::Star => Some(Self::Deref),
+            Token::Not => Some(Self::Not),
+            Token::And => Some(Self::Borrow),
             _ => None,
         }
-    }
-}
-
-/// BorrowExpr -> (& | &&) mut? Expr
-#[derive(Debug, PartialEq)]
-pub struct BorrowExpr {
-    pub borrow_cnt: u32,
-    pub is_mut: bool,
-    pub expr: Box<Expr>,
-}
-
-impl TokenStart for BorrowExpr {
-    fn is_token_start(tk: &Token) -> bool {
-        tk == &Token::And || tk == &Token::AndAnd
     }
 }
 
@@ -277,13 +332,27 @@ impl RangeExpr {
     }
 
     pub fn lhs(mut self, lhs: Expr) -> Self {
-        self.lhs = Some(Box::new(lhs));
+        self.set_lhs(lhs);
         self
     }
 
     pub fn rhs(mut self, rhs: Expr) -> Self {
-        self.rhs = Some(Box::new(rhs));
+        self.set_rhs(rhs);
         self
+    }
+
+    pub fn set_lhs(&mut self, lhs: Expr) {
+        self.lhs = Some(Box::new(lhs));
+    }
+
+    pub fn set_rhs(&mut self, rhs: Expr) {
+        self.rhs = Some(Box::new(rhs));
+    }
+}
+
+impl TokenStart for RangeExpr {
+    fn is_token_start(tk: &Token) -> bool {
+         tk == &Token::DotDotEq || tk == &Token::DotDot
     }
 }
 
@@ -311,71 +380,128 @@ impl FromToken for RangeOp {
 #[derive(Debug, PartialEq)]
 pub struct BinOpExpr {
     lhs: Box<Expr>,
-    bin_op: BinOp,
+    bin_op: BinOperator,
     rhs: Box<Expr>,
 }
 
-#[derive(StrEnum, Debug, PartialEq)]
-pub enum BinOp {
-    /// Arithmetic or logical operators
-    #[strenum("+")]
-    Plus,
+impl BinOpExpr {
+    pub fn new(lhs: Expr, bin_op: BinOperator, rhs: Expr) -> Self {
+        BinOpExpr {
+            lhs: Box::new(lhs),
+            bin_op,
+            rhs: Box::new(rhs),
+        }
+    }
+}
 
-    #[strenum("-")]
-    Minus,
+from_token! {
+#[derive(StrEnum, Debug, PartialEq, Clone)]
+    pub enum BinOperator {
+        /// Arithmetic or logical operators
+        #[strenum("+")]
+        Plus,
 
-    #[strenum("*")]
-    Star,
+        #[strenum("-")]
+        Minus,
 
-    #[strenum("/")]
-    Slash,
+        #[strenum("*")]
+        Star,
 
-    #[strenum("%")]
-    Percent,
+        #[strenum("/")]
+        Slash,
 
-    #[strenum("^")]
-    Caret,
+        #[strenum("%")]
+        Percent,
 
-    #[strenum("&")]
-    And,
+        #[strenum("^")]
+        Caret,
 
-    #[strenum("|")]
-    Or,
+        #[strenum("&")]
+        And,
 
-    #[strenum("<<")]
-    Shl,
+        #[strenum("|")]
+        Or,
 
-    #[strenum(">>")]
-    Shr,
+        #[strenum("<<")]
+        Shl,
 
-    /// Lazy boolean operators
-    #[strenum("&&")]
-    AndAnd,
+        #[strenum(">>")]
+        Shr,
 
-    #[strenum("||")]
-    OrOr,
+        /// Lazy boolean operators
+        #[strenum("&&")]
+        AndAnd,
 
-    /// Type cast operator
+        #[strenum("||")]
+        OrOr,
+
+        /// Type cast operator
+        As,
+
+        /// Comparison operators
+        #[strenum("==")]
+        EqEq,
+
+        #[strenum("!=")]
+        Ne,
+
+        #[strenum(">")]
+        Gt,
+
+        #[strenum("<")]
+        Lt,
+
+        #[strenum(">=")]
+        Ge,
+
+        #[strenum("<=")]
+        Le,
+    }
+}
+
+/// ```
+/// assert!(Precedence::As < Precedence::Multi);
+/// ```
+#[derive(Debug, PartialOrd, PartialEq)]
+enum Precedence {
     As,
+    Multi,
+    Add,
+    Shift,
+    And,
+    Xor,
+    Or,
+    Cmp,
+    AndAnd,
+    OrOr,
+}
 
-    /// Comparison operators
-    #[strenum("==")]
-    EqEq,
+impl Precedence {
+    fn from_bin_op(op: &BinOperator) -> Self {
+        match op {
+            BinOperator::As => Self::As,
+            BinOperator::Star | BinOperator::Slash | BinOperator::Percent => Self::Multi,
+            BinOperator::Plus | BinOperator::Minus => Self::Add,
+            BinOperator::Shl | BinOperator::Shr => Self::Shift,
+            BinOperator::And => Self::And,
+            BinOperator::Caret => Self::Xor,
+            BinOperator::Or => Self::Or,
+            BinOperator::EqEq
+            | BinOperator::Ne
+            | BinOperator::Gt
+            | BinOperator::Lt
+            | BinOperator::Ge
+            | BinOperator::Le => Self::Cmp,
+            BinOperator::AndAnd => Self::AndAnd,
+            BinOperator::OrOr => Self::OrOr,
+        }
+    }
+}
 
-    #[strenum("!=")]
-    Ne,
-
-    #[strenum(">")]
-    Gt,
-
-    #[strenum("<")]
-    Lt,
-
-    #[strenum(">=")]
-    Ge,
-
-    #[strenum("<=")]
-    Le,
+impl PartialOrd for BinOperator {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Precedence::from_bin_op(self).partial_cmp(&Precedence::from_bin_op(other))
+    }
 }
 
 /// GroupExpr -> `(` Expr `)`
@@ -383,12 +509,37 @@ pub type GroupedExpr = Box<Expr>;
 
 #[derive(Debug, PartialEq)]
 pub struct ArrayExpr {
-    // TODO
+    elems: Vec<Expr>,
+    len: ConstantExpr<usize>,
+}
+
+impl ArrayExpr {
+    pub fn new(elems: Vec<Expr>, len: ConstantExpr<usize>) -> Self {
+        ArrayExpr { elems, len }
+    }
+
+    pub fn elems(elems: Vec<Expr>) -> Self {
+        let length = elems.len();
+        ArrayExpr {
+            elems,
+            len: ConstantExpr::<usize>::const_value(length),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
 pub struct ArrayIndexExpr {
-    // TODO
+    pub expr: Box<Expr>,
+    pub index_expr: Box<Expr>,
+}
+
+impl ArrayIndexExpr {
+    pub fn new(expr: Expr, index_expr: Expr) -> Self {
+        ArrayIndexExpr {
+            expr: Box::new(expr),
+            index_expr: Box::new(index_expr),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -406,16 +557,41 @@ pub struct StructExpr;
 pub struct ReturnExpr(pub Box<Expr>);
 
 #[derive(Debug, PartialEq)]
+pub struct BreakExpr(pub Option<Box<Expr>>);
+
+#[derive(Debug, PartialEq)]
 pub struct CallExpr {
     pub expr: Box<Expr>,
-    pub call_params: Vec<Expr>,
+    pub call_params: CallParams,
 }
+
+pub type CallParams = Vec<Expr>;
 
 impl CallExpr {
     pub fn new(expr: Expr) -> Self {
         CallExpr {
             expr: Box::new(expr),
             call_params: vec![],
+        }
+    }
+
+    pub fn call_params(mut self, call_params: Vec<Expr>) -> Self {
+        self.call_params = call_params;
+        self
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FieldAccessExpr {
+    pub lhs: Box<Expr>,
+    pub rhs: Box<Expr>,
+}
+
+impl FieldAccessExpr {
+    pub fn new(lhs: Expr, rhs: Expr) -> Self {
+        FieldAccessExpr {
+            lhs: Box::new(lhs),
+            rhs: Box::new(rhs),
         }
     }
 }
