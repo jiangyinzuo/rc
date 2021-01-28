@@ -2,13 +2,15 @@ use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
 use crate::ast::expr::{
-    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, GroupedExpr, PathExpr, RangeExpr,
-    ReturnExpr, TupleExpr,
+    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, GroupedExpr, IfExpr, PathExpr,
+    RangeExpr, ReturnExpr, TupleExpr,
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
+use crate::ast::stmt::Stmt::ExprStmt;
 use crate::ast::types::Type::Identifier;
 use crate::parser::tests::parse_validate;
+use std::env::var;
 
 #[test]
 fn path_expr_test() {
@@ -140,18 +142,38 @@ fn left_paren_test() {
 fn bin_op_test() {
     parse_validate(
         vec!["1+2*4+6", "1>=2<=3"],
-        vec![Ok(BinOp(BinOpExpr::new(
-            BinOp(BinOpExpr::new(
-                Lit(1.into()),
-                BinOperator::Plus,
+        vec![
+            Ok(BinOp(BinOpExpr::new(
                 BinOp(BinOpExpr::new(
-                    Lit(2.into()),
-                    BinOperator::Star,
-                    Lit(4.into()),
+                    Lit(1.into()),
+                    BinOperator::Plus,
+                    BinOp(BinOpExpr::new(
+                        Lit(2.into()),
+                        BinOperator::Star,
+                        Lit(4.into()),
+                    )),
                 )),
-            )),
-            BinOperator::Plus,
-            Lit(6.into()),
-        ))), Err("Chained comparison operator require parentheses")],
+                BinOperator::Plus,
+                Lit(6.into()),
+            ))),
+            Err("Chained comparison operator require parentheses"),
+        ],
+    );
+}
+
+#[test]
+fn if_expr_test() {
+    parse_validate(
+        vec!["if true {} else {}", "if false {true}"],
+        vec![
+            Ok(If(IfExpr::from_exprs(
+                vec![LitBool(true)],
+                vec![BlockExpr::new(), BlockExpr::new()],
+            ))),
+            Ok(If(IfExpr::from_exprs(
+                vec![LitBool(false)],
+                vec![vec![LitBool(true).into()].into()],
+            ))),
+        ],
     );
 }

@@ -1,12 +1,12 @@
-use std::fmt;
-use std::fmt::{Debug, Formatter, Write};
-use strenum::StrEnum;
+use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
 use crate::ast::TokenStart;
 use crate::lexer::token::LiteralKind::{Char, Integer};
 use crate::lexer::token::Token;
 use crate::lexer::token::Token::{Minus, Not, Star};
-use crate::ast::expr::Expr::Path;
+use std::fmt;
+use std::fmt::{Debug, Formatter, Write};
+use strenum::StrEnum;
 
 macro_rules! from_token {
     (
@@ -39,6 +39,7 @@ macro_rules! from_token {
 pub enum Expr {
     Path(PathExpr),
     Lit(LitExpr),
+    LitBool(bool),
     Unary(UnAryExpr),
     Block(BlockExpr),
     Assign(AssignExpr),
@@ -55,7 +56,7 @@ pub enum Expr {
     MethodCall,
     FieldAccess(FieldAccessExpr),
     Loop(LoopExpr),
-    If,
+    If(IfExpr),
     Match,
     Return(ReturnExpr),
     Break(BreakExpr),
@@ -92,7 +93,7 @@ impl<V> ConstantExpr<V> {
 impl TokenStart for Expr {
     fn is_token_start(tk: &Token) -> bool {
         matches!(tk,
-            Token::Identifier(_) | Token::Literal {..} | Token::DotDot |
+            Token::Identifier(_) | Token::Literal {..} | Token::True | Token::False | Token::DotDot |
             Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
             Token::If | Token::Match | Token::Return
         ) || UnAryExpr::is_token_start(tk)
@@ -197,7 +198,10 @@ impl UnAryExpr {
 
 impl TokenStart for UnAryExpr {
     fn is_token_start(tk: &Token) -> bool {
-        matches!(tk, Token::Not | Token::Star | Token::Minus | Token::And | Token::AndAnd)
+        matches!(
+            tk,
+            Token::Not | Token::Star | Token::Minus | Token::And | Token::AndAnd
+        )
     }
 }
 
@@ -358,7 +362,7 @@ impl RangeExpr {
 
 impl TokenStart for RangeExpr {
     fn is_token_start(tk: &Token) -> bool {
-         tk == &Token::DotDotEq || tk == &Token::DotDot
+        tk == &Token::DotDotEq || tk == &Token::DotDot
     }
 }
 
@@ -593,6 +597,33 @@ impl FieldAccessExpr {
             lhs: Box::new(lhs),
             rhs: Box::new(rhs),
         }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct IfExpr {
+    conditions: Vec<Expr>,
+    blocks: Vec<BlockExpr>,
+}
+
+impl IfExpr {
+    pub fn new() -> Self {
+        IfExpr {
+            conditions: vec![],
+            blocks: vec![],
+        }
+    }
+
+    pub fn from_exprs(conditions: Vec<Expr>, blocks: Vec<BlockExpr>) -> Self {
+        IfExpr { conditions, blocks }
+    }
+
+    pub fn add_cond(&mut self, expr: Expr) {
+        self.conditions.push(expr);
+    }
+
+    pub fn add_block(&mut self, block_expr: BlockExpr) {
+        self.blocks.push(block_expr);
     }
 }
 

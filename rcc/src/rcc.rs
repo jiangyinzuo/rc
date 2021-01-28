@@ -1,6 +1,6 @@
 use crate::ast::file::File;
 use crate::code_gen::{CodeGen, TargetPlatform};
-use crate::ir::{BasicBlock, IRGen, IRGenContext};
+use crate::ir::{IRGen, IRGenContext};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use std::error::Error;

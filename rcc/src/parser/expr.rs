@@ -16,7 +16,10 @@ impl Parse for Expr {
 pub mod prec {
     use crate::ast::expr::Expr::{ArrayIndex, Assign, Call, FieldAccess, Range, Unary};
     use crate::ast::expr::UnOp::{Borrow, BorrowMut};
-    use crate::ast::expr::{ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr, FieldAccessExpr, FromToken, RangeExpr, UnAryExpr, UnOp, Precedence};
+    use crate::ast::expr::{
+        ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr,
+        FieldAccessExpr, FromToken, Precedence, RangeExpr, UnAryExpr, UnOp,
+    };
     use crate::ast::TokenStart;
     use crate::lexer::token::Token;
     use crate::parser::expr::primitive::primitive_expr;
@@ -117,7 +120,9 @@ pub mod prec {
                         let prec_next = Precedence::from_bin_op(&next_op);
                         if prec_last <= prec_next {
                             if prec_last == Precedence::Cmp && prec_last == prec_next {
-                                return Err("Chained comparison operator require parentheses".into());
+                                return Err(
+                                    "Chained comparison operator require parentheses".into()
+                                );
                             }
                             reduce(&mut bin_ops, &mut exprs);
                         }
@@ -223,7 +228,7 @@ pub mod prec {
 
 /// Primitive Expressions
 pub mod primitive {
-    use crate::ast::expr::Expr::{Array, Block, Lit, Path};
+    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Path};
     use crate::ast::expr::*;
     use crate::ast::stmt::Stmt;
     use crate::lexer::token::LiteralKind::*;
@@ -240,9 +245,11 @@ pub mod primitive {
         let expr = match cursor.next_token()? {
             Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
             Token::Literal { .. } => Lit(LitExpr::parse(cursor)?),
+            Token::True | Token::False => LitBool(*cursor.bump_token()? == Token::True),
             Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
             Token::LeftParen => parse_grouped_or_tuple_expr(cursor)?,
             Token::LeftSquareBrackets => Array(ArrayExpr::parse(cursor)?),
+            Token::If => If(IfExpr::parse(cursor)?),
             Token::Return => Expr::Return(ReturnExpr::parse(cursor)?),
             Token::Break => Expr::Break(BreakExpr::parse(cursor)?),
             Token::DotDot | Token::DotDotEq => range_expr(cursor)?,
@@ -360,7 +367,7 @@ pub mod primitive {
     impl Parse for BlockExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::LeftCurlyBraces)?;
-            let mut block_expr = BlockExpr { stmts: vec![] };
+            let mut block_expr = BlockExpr::new();
             while cursor.next_token()? != &Token::RightCurlyBraces {
                 block_expr.stmts.push(Stmt::parse(cursor)?);
             }
@@ -406,6 +413,23 @@ pub mod primitive {
                     }
                 }
             }
+        }
+    }
+
+    /// IfExpr -> `if` Expr BlockExpr ( `else` (BlockExpr | IfExpr) )?
+    impl Parse for IfExpr {
+        fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+            cursor.eat_token_eq(Token::If)?;
+            let mut if_expr = IfExpr::new();
+            if_expr.add_cond(Expr::parse(cursor)?);
+            if_expr.add_block(BlockExpr::parse(cursor)?);
+            while cursor.eat_token_if_eq(Token::Else) {
+                if cursor.eat_token_if_eq(Token::If) {
+                    if_expr.add_cond(Expr::parse(cursor)?);
+                }
+                if_expr.add_block(BlockExpr::parse(cursor)?);
+            }
+            Ok(if_expr)
         }
     }
 

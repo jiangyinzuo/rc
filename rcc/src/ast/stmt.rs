@@ -2,6 +2,7 @@ use super::pattern::Pattern;
 use crate::ast::expr::Expr;
 use crate::ast::item::VisItem;
 use crate::ast::types::Type;
+use crate::ast::stmt::Stmt::ExprStmt;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
@@ -9,6 +10,12 @@ pub enum Stmt {
     Item(VisItem),
     Let(LetStmt),
     ExprStmt(Expr),
+}
+
+impl From<Expr> for Stmt {
+    fn from(expr: Expr) -> Self {
+        ExprStmt(expr)
+    }
 }
 
 #[derive(Debug, PartialEq)]
