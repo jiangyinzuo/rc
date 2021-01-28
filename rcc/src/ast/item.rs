@@ -1,4 +1,5 @@
 use crate::ast::expr::BlockExpr;
+use crate::ast::pattern::Pattern;
 use crate::ast::types::Type;
 use crate::ast::{NamedASTNode, TokenStart, Visibility};
 use crate::lexer::token::Token;
@@ -6,17 +7,39 @@ use crate::lexer::token::Token;
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
     pub name: String,
+    pub fn_params: FnParams,
     pub ret_type: Type,
     pub fn_block: Option<BlockExpr>,
 }
 
 impl ItemFn {
-    pub fn new(name: String, ret_type: Type, fn_block: BlockExpr) -> Self {
+    pub fn new(name: String, fn_params: FnParams, ret_type: Type, fn_block: BlockExpr) -> Self {
         ItemFn {
             name,
+            fn_params,
             ret_type,
             fn_block: Some(fn_block),
         }
+    }
+}
+
+pub type FnParams = Vec<FnParam>;
+
+#[derive(Debug, PartialEq)]
+pub struct FnParam {
+    pattern: Pattern,
+    _type: Type,
+}
+
+impl FnParam {
+    pub fn new(pattern: Pattern, _type: Type) -> Self {
+        FnParam { pattern, _type }
+    }
+}
+
+impl TokenStart for FnParam {
+    fn is_token_start(tk: &Token) -> bool {
+        Pattern::is_token_start(tk)
     }
 }
 
@@ -40,7 +63,7 @@ impl VisItem {
 
 impl TokenStart for VisItem {
     fn is_token_start(tk: &Token) -> bool {
-        tk == &Token::Pub || InnerItem::is_token_start(tk) 
+        tk == &Token::Pub || InnerItem::is_token_start(tk)
     }
 }
 
@@ -59,7 +82,7 @@ pub enum InnerItem {
     Struct(ItemStruct),
 
     /// enum Color { Red, Yellow }
-    Enum(TypeEnum),
+    Enum(ItemEnum),
 
     /// const A: i32 = 2;
     Const,
@@ -69,6 +92,9 @@ pub enum InnerItem {
 
     /// impl Foo { ... }
     Impl,
+
+    /// extern "C" {}
+    ExternalBlock,
 }
 
 impl TokenStart for InnerItem {
@@ -129,13 +155,13 @@ impl ItemStruct {
 ///     Admin,
 /// }
 #[derive(Debug, PartialEq)]
-pub struct TypeEnum {
+pub struct ItemEnum {
     name: String,
-    enum_items: Vec<EnumItem>,
+    enum_items: Vec<EnumVariant>,
 }
 
 #[derive(Debug, PartialEq)]
-pub struct EnumItem {
+pub struct EnumVariant {
     name: String,
     fields: Fields,
 }

@@ -6,7 +6,7 @@ use crate::ast::TokenStart;
 use crate::lexer::token::LiteralKind::{Char, Integer};
 use crate::lexer::token::Token;
 use crate::lexer::token::Token::{Minus, Not, Star};
-use std::cmp::Ordering;
+use crate::ast::expr::Expr::Path;
 
 macro_rules! from_token {
     (
@@ -59,6 +59,12 @@ pub enum Expr {
     Match,
     Return(ReturnExpr),
     Break(BreakExpr),
+}
+
+impl From<&str> for Expr {
+    fn from(ident: &str) -> Self {
+        Path(ident.into())
+    }
 }
 
 #[derive(Debug, PartialEq)]

@@ -1,6 +1,15 @@
+use crate::ast::TokenStart;
+use crate::lexer::token::Token;
+
 #[derive(Debug, PartialEq)]
 pub enum Pattern {
     Identifier(IdentifierPattern),
+}
+
+impl TokenStart for Pattern {
+    fn is_token_start(tk: &Token) -> bool {
+        IdentifierPattern::is_token_start(tk)
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -22,5 +31,11 @@ impl IdentifierPattern {
             ident,
             is_mut: false
         }
+    }
+}
+
+impl TokenStart for IdentifierPattern {
+    fn is_token_start(tk: &Token) -> bool {
+        matches!(tk, Token::Identifier(_)) 
     }
 }
