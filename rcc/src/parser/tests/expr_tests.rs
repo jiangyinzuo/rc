@@ -2,8 +2,8 @@ use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
 use crate::ast::expr::{
-    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, GroupedExpr, IfExpr, PathExpr,
-    RangeExpr, ReturnExpr, TupleExpr,
+    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, FieldAccessExpr,
+    GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
@@ -175,5 +175,15 @@ fn if_expr_test() {
                 vec![vec![LitBool(true).into()].into()],
             ))),
         ],
+    );
+}
+
+#[test]
+fn call_expr_test() {
+    parse_validate(
+        vec!["1.hello()()"],
+        vec![Ok(Call(CallExpr::new(Call(CallExpr::new(FieldAccess(
+            FieldAccessExpr::new(Lit(1.into()), "hello".into()),
+        ))))))],
     );
 }

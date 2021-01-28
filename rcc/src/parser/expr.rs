@@ -173,7 +173,7 @@ pub mod prec {
     }
 
     /// CallExpr -> PrimitiveExpr
-    ///           | CallExpr `(` CallParamsExpr `)`
+    ///           | CallExpr `(` CallParams? `)`
     ///           | CallExpr ArrayIndexExpr
     ///           | CallExpr `.` PrimitiveExpr
     fn call_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
@@ -182,9 +182,14 @@ pub mod prec {
             expr = match tk {
                 Token::LeftParen => {
                     cursor.bump_token()?;
-                    let call_params = CallParams::parse(cursor)?;
-                    cursor.eat_token_eq(Token::RightParen)?;
-                    Call(CallExpr::new(expr).call_params(call_params))
+                    let mut call_expr =CallExpr::new(expr);
+
+                    if !cursor.eat_token_if_eq(Token::RightParen) {
+                        let call_params = CallParams::parse(cursor)?;
+                        cursor.eat_token_eq(Token::RightParen)?;
+                        call_expr = call_expr.call_params(call_params);
+                    }
+                    Call(call_expr)
                 }
                 Token::LeftSquareBrackets => {
                     let index_expr = ArrayIndexExpr::parse_index(cursor)?;
@@ -201,8 +206,7 @@ pub mod prec {
         Ok(expr)
     }
 
-    /// CallParams ->
-    ///    Expr ( , Expr )* ,?
+    /// CallParams -> Expr ( , Expr )* ,?
     impl Parse for CallParams {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             let mut call_params = vec![];
