@@ -2,7 +2,8 @@ use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
 use crate::ast::expr::{
-    AssignExpr, AssignOp, BlockExpr, GroupedExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
+    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, GroupedExpr, PathExpr, RangeExpr,
+    ReturnExpr, TupleExpr,
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
@@ -132,5 +133,25 @@ fn left_paren_test() {
             Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(2.into())]))),
             Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(22.into())]))),
         ],
+    );
+}
+
+#[test]
+fn bin_op_test() {
+    parse_validate(
+        vec!["1+2*4+6", "1>=2<=3"],
+        vec![Ok(BinOp(BinOpExpr::new(
+            BinOp(BinOpExpr::new(
+                Lit(1.into()),
+                BinOperator::Plus,
+                BinOp(BinOpExpr::new(
+                    Lit(2.into()),
+                    BinOperator::Star,
+                    Lit(4.into()),
+                )),
+            )),
+            BinOperator::Plus,
+            Lit(6.into()),
+        ))), Err("Chained comparison operator require parentheses")],
     );
 }

@@ -170,9 +170,6 @@ pub enum Token<'a> {
     #[strenum("@")]
     At,
 
-    #[strenum("_")]
-    Underscore,
-
     #[strenum(".")]
     Dot,
 

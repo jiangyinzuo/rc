@@ -463,7 +463,7 @@ from_token! {
 /// assert!(Precedence::As < Precedence::Multi);
 /// ```
 #[derive(Debug, PartialOrd, PartialEq)]
-enum Precedence {
+pub enum Precedence {
     As,
     Multi,
     Add,
@@ -477,7 +477,7 @@ enum Precedence {
 }
 
 impl Precedence {
-    fn from_bin_op(op: &BinOperator) -> Self {
+    pub fn from_bin_op(op: &BinOperator) -> Self {
         match op {
             BinOperator::As => Self::As,
             BinOperator::Star | BinOperator::Slash | BinOperator::Percent => Self::Multi,
@@ -495,12 +495,6 @@ impl Precedence {
             BinOperator::AndAnd => Self::AndAnd,
             BinOperator::OrOr => Self::OrOr,
         }
-    }
-}
-
-impl PartialOrd for BinOperator {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Precedence::from_bin_op(self).partial_cmp(&Precedence::from_bin_op(other))
     }
 }
 

@@ -27,7 +27,9 @@ fn parse_validate<T: Parse>(
         let result = parse_input::<T>(input);
         match excepted {
             Ok(segments) => assert_eq!(Ok(segments), result),
-            Err(s) => assert_eq!(excepted.unwrap_err(), s),
+            Err(s) => {
+                assert_eq!(result.unwrap_err().0, s)
+            },
         }
     }
 }

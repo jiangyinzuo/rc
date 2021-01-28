@@ -15,13 +15,13 @@ impl Parse for Expr {
 /// Expression having precedences
 pub mod prec {
     use crate::ast::expr::Expr::{ArrayIndex, Assign, Call, FieldAccess, Range, Unary};
-    use crate::ast::expr::{ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr, FieldAccessExpr, RangeExpr, RangeOp, ReturnExpr, UnAryExpr, UnOp, FromToken};
+    use crate::ast::expr::UnOp::{Borrow, BorrowMut};
+    use crate::ast::expr::{ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr, FieldAccessExpr, FromToken, RangeExpr, UnAryExpr, UnOp, Precedence};
     use crate::ast::TokenStart;
     use crate::lexer::token::Token;
     use crate::parser::expr::primitive::primitive_expr;
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
-    use crate::ast::expr::UnOp::{Borrow, BorrowMut};
 
     pub fn parse(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
         self::assign_expr(cursor)
@@ -96,8 +96,8 @@ pub mod prec {
     fn bin_op_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
         fn reduce(bin_ops: &mut Vec<BinOperator>, exprs: &mut Vec<Expr>) {
             while let Some(last_op) = bin_ops.pop() {
-                let lhs = exprs.pop().unwrap();
                 let rhs = exprs.pop().unwrap();
+                let lhs = exprs.pop().unwrap();
                 exprs.push(Expr::BinOp(BinOpExpr::new(lhs, last_op, rhs)));
             }
             debug_assert_eq!(exprs.len(), 1);
@@ -113,7 +113,12 @@ pub mod prec {
                 if let Some(next_op) = cursor.eat_token_if_from::<BinOperator>() {
                     if let Some(last_op) = bin_ops.last() {
                         // 1 + 2 * 3   <- -
-                        if last_op < &next_op {
+                        let prec_last = Precedence::from_bin_op(last_op);
+                        let prec_next = Precedence::from_bin_op(&next_op);
+                        if prec_last <= prec_next {
+                            if prec_last == Precedence::Cmp && prec_last == prec_next {
+                                return Err("Chained comparison operator require parentheses".into());
+                            }
                             reduce(&mut bin_ops, &mut exprs);
                         }
                     }
@@ -218,7 +223,7 @@ pub mod prec {
 
 /// Primitive Expressions
 pub mod primitive {
-    use crate::ast::expr::Expr::{Array, Block, Call, Lit, Path, Range, Unary};
+    use crate::ast::expr::Expr::{Array, Block, Lit, Path};
     use crate::ast::expr::*;
     use crate::ast::stmt::Stmt;
     use crate::lexer::token::LiteralKind::*;

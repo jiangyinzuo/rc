@@ -31,7 +31,7 @@ use std::fmt::Debug;
 use crate::ast::Visibility;
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
-use crate::ast::expr::{AssignOp, RangeOp, FromToken};
+use crate::ast::expr::{FromToken};
 
 pub mod expr;
 pub mod file;
@@ -41,6 +41,7 @@ pub mod item;
 mod tests;
 mod types;
 mod stmt;
+mod pattern;
 
 pub trait Parse: Sized + Debug + PartialEq {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError>;
