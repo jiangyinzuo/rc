@@ -232,7 +232,7 @@ pub mod prec {
 
 /// Primitive Expressions
 pub mod primitive {
-    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Path};
+    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Path, While, Loop};
     use crate::ast::expr::*;
     use crate::ast::stmt::Stmt;
     use crate::lexer::token::LiteralKind::*;
@@ -253,6 +253,8 @@ pub mod primitive {
             Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
             Token::LeftParen => parse_grouped_or_tuple_expr(cursor)?,
             Token::LeftSquareBrackets => Array(ArrayExpr::parse(cursor)?),
+            Token::While => While(WhileExpr::parse(cursor)?),
+            Token::Loop => Loop(LoopExpr::parse(cursor)?),
             Token::If => If(IfExpr::parse(cursor)?),
             Token::Return => Expr::Return(ReturnExpr::parse(cursor)?),
             Token::Break => Expr::Break(BreakExpr::parse(cursor)?),
@@ -417,6 +419,20 @@ pub mod primitive {
                     }
                 }
             }
+        }
+    }
+
+    impl Parse for WhileExpr {
+        fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+            cursor.eat_token_eq(Token::While)?;
+            Ok(WhileExpr(Box::new(Expr::parse(cursor)?), Box::new(BlockExpr::parse(cursor)?)))
+        }
+    }
+
+    impl Parse for LoopExpr {
+        fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+            cursor.eat_token_eq(Token::Loop)?;
+            Ok(LoopExpr(Box::new(BlockExpr::parse(cursor)?)))
         }
     }
 

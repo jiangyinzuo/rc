@@ -54,11 +54,20 @@ pub enum Expr {
     MethodCall,
     FieldAccess(FieldAccessExpr),
     While(WhileExpr),
-    Loop(Box<BlockExpr>),
+    Loop(LoopExpr),
+    For,
     If(IfExpr),
     Match,
     Return(ReturnExpr),
     Break(BreakExpr),
+}
+
+impl Expr {
+    pub fn with_block(&self) -> bool {
+        matches!(self,
+            Self::Block(_) | Self::Struct(_) | Self::While(_) |
+            Self::Loop(_)  | Self::If(_) | Self::Match | Self::For)
+    }
 }
 
 impl From<&str> for Expr {
@@ -611,4 +620,7 @@ impl IfExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct WhileExpr(Box<Expr>, Box<BlockExpr>);
+pub struct WhileExpr(pub Box<Expr>, pub Box<BlockExpr>);
+
+#[derive(Debug, PartialEq)]
+pub struct LoopExpr(pub Box<BlockExpr>);

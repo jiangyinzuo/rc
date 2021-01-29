@@ -6,6 +6,7 @@ pub mod types;
 pub mod expr;
 pub mod stmt;
 pub mod pattern;
+pub mod visit;
 
 #[derive(Debug, PartialEq)]
 pub enum Visibility {

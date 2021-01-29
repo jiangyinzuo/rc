@@ -1,4 +1,9 @@
-mod file;
+//! Semantic analysis includes:
+//! - Symbol resolving
+//! - Type check
+//! - Flow control check
+//!
+pub mod file;
 
 use crate::rcc::RccError;
 

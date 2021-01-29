@@ -8,6 +8,10 @@ use crate::lexer::token::Token;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 
+/// Stmt -> Semi
+///       | LetStmt
+///       | Item
+///       | ExprStmt
 impl Parse for Stmt {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         Ok(match cursor.next_token()? {
@@ -17,7 +21,13 @@ impl Parse for Stmt {
             }
             Token::Let => Self::Let(LetStmt::parse(cursor)?),
             tk if VisItem::is_token_start(tk) => Self::Item(VisItem::parse(cursor)?),
-            tk if Expr::is_token_start(tk) => Self::ExprStmt(Expr::parse(cursor)?),
+            tk if Expr::is_token_start(tk) => {
+                let expr = Expr::parse(cursor)?;
+                if !expr.with_block() {
+                    cursor.eat_token_eq(Token::Semi)?;
+                }
+                Self::ExprStmt(expr)
+            },
             _ => unimplemented!(),
         })
     }
