@@ -1,9 +1,7 @@
 use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
 use crate::ast::TokenStart;
-use crate::lexer::token::LiteralKind::{Char, Integer};
 use crate::lexer::token::Token;
-use crate::lexer::token::Token::{Minus, Not, Star};
 use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 use strenum::StrEnum;
@@ -24,14 +22,14 @@ macro_rules! from_token {
               $variant,)*
         }
 
-       impl FromToken for BinOperator {
-           fn from_token(tk: Token) -> Option<Self> {
-               match tk {
-                   $(Token::$variant => Some(Self::$variant),)*
-                   _ => None,
-               }
-           }
-       }
+        impl FromToken for $name {
+            fn from_token(tk: Token) -> Option<Self> {
+                match tk {
+                    $(Token::$variant => Some(Self::$variant),)*
+                    _ => None,
+                }
+            }
+        }
     };
 }
 
@@ -55,7 +53,8 @@ pub enum Expr {
     Call(CallExpr),
     MethodCall,
     FieldAccess(FieldAccessExpr),
-    Loop(LoopExpr),
+    While(WhileExpr),
+    Loop(Box<BlockExpr>),
     If(IfExpr),
     Match,
     Return(ReturnExpr),
@@ -95,10 +94,10 @@ impl TokenStart for Expr {
         matches!(tk,
             Token::Identifier(_) | Token::Literal {..} | Token::True | Token::False | Token::DotDot |
             Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
+            Token::For | Token::Loop | Token::While |
             Token::If | Token::Match | Token::Return
         ) || UnAryExpr::is_token_start(tk)
             || RangeExpr::is_token_start(tk)
-            || LoopExpr::is_token_start(tk)
     }
 }
 
@@ -267,61 +266,43 @@ impl AssignExpr {
         }
     }
 }
+from_token! {
+    #[derive(StrEnum, Debug, PartialEq)]
+    pub enum AssignOp {
+        /// Compound assignment operators
+        #[strenum("+=")]
+        PlusEq,
 
-#[derive(StrEnum, Debug, PartialEq)]
-pub enum AssignOp {
-    /// Compound assignment operators
-    #[strenum("+=")]
-    PlusEq,
+        #[strenum("-=")]
+        MinusEq,
 
-    #[strenum("-=")]
-    MinusEq,
+        #[strenum("*=")]
+        StarEq,
 
-    #[strenum("*=")]
-    StarEq,
+        #[strenum("/=")]
+        SlashEq,
 
-    #[strenum("/=")]
-    SlashEq,
+        #[strenum("%=")]
+        PercentEq,
 
-    #[strenum("%=")]
-    PercentEq,
+        #[strenum("^=")]
+        CaretEq,
 
-    #[strenum("^=")]
-    CaretEq,
+        #[strenum("&=")]
+        AndEq,
 
-    #[strenum("&=")]
-    AndEq,
+        #[strenum("|=")]
+        OrEq,
 
-    #[strenum("|=")]
-    OrEq,
+        #[strenum("<<=")]
+        ShlEq,
 
-    #[strenum("<<=")]
-    ShlEq,
+        #[strenum(">>=")]
+        ShrEq,
 
-    #[strenum(">>=")]
-    ShrEq,
-
-    /// Assignment operators
-    #[strenum("=")]
-    Eq,
-}
-
-impl FromToken for AssignOp {
-    fn from_token(tk: Token) -> Option<Self> {
-        match tk {
-            Token::PlusEq => Some(Self::PlusEq),
-            Token::MinusEq => Some(Self::MinusEq),
-            Token::StarEq => Some(Self::StarEq),
-            Token::SlashEq => Some(Self::SlashEq),
-            Token::PercentEq => Some(Self::PercentEq),
-            Token::CaretEq => Some(Self::CaretEq),
-            Token::AndEq => Some(Self::AndEq),
-            Token::OrEq => Some(Self::OrEq),
-            Token::ShlEq => Some(Self::ShlEq),
-            Token::ShrEq => Some(Self::ShrEq),
-            Token::Eq => Some(Self::Eq),
-            _ => None,
-        }
+        /// Assignment operators
+        #[strenum("=")]
+        Eq,
     }
 }
 
@@ -405,7 +386,7 @@ impl BinOpExpr {
 }
 
 from_token! {
-#[derive(StrEnum, Debug, PartialEq, Clone)]
+    #[derive(StrEnum, Debug, PartialEq, Clone)]
     pub enum BinOperator {
         /// Arithmetic or logical operators
         #[strenum("+")]
@@ -469,6 +450,8 @@ from_token! {
     }
 }
 
+/// # Examples
+///
 /// ```
 /// assert!(Precedence::As < Precedence::Multi);
 /// ```
@@ -628,10 +611,4 @@ impl IfExpr {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct LoopExpr;
-
-impl TokenStart for LoopExpr {
-    fn is_token_start(tk: &Token) -> bool {
-        matches!(tk, Token::For | Token::Loop | Token::While)
-    }
-}
+pub struct WhileExpr(Box<Expr>, Box<BlockExpr>);
