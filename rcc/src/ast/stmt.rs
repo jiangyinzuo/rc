@@ -1,13 +1,13 @@
 use super::pattern::Pattern;
 use crate::ast::expr::Expr;
-use crate::ast::item::VisItem;
 use crate::ast::types::Type;
 use crate::ast::stmt::Stmt::ExprStmt;
+use crate::ast::item::Item;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
     Semi,
-    Item(VisItem),
+    Item(Item),
     Let(LetStmt),
     ExprStmt(Expr),
 }

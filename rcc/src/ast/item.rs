@@ -6,6 +6,7 @@ use crate::lexer::token::Token;
 
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
+    vis: Visibility,
     pub name: String,
     pub fn_params: FnParams,
     pub ret_type: Type,
@@ -13,8 +14,9 @@ pub struct ItemFn {
 }
 
 impl ItemFn {
-    pub fn new(name: String, fn_params: FnParams, ret_type: Type, fn_block: BlockExpr) -> Self {
+    pub fn new(vis: Visibility, name: String, fn_params: FnParams, ret_type: Type, fn_block: BlockExpr) -> Self {
         ItemFn {
+            vis,
             name,
             fn_params,
             ret_type,
@@ -50,31 +52,7 @@ impl NamedASTNode for ItemFn {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct VisItem {
-    pub vis: Visibility,
-    pub inner_item: InnerItem,
-}
-
-impl VisItem {
-    pub fn new(vis: Visibility, inner_item: InnerItem) -> Self {
-        VisItem { vis, inner_item }
-    }
-}
-
-impl TokenStart for VisItem {
-    fn is_token_start(tk: &Token) -> bool {
-        tk == &Token::Pub || InnerItem::is_token_start(tk)
-    }
-}
-
-impl NamedASTNode for VisItem {
-    fn ident_name(&self) -> &str {
-        self.inner_item.ident_name()
-    }
-}
-
-#[derive(Debug, PartialEq)]
-pub enum InnerItem {
+pub enum Item {
     /// fn add(a, b) { a + b }
     Fn(ItemFn),
 
@@ -97,11 +75,12 @@ pub enum InnerItem {
     ExternalBlock,
 }
 
-impl TokenStart for InnerItem {
+impl TokenStart for Item {
     fn is_token_start(tk: &Token) -> bool {
         matches!(
             tk,
-            Token::Priv
+            Token::Pub
+                | Token::Priv
                 | Token::Fn
                 | Token::Const
                 | Token::Static
@@ -112,7 +91,7 @@ impl TokenStart for InnerItem {
     }
 }
 
-impl NamedASTNode for InnerItem {
+impl NamedASTNode for Item {
     fn ident_name(&self) -> &str {
         match self {
             Self::Fn(item_fn) => item_fn.ident_name(),
@@ -123,16 +102,18 @@ impl NamedASTNode for InnerItem {
 
 /// # Examples
 /// `struct Student { name: String, age: u32 }`
-/// `struct Teacher(String, u32);`
+/// `pub struct Teacher(String, u32);`
 #[derive(Debug, PartialEq)]
 pub struct ItemStruct {
+    vis: Visibility,
     name: String,
     fields: Fields,
 }
 
 impl ItemStruct {
-    pub fn new(name: String) -> Self {
+    pub fn new(vis: Visibility, name: String) -> Self {
         ItemStruct {
+            vis,
             name,
             fields: Fields::None,
         }

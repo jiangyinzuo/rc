@@ -62,15 +62,12 @@ fn unary_expr_test() {
 fn return_expr_test() {
     parse_validate(
         vec!["{ return 0;}"],
-        vec![Ok(Block(BlockExpr {
-            stmts: vec![
-                Stmt::ExprStmt(Return(ReturnExpr(Box::new(Lit(LitExpr {
-                    ret_type: LitExpr::EMPTY_INT_TYPE.into(),
-                    value: "0".into(),
-                }))))),
-                Stmt::Semi,
-            ],
-        }))],
+        vec![Ok(Block(BlockExpr::from(vec![
+            Stmt::ExprStmt(Return(ReturnExpr(Box::new(Lit(LitExpr {
+                ret_type: LitExpr::EMPTY_INT_TYPE.into(),
+                value: "0".into(),
+            }))))),
+        ])))],
     );
 }
 
@@ -172,7 +169,7 @@ fn if_expr_test() {
             ))),
             Ok(If(IfExpr::from_exprs(
                 vec![LitBool(false)],
-                vec![vec![LitBool(true).into()].into()],
+                vec![BlockExpr::new().expr_without_block(LitBool(true))],
             ))),
         ],
     );

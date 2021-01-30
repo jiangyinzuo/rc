@@ -1,5 +1,4 @@
 use crate::lexer::token::LiteralKind::{Float, Integer};
-use crate::lexer::token::Token::True;
 use strenum::StrEnum;
 
 #[derive(Clone, Debug, PartialEq, StrEnum)]

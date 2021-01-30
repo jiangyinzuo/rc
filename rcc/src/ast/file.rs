@@ -1,6 +1,6 @@
-use crate::ast::item::VisItem;
+use crate::ast::item::Item;
 
 #[derive(Debug, PartialEq)]
 pub struct File {
-    pub items: Vec<VisItem>,
+    pub items: Vec<Item>,
 }

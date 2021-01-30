@@ -18,8 +18,9 @@ pub mod prec {
     use crate::ast::expr::UnOp::{Borrow, BorrowMut};
     use crate::ast::expr::{
         ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr,
-        FieldAccessExpr, FromToken, Precedence, RangeExpr, UnAryExpr, UnOp,
+        FieldAccessExpr, Precedence, RangeExpr, UnAryExpr, UnOp,
     };
+    use crate::ast::FromToken;
     use crate::ast::TokenStart;
     use crate::lexer::token::Token;
     use crate::parser::expr::primitive::primitive_expr;
@@ -240,6 +241,7 @@ pub mod primitive {
     use crate::parser::expr::prec::range_expr;
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
+    use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
 
     /// PrimitiveExpr -> PathExpr | LitExpr | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr
@@ -369,13 +371,22 @@ pub mod primitive {
         }
     }
 
-    /// BlockExpr -> `{` Expr* `}`
+    /// BlockExpr -> `{` Stmt* Expr(without block)? `}`
     impl Parse for BlockExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::LeftCurlyBraces)?;
             let mut block_expr = BlockExpr::new();
             while cursor.next_token()? != &Token::RightCurlyBraces {
-                block_expr.stmts.push(Stmt::parse(cursor)?);
+                match parse_stmt_or_expr_without_block(cursor)? {
+                    StmtOrExpr::Stmt(stmt ) => block_expr.stmts.push(stmt),
+                    StmtOrExpr::Expr(expr) => {
+                        if block_expr.expr_without_block.is_none() {
+                            block_expr.expr_without_block = Some(Box::new(expr));
+                        } else {
+                            return Err("expected `;`".into());
+                        }
+                    }
+                }
             }
             cursor.eat_token_eq(Token::RightCurlyBraces)?;
             Ok(block_expr)

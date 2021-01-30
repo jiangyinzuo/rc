@@ -1,6 +1,6 @@
 use crate::ast::expr::BlockExpr;
 use crate::ast::item::{
-    FnParam, FnParams, InnerItem, ItemFn, ItemStruct, StructField, TupleField, ItemEnum, VisItem,
+    FnParam, FnParams, Item, ItemFn, ItemStruct, StructField, TupleField, ItemEnum,
 };
 use crate::ast::pattern::Pattern;
 use crate::ast::types::Type;
@@ -10,36 +10,14 @@ use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 use std::string::ToString;
 
-impl Parse for VisItem {
+impl Parse for Item {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        match cursor.next_token()? {
-            Token::Pub => {
-                cursor.bump_token()?;
-                Ok(VisItem {
-                    vis: Visibility::Pub,
-                    inner_item: InnerItem::parse(cursor)?,
-                })
-            }
-            Token::Fn
-            | Token::Struct
-            | Token::Enum
-            | Token::Const
-            | Token::Static
-            | Token::Impl => Ok(VisItem {
-                vis: Visibility::Priv,
-                inner_item: InnerItem::parse(cursor)?,
-            }),
-            _ => Err("invalid vis item".into()),
-        }
-    }
-}
+        let vis = cursor.eat_token_if_from::<Visibility>().unwrap_or(Visibility::Priv);
 
-impl Parse for InnerItem {
-    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.next_token()? {
-            Token::Fn => Ok(Self::Fn(ItemFn::parse(cursor)?)),
-            Token::Struct => Ok(Self::Struct(ItemStruct::parse(cursor)?)),
-            Token::Enum => Ok(Self::Enum(ItemEnum::parse(cursor)?)),
+            Token::Fn => Ok(Self::Fn(ItemFn::parse_with_attr(cursor, vis)?)),
+            Token::Struct => Ok(Self::Struct(ItemStruct::parse_with_attr(cursor, vis)?)),
+            Token::Enum => Ok(Self::Enum(ItemEnum::parse_with_attr(cursor, vis)?)),
             Token::Static => unimplemented!(),
             Token::Const => unimplemented!(),
             Token::Impl => unimplemented!(),
@@ -50,13 +28,13 @@ impl Parse for InnerItem {
 
 /// Parse struct definition
 /// ItemStruct -> struct Identifier ; | TupleField ; | StructField
-impl Parse for ItemStruct {
-    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+impl ItemStruct {
+    fn parse_with_attr(cursor: &mut ParseCursor, vis: Visibility) -> Result<Self, RccError> {
         debug_assert!(cursor.next_token()? == &Token::Struct);
         cursor.bump_token()?;
         let ident = cursor.bump_token()?;
         if let Token::Identifier(struct_name) = ident {
-            let type_struct = Self::new(struct_name.to_string());
+            let type_struct = Self::new(vis, struct_name.to_string());
             match cursor.next_token()? {
                 // struct Foo;
                 Token::Semi => Ok(type_struct),
@@ -84,15 +62,15 @@ impl Parse for ItemStruct {
     }
 }
 
-impl Parse for ItemEnum {
-    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+impl ItemEnum {
+    fn parse_with_attr(cursor: &mut ParseCursor, vis: Visibility) -> Result<Self, RccError> {
         unimplemented!()
     }
 }
 
 /// ItemFn -> `fn` identifier `(` FnParams? `)` ( `->` Type )? BlockExpr
-impl Parse for ItemFn {
-    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+impl ItemFn {
+    fn parse_with_attr(cursor: &mut ParseCursor, vis: Visibility) -> Result<Self, RccError> {
         cursor.eat_token_eq(Token::Fn)?;
         let fn_name = cursor.eat_identifier()?;
 
@@ -116,6 +94,7 @@ impl Parse for ItemFn {
         };
         let fn_block = BlockExpr::parse(cursor)?;
         Ok(ItemFn::new(
+            vis,
             fn_name.to_string(),
             fn_params,
             ret_type,

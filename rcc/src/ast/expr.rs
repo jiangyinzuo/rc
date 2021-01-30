@@ -1,37 +1,12 @@
 use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
-use crate::ast::TokenStart;
+use crate::ast::{TokenStart, FromToken};
 use crate::lexer::token::Token;
 use std::fmt;
 use std::fmt::{Debug, Formatter, Write};
 use strenum::StrEnum;
 
-macro_rules! from_token {
-    (
-        #[$($attrs_pub:tt)*]
-        pub enum $name:ident {
-            $(
-              $(#[$($attrs:tt)*])*
-              $variant:ident,)*
-        }
-    ) => {
-        #[$($attrs_pub)*]
-        pub enum $name {
-            $(
-              $(#[$($attrs)*])*
-              $variant,)*
-        }
-
-        impl FromToken for $name {
-            fn from_token(tk: Token) -> Option<Self> {
-                match tk {
-                    $(Token::$variant => Some(Self::$variant),)*
-                    _ => None,
-                }
-            }
-        }
-    };
-}
+use crate::from_token;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -113,17 +88,24 @@ impl TokenStart for Expr {
 #[derive(Debug, PartialEq)]
 pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
+    pub expr_without_block: Option<Box<Expr>>,
 }
 
 impl BlockExpr {
     pub fn new() -> Self {
-        BlockExpr { stmts: vec![] }
+        BlockExpr { stmts: vec![], expr_without_block: None }
+    }
+
+    pub fn expr_without_block(mut self, expr: Expr) -> Self {
+        debug_assert!(!expr.with_block());
+        self.expr_without_block = Some(Box::new(expr));
+        self
     }
 }
 
 impl From<Vec<Stmt>> for BlockExpr {
     fn from(stmts: Vec<Stmt>) -> Self {
-        BlockExpr { stmts }
+        BlockExpr { stmts, expr_without_block: None }
     }
 }
 
@@ -255,10 +237,6 @@ impl FromToken for UnOp {
     }
 }
 
-pub trait FromToken: Sized {
-    fn from_token(tk: Token) -> Option<Self>;
-}
-
 #[derive(Debug, PartialEq)]
 pub struct AssignExpr {
     pub lhs: Box<Expr>,
@@ -275,6 +253,7 @@ impl AssignExpr {
         }
     }
 }
+
 from_token! {
     #[derive(StrEnum, Debug, PartialEq)]
     pub enum AssignOp {
@@ -356,24 +335,16 @@ impl TokenStart for RangeExpr {
     }
 }
 
-#[derive(StrEnum, Debug, PartialEq)]
-pub enum RangeOp {
-    /// Range operators
-    #[strenum("..")]
-    DotDot,
+from_token! {
+    #[derive(StrEnum, Debug, PartialEq)]
+    pub enum RangeOp {
+        /// Range operators
+        #[strenum("..")]
+        DotDot,
 
-    /// Range inclusive operators
-    #[strenum("..=")]
-    DotDotEq,
-}
-
-impl FromToken for RangeOp {
-    fn from_token(tk: Token) -> Option<Self> {
-        match tk {
-            Token::DotDot => Some(Self::DotDot),
-            Token::DotDotEq => Some(Self::DotDotEq),
-            _ => None,
-        }
+        /// Range inclusive operators
+        #[strenum("..=")]
+        DotDotEq,
     }
 }
 

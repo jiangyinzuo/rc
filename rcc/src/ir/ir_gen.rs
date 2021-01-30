@@ -1,7 +1,7 @@
 use crate::ast::expr::Expr;
 use crate::ast::expr::{BlockExpr, LitExpr};
 use crate::ast::file::File;
-use crate::ast::item::{InnerItem, ItemFn, VisItem};
+use crate::ast::item::{Item, ItemFn};
 use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
 use crate::ast::types::Type;
 use crate::ast::stmt::Stmt;
@@ -15,13 +15,7 @@ impl IRGen for File {
     }
 }
 
-impl IRGen for VisItem {
-    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
-        self.inner_item.generate(cxt)
-    }
-}
-
-impl IRGen for InnerItem {
+impl IRGen for Item {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         match self {
             Self::Fn(item_fn) => item_fn.generate(cxt)?,

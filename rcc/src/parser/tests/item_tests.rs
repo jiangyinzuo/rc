@@ -1,10 +1,11 @@
-use crate::ast::expr::{BlockExpr, BinOpExpr, BinOperator};
-use crate::ast::expr::Expr::{Lit, BinOp};
+use crate::ast::expr::Expr::{BinOp, Lit};
 use crate::ast::expr::LitExpr;
-use crate::ast::item::{FnParam, ItemFn};
+use crate::ast::expr::{BinOpExpr, BinOperator, BlockExpr};
+use crate::ast::item::{FnParam, Item, ItemFn};
 use crate::ast::pattern::{IdentifierPattern, Pattern};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::Type;
+use crate::ast::Visibility::Priv;
 use crate::parser::tests::parse_validate;
 
 #[test]
@@ -20,23 +21,25 @@ fn item_fn_test() {
             "##,
         ],
         vec![
-            Ok(ItemFn::new(
+            Ok(Item::Fn(ItemFn::new(
+                Priv,
                 "main".into(),
                 vec![],
                 "i32".into(),
-                vec![Stmt::ExprStmt(Lit(LitExpr {
+                BlockExpr::new().expr_without_block(Lit(LitExpr {
                     ret_type: LitExpr::EMPTY_INT_TYPE.into(),
                     value: "0".into(),
-                }))]
-                .into(),
-            )),
-            Ok(ItemFn::new(
+                })),
+            ))),
+            Ok(Item::Fn(ItemFn::new(
+                Priv,
                 "oops".into(),
                 vec![],
                 Type::unit(),
                 BlockExpr::new(),
-            )),
-            Ok(ItemFn::new(
+            ))),
+            Ok(Item::Fn(ItemFn::new(
+                Priv,
                 "add".into(),
                 vec![
                     FnParam::new(
@@ -49,10 +52,12 @@ fn item_fn_test() {
                     ),
                 ],
                 "i32".into(),
-                vec![Stmt::ExprStmt(BinOp(BinOpExpr::new(
-                    "a".into(), BinOperator::Plus, "b".into()
-                )))].into(),
-            )),
+                BlockExpr::new().expr_without_block(BinOp(BinOpExpr::new(
+                    "a".into(),
+                    BinOperator::Plus,
+                    "b".into(),
+                ))),
+            ))),
         ],
     );
 }

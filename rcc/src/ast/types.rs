@@ -31,6 +31,7 @@ impl From<String> for Type {
         Identifier(s)
     }
 }
+
 impl From<&str> for Type {
     fn from(s: &str) -> Self {
         Identifier(s.into())
