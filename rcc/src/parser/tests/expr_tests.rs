@@ -7,22 +7,19 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
-use crate::ast::stmt::Stmt::ExprStmt;
-use crate::ast::types::TypeAnnotation::Identifier;
 use crate::parser::tests::parse_validate;
-use std::env::var;
 
 #[test]
 fn path_expr_test() {
     parse_validate(
-        vec!["a::b::c", "a::", "a", "::", "::a", "i8::i16"],
+        vec!["a::b::c", "a::", "a", "::", "::a", "i8::I16"],
         vec![
             Ok(PathExpr::from(vec!["a", "b", "c"])),
             Err("invalid path"),
             Ok(vec!["a"].into()),
             Err("invalid path"),
             Err("invalid path"),
-            Ok(vec!["i8", "i16"].into()),
+            Ok(vec!["i8", "I16"].into()),
         ],
     );
 }
@@ -63,10 +60,10 @@ fn return_expr_test() {
     parse_validate(
         vec!["{ return 0;}"],
         vec![Ok(Block(BlockExpr::from(vec![
-            Stmt::ExprStmt(Return(ReturnExpr(Box::new(Lit(LitExpr {
+            Stmt::ExprStmt(Return(ReturnExpr(Some(Box::new(Lit(LitExpr {
                 ret_type: LitExpr::EMPTY_INT_TYPE.into(),
                 value: "0".into(),
-            }))))),
+            })))))),
         ])))],
     );
 }

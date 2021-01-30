@@ -58,7 +58,7 @@ impl NamedASTNode for Item {
 
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
-    pub vis: Visibility,
+    vis: Visibility,
     pub name: String,
     pub fn_params: FnParams,
     pub ret_type: TypeAnnotation,
@@ -80,6 +80,10 @@ impl ItemFn {
             ret_type,
             fn_block: Some(fn_block),
         }
+    }
+
+    pub fn vis(&self) -> Visibility {
+        self.vis.clone()
     }
 }
 
@@ -106,10 +110,8 @@ impl FnParams {
 }
 
 impl From<Vec<FnParam>> for FnParams {
-     fn from(params: Vec<FnParam>) -> Self {
-        FnParams {
-            params
-        }
+    fn from(params: Vec<FnParam>) -> Self {
+        FnParams { params }
     }
 }
 
@@ -172,6 +174,10 @@ impl ItemStruct {
 
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    pub fn vis(&self) -> Visibility {
+        self.vis.clone()
     }
 }
 

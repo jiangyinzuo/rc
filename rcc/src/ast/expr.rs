@@ -112,7 +112,7 @@ impl BlockExpr {
         BlockExpr {
             stmts: vec![],
             expr_without_block: None,
-            scope: Scope::new(std::ptr::null()),
+            scope: Scope::new(),
         }
     }
 
@@ -128,7 +128,7 @@ impl From<Vec<Stmt>> for BlockExpr {
         BlockExpr {
             stmts,
             expr_without_block: None,
-            scope: Scope::new(std::ptr::null()),
+            scope: Scope::new(),
         }
     }
 }

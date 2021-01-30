@@ -1,3 +1,4 @@
+use super::scope::BULITIN_SCOPE;
 use crate::analyser::scope::Scope;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
@@ -33,20 +34,38 @@ pub enum TypeInfo {
         vis: Visibility,
         fields: NonNull<Fields>,
     },
+
+    /// primitive type
+    Bool,
+    Char,
+    F32,
+    F64,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
 }
 
 impl TypeInfo {
     pub(crate) fn from_item_fn(item: &ItemFn) -> Self {
         let tp_fn_ptr = TypeFnPtr::from_item(item);
         Self::Fn {
-            vis: item.vis.clone(),
+            vis: item.vis(),
             inner: tp_fn_ptr,
         }
     }
 
     pub(crate) fn from_item_struct(item: &ItemStruct) -> Self {
         Self::Struct {
-            vis: Visibility::Priv,
+            vis: item.vis(),
             fields: NonNull::from(item.fields()),
         }
     }
@@ -56,15 +75,31 @@ pub struct SymbolResolver {
     /// global scope
     file_scope: Scope,
     cur_scope: NonNull<Scope>,
+    scope_stack: Vec<NonNull<Scope>>,
 }
 
 impl SymbolResolver {
     fn new() -> SymbolResolver {
-        let mut file_scope = Scope::new(std::ptr::null());
-        let cur_scope = NonNull::new(&mut file_scope).expect("&mut file_scope is null");
+        let mut file_scope = Scope::new();
+        file_scope.set_father(&BULITIN_SCOPE);
+        let cur_scope = NonNull::from(&file_scope);
         SymbolResolver {
             file_scope,
             cur_scope,
+            scope_stack: vec![],
+        }
+    }
+
+    fn push_scope(&mut self, scope: &Scope) {
+        self.scope_stack.push(self.cur_scope);
+        self.cur_scope = NonNull::from(scope);
+    }
+
+    fn pop_scope(&mut self) {
+        if let Some(s) = self.scope_stack.pop() {
+            self.cur_scope = s;
+        } else {
+            debug_assert!(false, "scope_stack is empty!");
         }
     }
 }
@@ -72,6 +107,12 @@ impl SymbolResolver {
 impl Visit for SymbolResolver {
     fn visit_file(&mut self, file: &mut File) {
         for item in file.items.iter_mut() {
+            // add global type definition
+            match item {
+                Item::Fn(item_fn) => self.file_scope.add_type_fn(item_fn),
+                Item::Struct(item_struct) => self.file_scope.add_type_struct(item_struct),
+                _ => {}
+            }
             self.visit_item(item);
         }
     }
@@ -129,12 +170,15 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) {
+        block_expr.scope.set_father_from_non_null(self.cur_scope);
+        self.push_scope(&block_expr.scope);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt);
         }
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
             self.visit_expr(expr);
         }
+        self.pop_scope();
     }
 
     fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) {
