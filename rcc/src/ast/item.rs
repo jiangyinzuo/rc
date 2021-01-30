@@ -165,6 +165,14 @@ impl ItemStruct {
         self.fields = Fields::Tuple(tuple_fields);
         self
     }
+
+    pub fn fields(&self) -> &Fields {
+        &self.fields
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 /// enum Identity {

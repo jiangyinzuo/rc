@@ -235,13 +235,15 @@ pub mod prec {
 pub mod primitive {
     use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Path, While, Loop};
     use crate::ast::expr::*;
-    use crate::ast::stmt::Stmt;
     use crate::lexer::token::LiteralKind::*;
     use crate::lexer::token::Token;
     use crate::parser::expr::prec::range_expr;
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
+    use crate::ast::TokenStart;
+    use crate::ast::item::Item;
+    use crate::analyser::scope::Scope;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr
@@ -371,6 +373,8 @@ pub mod primitive {
         }
     }
 
+    /// Local type definitions are analysed here.
+    ///
     /// BlockExpr -> `{` Stmt* Expr(without block)? `}`
     impl Parse for BlockExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
@@ -378,7 +382,16 @@ pub mod primitive {
             let mut block_expr = BlockExpr::new();
             while cursor.next_token()? != &Token::RightCurlyBraces {
                 match parse_stmt_or_expr_without_block(cursor)? {
-                    StmtOrExpr::Stmt(stmt ) => block_expr.stmts.push(stmt),
+                    StmtOrExpr::Stmt(stmt ) => {
+                        if let crate::ast::stmt::Stmt::Item(item) = &stmt {
+                            match item {
+                                Item::Fn(item_fn) => block_expr.scope.add_type_fn(item_fn),
+                                Item::Struct(item_struct) => block_expr.scope.add_type_struct(item_struct),
+                                _ => { /* TODO */ }
+                            }
+                        }
+                        block_expr.stmts.push(stmt)
+                    },
                     StmtOrExpr::Expr(expr) => {
                         if block_expr.expr_without_block.is_none() {
                             block_expr.expr_without_block = Some(Box::new(expr));
@@ -464,12 +477,17 @@ pub mod primitive {
         }
     }
 
-    /// ReturnExpr -> `return` Expr
+    /// ReturnExpr -> `return` Expr?
     impl Parse for ReturnExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::Return)?;
-            let expr = Expr::parse(cursor)?;
-            Ok(ReturnExpr(Box::new(expr)))
+            if let Ok(tk) = cursor.next_token() {
+                if Expr::is_token_start(tk) {
+                    let expr = Expr::parse(cursor)?;
+                    return Ok(ReturnExpr(Some(Box::new(expr))));
+                }
+            }
+            Ok(ReturnExpr(None))
         }
     }
 
@@ -477,11 +495,13 @@ pub mod primitive {
     impl Parse for BreakExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::Break)?;
-            Ok(if let Ok(expr) = Expr::parse(cursor) {
-                BreakExpr(Some(Box::new(expr)))
-            } else {
-                BreakExpr(None)
-            })
+            if let Ok(tk) = cursor.next_token() {
+                if Expr::is_token_start(tk) {
+                    let expr = Expr::parse(cursor)?;
+                    return Ok(BreakExpr(Some(Box::new(expr))));
+                }
+            }
+            Ok(BreakExpr(None))
         }
     }
 }

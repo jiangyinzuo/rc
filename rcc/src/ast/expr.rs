@@ -54,7 +54,7 @@ impl From<&str> for Expr {
 
 #[derive(Debug, PartialEq)]
 pub struct ConstantExpr<V> {
-    expr: Option<Box<Expr>>,
+    pub expr: Option<Box<Expr>>,
     const_value: Option<V>,
 }
 
@@ -89,11 +89,10 @@ impl TokenStart for Expr {
 pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
-    /// generate in the semantic analysis stage
-    pub scope: Option<Scope>,
+    pub scope: Scope,
 }
 
-impl Debug for BlockExpr {
+impl  Debug for BlockExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.expr_without_block {
             Some(expr) => write!(f, "{{ {:?} {:?} }}", self.stmts, expr),
@@ -109,11 +108,11 @@ impl PartialEq for BlockExpr {
 }
 
 impl BlockExpr {
-    pub fn new() -> Self {
+    pub fn new() -> BlockExpr {
         BlockExpr {
             stmts: vec![],
             expr_without_block: None,
-            scope: None,
+            scope: Scope::new(std::ptr::null()),
         }
     }
 
@@ -129,7 +128,7 @@ impl From<Vec<Stmt>> for BlockExpr {
         BlockExpr {
             stmts,
             expr_without_block: None,
-            scope: None,
+            scope: Scope::new(std::ptr::null()),
         }
     }
 }
@@ -375,9 +374,9 @@ from_token! {
 
 #[derive(Debug, PartialEq)]
 pub struct BinOpExpr {
-    lhs: Box<Expr>,
+    pub lhs: Box<Expr>,
     bin_op: BinOperator,
-    rhs: Box<Expr>,
+    pub rhs: Box<Expr>,
 }
 
 impl BinOpExpr {
@@ -501,20 +500,20 @@ pub type GroupedExpr = Box<Expr>;
 
 #[derive(Debug, PartialEq)]
 pub struct ArrayExpr {
-    elems: Vec<Expr>,
-    len: ConstantExpr<usize>,
+    pub elems: Vec<Expr>,
+    pub len_expr: ConstantExpr<usize>,
 }
 
 impl ArrayExpr {
-    pub fn new(elems: Vec<Expr>, len: ConstantExpr<usize>) -> Self {
-        ArrayExpr { elems, len }
+    pub fn new(elems: Vec<Expr>, len_expr: ConstantExpr<usize>) -> Self {
+        ArrayExpr { elems, len_expr }
     }
 
-    pub fn elems(elems: Vec<Expr>) -> Self {
+    pub fn elems(elems: Vec<Expr>) -> ArrayExpr {
         let length = elems.len();
         ArrayExpr {
             elems,
-            len: ConstantExpr::<usize>::const_value(length),
+            len_expr: ConstantExpr::<usize>::const_value(length),
         }
     }
 }
@@ -546,7 +545,7 @@ pub struct TupleIndexExpr {
 pub struct StructExpr;
 
 #[derive(Debug, PartialEq)]
-pub struct ReturnExpr(pub Box<Expr>);
+pub struct ReturnExpr(pub Option<Box<Expr>>);
 
 #[derive(Debug, PartialEq)]
 pub struct BreakExpr(pub Option<Box<Expr>>);
@@ -602,7 +601,7 @@ impl IfExpr {
         }
     }
 
-    pub fn from_exprs(conditions: Vec<Expr>, blocks: Vec<BlockExpr>) -> Self {
+    pub fn from_exprs(conditions: Vec<Expr>, blocks: Vec<BlockExpr>) -> IfExpr {
         IfExpr { conditions, blocks }
     }
 
