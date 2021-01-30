@@ -4,7 +4,7 @@ mod ir_tests{
     use crate::ir::{Data, IRGen, IRGenContext, Quad};
     use crate::parser::{Parse, ParseCursor};
     use crate::lexer::Lexer;
-    use crate::ast::types::Type;
+    use crate::ast::types::TypeAnnotation;
 
     fn get_cxt(input: &str) -> Result<IRGenContext, String> {
         let mut lexer = Lexer::new(input);
@@ -27,7 +27,7 @@ mod ir_tests{
         assert_eq!(
             basic_blocks.quads,
             vec![Quad::ret(Data {
-                _type: Type::Identifier("i32".into()),
+                _type: TypeAnnotation::Identifier("i32".into()),
                 value: "20".to_string()
             })]
         );

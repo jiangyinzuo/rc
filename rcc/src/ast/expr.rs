@@ -1,11 +1,12 @@
 use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
-use crate::ast::{TokenStart, FromToken};
+use crate::ast::{FromToken, TokenStart};
 use crate::lexer::token::Token;
 use std::fmt;
-use std::fmt::{Debug, Formatter, Write};
+use std::fmt::{Debug, Formatter};
 use strenum::StrEnum;
 
+use crate::analyser::scope::Scope;
 use crate::from_token;
 
 #[derive(Debug, PartialEq)]
@@ -85,15 +86,35 @@ impl TokenStart for Expr {
     }
 }
 
-#[derive(Debug, PartialEq)]
 pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
+    /// generate in the semantic analysis stage
+    pub scope: Option<Scope>,
+}
+
+impl Debug for BlockExpr {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match &self.expr_without_block {
+            Some(expr) => write!(f, "{{ {:?} {:?} }}", self.stmts, expr),
+            None => write!(f, "{{ {:?} }}", self.stmts),
+        }
+    }
+}
+
+impl PartialEq for BlockExpr {
+    fn eq(&self, other: &Self) -> bool {
+        self.stmts.eq(&other.stmts) && self.expr_without_block.eq(&other.expr_without_block)
+    }
 }
 
 impl BlockExpr {
     pub fn new() -> Self {
-        BlockExpr { stmts: vec![], expr_without_block: None }
+        BlockExpr {
+            stmts: vec![],
+            expr_without_block: None,
+            scope: None,
+        }
     }
 
     pub fn expr_without_block(mut self, expr: Expr) -> Self {
@@ -105,7 +126,11 @@ impl BlockExpr {
 
 impl From<Vec<Stmt>> for BlockExpr {
     fn from(stmts: Vec<Stmt>) -> Self {
-        BlockExpr { stmts, expr_without_block: None }
+        BlockExpr {
+            stmts,
+            expr_without_block: None,
+            scope: None,
+        }
     }
 }
 

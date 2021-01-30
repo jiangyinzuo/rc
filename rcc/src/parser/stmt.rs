@@ -2,7 +2,7 @@ use crate::ast::expr::Expr;
 use crate::ast::item::Item;
 use crate::ast::pattern::Pattern;
 use crate::ast::stmt::{LetStmt, Stmt};
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::TokenStart;
 use crate::lexer::token::Token;
 use crate::parser::{Parse, ParseCursor};
@@ -37,14 +37,14 @@ pub(super) fn parse_stmt_or_expr_without_block(cursor: &mut ParseCursor) -> Resu
     }))
 }
 
-/// LetStmt -> `let` Pattern (: Type)? ( = Expr)? ;
+/// LetStmt -> `let` Pattern (: TypeAnnotation)? ( = Expr)? ;
 impl Parse for LetStmt {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         cursor.eat_token_eq(Token::Let)?;
         let pattern = Pattern::parse(cursor)?;
         let mut let_stmt = LetStmt::new(pattern);
         if cursor.eat_token_if_eq(Token::Colon) {
-            let_stmt = let_stmt._type(Type::parse(cursor)?);
+            let_stmt = let_stmt._type(TypeAnnotation::parse(cursor)?);
         }
         if cursor.eat_token_if_eq(Token::Eq) {
             let_stmt = let_stmt.expr(Expr::parse(cursor)?);

@@ -2,12 +2,9 @@ use crate::ast::expr::BlockExpr;
 use crate::ast::expr::Expr::Lit;
 use crate::ast::expr::LitExpr;
 use crate::ast::file::File;
-
-use crate::ast::item::{Item, ItemFn};
-
+use crate::ast::item::{Item, ItemFn, FnParams};
 use super::parse_input;
-use crate::ast::stmt::Stmt;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::Visibility::Priv;
 
 #[test]
@@ -17,8 +14,8 @@ fn file_test() {
         items: vec![Item::Fn(ItemFn::new(
             Priv,
             "pi".into(),
-            vec![],
-            Type::Identifier("f64".into()),
+            FnParams::new(),
+            TypeAnnotation::Identifier("f64".into()),
             BlockExpr::new().expr_without_block(Lit(LitExpr {
                 ret_type: "f64".into(),
                 value: "3.14".into(),

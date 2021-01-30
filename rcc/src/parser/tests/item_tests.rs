@@ -1,10 +1,10 @@
 use crate::ast::expr::Expr::{BinOp, Lit};
 use crate::ast::expr::LitExpr;
 use crate::ast::expr::{BinOpExpr, BinOperator, BlockExpr};
-use crate::ast::item::{FnParam, Item, ItemFn};
+use crate::ast::item::{FnParam, Item, ItemFn, FnParams};
 use crate::ast::pattern::{IdentifierPattern, Pattern};
 use crate::ast::stmt::Stmt;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::Visibility::Priv;
 use crate::parser::tests::parse_validate;
 
@@ -24,7 +24,7 @@ fn item_fn_test() {
             Ok(Item::Fn(ItemFn::new(
                 Priv,
                 "main".into(),
-                vec![],
+                FnParams::new(),
                 "i32".into(),
                 BlockExpr::new().expr_without_block(Lit(LitExpr {
                     ret_type: LitExpr::EMPTY_INT_TYPE.into(),
@@ -34,8 +34,8 @@ fn item_fn_test() {
             Ok(Item::Fn(ItemFn::new(
                 Priv,
                 "oops".into(),
-                vec![],
-                Type::unit(),
+                FnParams::new(),
+                TypeAnnotation::unit(),
                 BlockExpr::new(),
             ))),
             Ok(Item::Fn(ItemFn::new(
@@ -50,7 +50,7 @@ fn item_fn_test() {
                         Pattern::Identifier(IdentifierPattern::new_const("b".into())),
                         "i32".into(),
                     ),
-                ],
+                ].into(),
                 "i32".into(),
                 BlockExpr::new().expr_without_block(BinOp(BinOpExpr::new(
                     "a".into(),

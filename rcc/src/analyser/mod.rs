@@ -5,3 +5,4 @@
 //!
 
 mod sym_resolver;
+pub mod scope;

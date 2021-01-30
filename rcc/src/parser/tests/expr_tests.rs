@@ -8,7 +8,7 @@ use crate::ast::expr::{
 use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::stmt::Stmt::ExprStmt;
-use crate::ast::types::Type::Identifier;
+use crate::ast::types::TypeAnnotation::Identifier;
 use crate::parser::tests::parse_validate;
 use std::env::var;
 

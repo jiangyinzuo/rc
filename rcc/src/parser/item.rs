@@ -1,9 +1,9 @@
 use crate::ast::expr::BlockExpr;
 use crate::ast::item::{
-    FnParam, FnParams, Item, ItemFn, ItemStruct, StructField, TupleField, ItemEnum,
+    FnParam, FnParams, Item, ItemFn, ItemStruct, StructField, TupleField, TypeEnum,
 };
 use crate::ast::pattern::Pattern;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::{TokenStart, Visibility};
 use crate::lexer::token::Token;
 use crate::parser::{Parse, ParseCursor};
@@ -17,7 +17,7 @@ impl Parse for Item {
         match cursor.next_token()? {
             Token::Fn => Ok(Self::Fn(ItemFn::parse_with_attr(cursor, vis)?)),
             Token::Struct => Ok(Self::Struct(ItemStruct::parse_with_attr(cursor, vis)?)),
-            Token::Enum => Ok(Self::Enum(ItemEnum::parse_with_attr(cursor, vis)?)),
+            Token::Enum => Ok(Self::Enum(TypeEnum::parse_with_attr(cursor, vis)?)),
             Token::Static => unimplemented!(),
             Token::Const => unimplemented!(),
             Token::Impl => unimplemented!(),
@@ -62,7 +62,7 @@ impl ItemStruct {
     }
 }
 
-impl ItemEnum {
+impl TypeEnum {
     fn parse_with_attr(cursor: &mut ParseCursor, vis: Visibility) -> Result<Self, RccError> {
         unimplemented!()
     }
@@ -76,7 +76,7 @@ impl ItemFn {
 
         cursor.eat_token_eq(Token::LeftParen)?;
         let fn_params = if cursor.eat_token_if_eq(Token::RightParen) {
-            vec![]
+            FnParams::new()
         } else {
             let fn_params = FnParams::parse(cursor)?;
             cursor.eat_token_eq(Token::RightParen)?;
@@ -86,10 +86,10 @@ impl ItemFn {
         let ret_type = match cursor.next_token()? {
             Token::RArrow => {
                 cursor.bump_token()?;
-                Type::parse(cursor)?
+                TypeAnnotation::parse(cursor)?
             }
             Token::Semi => unimplemented!("fn declaration without block not implemented"),
-            Token::LeftCurlyBraces => Type::unit(),
+            Token::LeftCurlyBraces => TypeAnnotation::unit(),
             _ => return Err("except '->' or '{'".into()),
         };
         let fn_block = BlockExpr::parse(cursor)?;
@@ -106,7 +106,7 @@ impl ItemFn {
 /// FnParams -> FnParam (, FnParam)* ,?
 impl Parse for FnParams {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        let mut fn_params = vec![FnParam::parse(cursor)?];
+        let mut fn_params: FnParams = vec![FnParam::parse(cursor)?].into();
         while cursor.eat_token_if_eq(Token::Comma) {
             if FnParam::is_token_start(cursor.next_token()?) {
                 fn_params.push(FnParam::parse(cursor)?);
@@ -123,7 +123,7 @@ impl Parse for FnParam {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         let ptn = Pattern::parse(cursor)?;
         cursor.eat_token_eq(Token::Colon)?;
-        let _type = Type::parse(cursor)?;
+        let _type = TypeAnnotation::parse(cursor)?;
         Ok(FnParam::new(ptn, _type))
     }
 }

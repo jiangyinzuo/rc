@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 use crate::ir::Opcode::Ret;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 
 pub mod ir_gen;
 mod tests;
@@ -13,7 +13,7 @@ pub enum Opcode {
 #[derive(Debug, PartialEq)]
 pub struct Quad {
     op: Opcode,
-    op_type: Type,
+    op_type: TypeAnnotation,
     src1: String,
     src2: String,
 }
@@ -39,7 +39,7 @@ pub trait IRGen {
 }
 
 pub struct Data {
-    _type: Type,
+    _type: TypeAnnotation,
     value: String,
 }
 

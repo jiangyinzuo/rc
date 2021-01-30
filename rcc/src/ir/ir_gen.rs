@@ -3,7 +3,7 @@ use crate::ast::expr::{BlockExpr, LitExpr};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn};
 use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::stmt::Stmt;
 
 impl IRGen for File {
@@ -81,7 +81,7 @@ impl IRGen for LitExpr {
 impl LitExpr {
     fn to_data(&self) -> Data {
         Data {
-            _type: Type::Identifier(self.ret_type.clone()),
+            _type: TypeAnnotation::Identifier(self.ret_type.clone()),
             value: self.value.to_string(),
         }
     }

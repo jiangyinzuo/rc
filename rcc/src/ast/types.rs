@@ -1,8 +1,9 @@
-use crate::ast::types::Type::{Tuple, Identifier};
+use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
 use std::fmt::{Debug, Formatter};
+use crate::ast::item::ItemFn;
 
-#[derive(PartialEq)]
-pub enum Type {
+#[derive(PartialEq, Clone)]
+pub enum TypeAnnotation {
     /// `char`, `u8`, `bool`,
     ///  `struct Foo;`, `enum Color(String);`, etc.
     Identifier(String),
@@ -26,19 +27,19 @@ pub enum Type {
     Never,
 }
 
-impl From<String> for Type {
+impl From<String> for TypeAnnotation {
     fn from(s: String) -> Self {
         Identifier(s)
     }
 }
 
-impl From<&str> for Type {
+impl From<&str> for TypeAnnotation {
     fn from(s: &str) -> Self {
         Identifier(s.into())
     }
 }
 
-impl Debug for Type {
+impl Debug for TypeAnnotation {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Identifier(s) => f.write_str(&s),
@@ -47,33 +48,46 @@ impl Debug for Type {
             Self::Slice(ts) => write!(f, "[{:?}]", ts),
             Self::FnPtr(fptr) => write!(f, "{:?}", fptr),
             Self::Ptr(ptr) => write!(f, "{:?}", ptr),
-            Self::Never => write!(f, "!")
+            Self::Never => write!(f, "!"),
         }
     }
 }
 
-impl Type {
-    pub fn unit() -> Type {
+impl TypeAnnotation {
+    pub fn unit() -> TypeAnnotation {
         Tuple(vec![])
     }
 }
 
-pub type TypeTuple = Vec<Type>;
-pub type TypeSlice = Box<Type>;
+pub type TypeTuple = Vec<TypeAnnotation>;
+pub type TypeSlice = Box<TypeAnnotation>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypeArray {
-    _type: Box<Type>,
+    _type: Box<TypeAnnotation>,
     len: u32,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypeFnPtr {
-    args: Vec<Type>,
-    ret_type: Box<Type>,
+    params: Vec<TypeAnnotation>,
+    ret_type: Box<TypeAnnotation>,
 }
 
-#[derive(Debug, PartialEq)]
+impl TypeFnPtr {
+    pub fn new(params: Vec<TypeAnnotation>, ret_type: TypeAnnotation) -> Self {
+        TypeFnPtr {
+            params,
+            ret_type: Box::new(ret_type),
+        }
+    }
+
+    pub fn from_item(item: &ItemFn) -> Self {
+        TypeFnPtr::new(item.fn_params.type_annotations(), item.ret_type.clone())
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum PtrKind {
     /// &i32
     Ref,
@@ -87,8 +101,8 @@ pub enum PtrKind {
     ConstRawPtr,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct TypePtr {
     ptr_kind: PtrKind,
-    _type: Box<Type>,
+    _type: Box<TypeAnnotation>,
 }

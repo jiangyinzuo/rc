@@ -1,6 +1,6 @@
 use super::pattern::Pattern;
 use crate::ast::expr::Expr;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::stmt::Stmt::ExprStmt;
 use crate::ast::item::Item;
 
@@ -21,7 +21,7 @@ impl From<Expr> for Stmt {
 #[derive(Debug, PartialEq)]
 pub struct LetStmt {
     pattern: Pattern,
-    _type: Option<Type>,
+    _type: Option<TypeAnnotation>,
     expr: Option<Expr>,
 }
 
@@ -34,7 +34,7 @@ impl LetStmt {
         }
     }
 
-    pub fn _type(mut self, _type: Type) -> Self {
+    pub fn _type(mut self, _type: TypeAnnotation) -> Self {
         self._type = Some(_type);
         self
     }

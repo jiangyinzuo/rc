@@ -1,5 +1,5 @@
-use crate::ast::item::{StructField, TupleField, ItemEnum};
-use crate::ast::types::{Type, TypeArray, TypeFnPtr, TypePtr, TypeSlice, TypeTuple};
+use crate::ast::item::{StructField, TupleField, TypeEnum};
+use crate::ast::types::{TypeAnnotation, TypeArray, TypeFnPtr, TypePtr, TypeSlice, TypeTuple};
 use crate::ast::Visibility;
 use crate::lexer::token::Token;
 use crate::lexer::token::Token::{Comma, LeftParen, RightParen, Semi};
@@ -19,7 +19,7 @@ impl Parse for TypeArrayOrSlice {
     }
 }
 
-impl Parse for Type {
+impl Parse for TypeAnnotation {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         match cursor.bump_token()? {
             Token::Identifier(s) => Ok(Self::Identifier(s.to_string())),
@@ -82,7 +82,7 @@ impl Parse for Vec<TupleField> {
 
         loop {
             let vis = Visibility::parse(cursor)?;
-            let _type = Type::parse(cursor)?;
+            let _type = TypeAnnotation::parse(cursor)?;
             tuple_fields.push(TupleField { vis, _type });
             match cursor.bump_token()? {
                 Comma => {}

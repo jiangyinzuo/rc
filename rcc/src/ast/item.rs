@@ -1,55 +1,8 @@
 use crate::ast::expr::BlockExpr;
 use crate::ast::pattern::Pattern;
-use crate::ast::types::Type;
+use crate::ast::types::TypeAnnotation;
 use crate::ast::{NamedASTNode, TokenStart, Visibility};
 use crate::lexer::token::Token;
-
-#[derive(Debug, PartialEq)]
-pub struct ItemFn {
-    vis: Visibility,
-    pub name: String,
-    pub fn_params: FnParams,
-    pub ret_type: Type,
-    pub fn_block: Option<BlockExpr>,
-}
-
-impl ItemFn {
-    pub fn new(vis: Visibility, name: String, fn_params: FnParams, ret_type: Type, fn_block: BlockExpr) -> Self {
-        ItemFn {
-            vis,
-            name,
-            fn_params,
-            ret_type,
-            fn_block: Some(fn_block),
-        }
-    }
-}
-
-pub type FnParams = Vec<FnParam>;
-
-#[derive(Debug, PartialEq)]
-pub struct FnParam {
-    pattern: Pattern,
-    _type: Type,
-}
-
-impl FnParam {
-    pub fn new(pattern: Pattern, _type: Type) -> Self {
-        FnParam { pattern, _type }
-    }
-}
-
-impl TokenStart for FnParam {
-    fn is_token_start(tk: &Token) -> bool {
-        Pattern::is_token_start(tk)
-    }
-}
-
-impl NamedASTNode for ItemFn {
-    fn ident_name(&self) -> &str {
-        &self.name
-    }
-}
 
 #[derive(Debug, PartialEq)]
 pub enum Item {
@@ -60,7 +13,10 @@ pub enum Item {
     Struct(ItemStruct),
 
     /// enum Color { Red, Yellow }
-    Enum(ItemEnum),
+    Enum(TypeEnum),
+
+    /// type Int = i32;
+    Type,
 
     /// const A: i32 = 2;
     Const,
@@ -100,6 +56,87 @@ impl NamedASTNode for Item {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct ItemFn {
+    pub vis: Visibility,
+    pub name: String,
+    pub fn_params: FnParams,
+    pub ret_type: TypeAnnotation,
+    pub fn_block: Option<BlockExpr>,
+}
+
+impl ItemFn {
+    pub fn new(
+        vis: Visibility,
+        name: String,
+        fn_params: FnParams,
+        ret_type: TypeAnnotation,
+        fn_block: BlockExpr,
+    ) -> Self {
+        ItemFn {
+            vis,
+            name,
+            fn_params,
+            ret_type,
+            fn_block: Some(fn_block),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FnParams {
+    params: Vec<FnParam>,
+}
+
+impl FnParams {
+    pub fn new() -> FnParams {
+        FnParams { params: vec![] }
+    }
+
+    pub fn type_annotations(&self) -> Vec<TypeAnnotation> {
+        self.params
+            .iter()
+            .map(|param| param._type.clone())
+            .collect()
+    }
+
+    pub fn push(&mut self, param: FnParam) {
+        self.params.push(param);
+    }
+}
+
+impl From<Vec<FnParam>> for FnParams {
+     fn from(params: Vec<FnParam>) -> Self {
+        FnParams {
+            params
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub struct FnParam {
+    pattern: Pattern,
+    _type: TypeAnnotation,
+}
+
+impl FnParam {
+    pub fn new(pattern: Pattern, _type: TypeAnnotation) -> Self {
+        FnParam { pattern, _type }
+    }
+}
+
+impl TokenStart for FnParam {
+    fn is_token_start(tk: &Token) -> bool {
+        Pattern::is_token_start(tk)
+    }
+}
+
+impl NamedASTNode for ItemFn {
+    fn ident_name(&self) -> &str {
+        &self.name
+    }
+}
+
 /// # Examples
 /// `struct Student { name: String, age: u32 }`
 /// `pub struct Teacher(String, u32);`
@@ -136,7 +173,8 @@ impl ItemStruct {
 ///     Admin,
 /// }
 #[derive(Debug, PartialEq)]
-pub struct ItemEnum {
+pub struct TypeEnum {
+    vis: Visibility,
     name: String,
     enum_items: Vec<EnumVariant>,
 }
@@ -161,11 +199,11 @@ pub enum Fields {
 pub struct StructField {
     pub vis: Visibility,
     pub name: String,
-    pub _type: Type,
+    pub _type: TypeAnnotation,
 }
 
 #[derive(Debug, PartialEq)]
 pub struct TupleField {
     pub vis: Visibility,
-    pub _type: Type,
+    pub _type: TypeAnnotation,
 }
