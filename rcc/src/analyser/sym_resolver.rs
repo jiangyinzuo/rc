@@ -14,6 +14,7 @@ use crate::ast::Visibility;
 use crate::rcc::RccError;
 use std::ptr::NonNull;
 
+#[derive(Debug, PartialEq)]
 pub enum VarKind {
     Static,
     Const,
@@ -21,9 +22,25 @@ pub enum VarKind {
     Local,
 }
 
+#[derive(Debug, PartialEq)]
 pub struct VarInfo {
+    stmt_id: u64,
     kind: VarKind,
     _type: TypeAnnotation,
+}
+
+impl VarInfo {
+    pub fn new(stmt_id: u64, kind: VarKind, _type: TypeAnnotation) -> VarInfo {
+        VarInfo {
+            stmt_id,
+            kind,
+            _type
+        }
+    }
+
+    pub fn stmt_id(&self) -> u64 {
+        self.stmt_id
+    }
 }
 
 pub enum TypeInfo {
@@ -87,12 +104,13 @@ impl SymbolResolver {
         }
     }
 
-    fn push_scope(&mut self, scope: &mut Scope) {
+    fn enter_block(&mut self, block_expr: &mut BlockExpr) {
+        block_expr.scope.set_father(self.cur_scope);
         self.scope_stack.push(self.cur_scope);
-        self.cur_scope = scope;
+        self.cur_scope = &mut block_expr.scope;
     }
 
-    fn pop_scope(&mut self) {
+    fn exit_block(&mut self) {
         if let Some(s) = self.scope_stack.pop() {
             self.cur_scope = s;
         } else {
@@ -187,7 +205,11 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
-        path_expr.segments.last();
+        if let Some(ident) = path_expr.segments.last() {
+            unsafe {(*self.cur_scope).find_variable(ident);}
+        } else {
+            return Err("invalid ident".into())
+        }
         Ok(())
     }
 
@@ -200,15 +222,15 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
-        block_expr.scope.set_father(self.cur_scope);
-        self.push_scope(&mut block_expr.scope);
+
+        self.enter_block( block_expr);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt);
         }
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
             self.visit_expr(expr);
         }
-        self.pop_scope();
+        self.exit_block();
         Ok(())
     }
 

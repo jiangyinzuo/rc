@@ -4,6 +4,7 @@ use crate::rcc::RccError;
 use crate::ast::file::File;
 
 mod sym_resolver_tests;
+mod scope_test;
 
 fn get_ast_file(input: &str) -> Result<File, RccError> {
     // lex

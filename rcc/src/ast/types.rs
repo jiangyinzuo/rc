@@ -4,7 +4,7 @@ use crate::ast::item::ItemFn;
 use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
 
 pub trait RetType {
-    fn ret_type(&self) -> &TypeAnnotation; 
+    fn ret_type(&self) -> &TypeAnnotation;
 }
 
 #[derive(PartialEq, Clone)]

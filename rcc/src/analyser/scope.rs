@@ -6,6 +6,7 @@ pub struct Scope {
     father: Option<NonNull<Scope>>,
     pub(crate) types: HashMap<String, TypeInfo>,
     variables: HashMap<String, Vec<VarInfo>>,
+    pub cur_stmt_id: u64,
 }
 
 use crate::analyser::sym_resolver::TypeInfo::*;
@@ -44,12 +45,37 @@ impl Scope {
             father: None,
             types: HashMap::new(),
             variables: HashMap::new(),
+            cur_stmt_id: 0,
         }
     }
 
-    pub fn add_variable(&mut self, ident: &str) {
-        // TODO
-        // self.variables.insert(ident.to_string())
+    pub fn add_variable(&mut self, ident: &str, info: VarInfo) {
+        if let Some(v) = self.variables.get_mut(ident) {
+            v.push(info);
+        } else {
+            self.variables.insert(ident.to_string(), vec![info]);
+        }
+    }
+
+    pub fn find_variable(&mut self, ident: &str) -> Option<&VarInfo> {
+        if let Some(v) = self.variables.get(ident) {
+            let mut left = 0;
+            let mut right = v.len();
+            while left < right {
+                let mid = (left + right + 1) / 2;
+                let stmt_id = unsafe { (*v.get_unchecked(mid)).stmt_id() };
+                // Let stmt and variable using stmt is impossible to be the same.
+                debug_assert_ne!(stmt_id, self.cur_stmt_id);
+                if self.cur_stmt_id < stmt_id {
+                    right = mid - 1;
+                } else {
+                    left = mid;
+                }
+            }
+            Some(unsafe { v.get_unchecked(left) })
+        } else {
+            None
+        }
     }
 
     pub fn add_typedef(&mut self, item: &Item) {
