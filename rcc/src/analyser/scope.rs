@@ -1,5 +1,5 @@
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo};
-use crate::ast::item::{ItemFn, ItemStruct};
+use crate::ast::item::{ItemFn, ItemStruct, Item};
 use std::collections::HashMap;
 
 pub struct Scope {
@@ -11,6 +11,7 @@ pub struct Scope {
 use crate::analyser::sym_resolver::TypeInfo::*;
 use lazy_static::lazy_static;
 use std::ptr::NonNull;
+use std::ops::Deref;
 
 lazy_static! {
     pub static ref BULITIN_SCOPE: Scope = {
@@ -46,21 +47,31 @@ impl Scope {
         }
     }
 
-    pub fn add_type_fn(&mut self, item_fn: &ItemFn) {
+    pub fn add_typedef(&mut self, item: &Item) {
+        match item {
+            Item::Fn(item_fn) => self.add_type_fn(item_fn),
+            Item::Struct(item_struct) => self.add_type_struct(item_struct),
+            _ => { /* TODO */ }
+        }
+    }
+
+    fn add_type_fn(&mut self, item_fn: &ItemFn) {
         let type_info = TypeInfo::from_item_fn(item_fn);
         self.types.insert(item_fn.name.clone(), type_info);
     }
 
-    pub fn add_type_struct(&mut self, item_struct: &ItemStruct) {
+    fn add_type_struct(&mut self, item_struct: &ItemStruct) {
         let type_info = TypeInfo::from_item_struct(item_struct);
         self.types.insert(item_struct.name().to_string(), type_info);
     }
 
-    pub fn set_father(&mut self, father: &Scope) {
-        self.father = Some(NonNull::from(father));
+    pub fn set_father(&mut self, father: *mut Scope) {
+        unsafe {
+            self.father = Some(NonNull::new_unchecked(father));
+        }
     }
 
-    pub fn set_father_from_non_null(&mut self, father: NonNull<Scope>) {
-        self.father = Some(father);
+    pub fn set_father_as_builtin_scope(&mut self) {
+        self.father = Some(NonNull::from(BULITIN_SCOPE.deref()));
     }
 }

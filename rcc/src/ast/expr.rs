@@ -92,7 +92,7 @@ pub struct BlockExpr {
     pub scope: Scope,
 }
 
-impl  Debug for BlockExpr {
+impl Debug for BlockExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match &self.expr_without_block {
             Some(expr) => write!(f, "{{ {:?} {:?} }}", self.stmts, expr),

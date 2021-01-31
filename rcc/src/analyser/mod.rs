@@ -6,3 +6,5 @@
 
 mod sym_resolver;
 pub mod scope;
+#[cfg(test)]
+mod tests;

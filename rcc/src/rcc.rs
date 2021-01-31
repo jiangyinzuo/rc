@@ -33,8 +33,8 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
         let token_stream = lexer.tokenize();
 
         // parse
-        let mut cxt = ParseCursor::new(token_stream);
-        let ast_file = File::parse(&mut cxt)?;
+        let mut cursor = ParseCursor::new(token_stream);
+        let ast_file = File::parse(&mut cursor)?;
 
         // generate ir
         let mut ir_gen_cxt = IRGenContext::new();

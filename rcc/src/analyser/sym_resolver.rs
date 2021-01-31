@@ -72,27 +72,23 @@ impl TypeInfo {
 }
 
 pub struct SymbolResolver {
-    /// global scope
-    file_scope: Scope,
-    cur_scope: NonNull<Scope>,
-    scope_stack: Vec<NonNull<Scope>>,
+    cur_scope: *mut Scope,
+    file_scope: *mut Scope,
+    scope_stack: Vec<*mut Scope>,
 }
 
 impl SymbolResolver {
-    fn new() -> SymbolResolver {
-        let mut file_scope = Scope::new();
-        file_scope.set_father(&BULITIN_SCOPE);
-        let cur_scope = NonNull::from(&file_scope);
+    pub fn new() -> SymbolResolver {
         SymbolResolver {
-            file_scope,
-            cur_scope,
+            cur_scope: std::ptr::null_mut(),
+            file_scope: std::ptr::null_mut(),
             scope_stack: vec![],
         }
     }
 
-    fn push_scope(&mut self, scope: &Scope) {
+    fn push_scope(&mut self, scope: &mut Scope) {
         self.scope_stack.push(self.cur_scope);
-        self.cur_scope = NonNull::from(scope);
+        self.cur_scope = scope;
     }
 
     fn pop_scope(&mut self) {
@@ -102,17 +98,15 @@ impl SymbolResolver {
             debug_assert!(false, "scope_stack is empty!");
         }
     }
+
+    fn cur_scope_is_global(&mut self) -> bool {
+        !self.file_scope.is_null() && self.cur_scope == self.file_scope
+    }
 }
 
 impl Visit for SymbolResolver {
     fn visit_file(&mut self, file: &mut File) {
         for item in file.items.iter_mut() {
-            // add global type definition
-            match item {
-                Item::Fn(item_fn) => self.file_scope.add_type_fn(item_fn),
-                Item::Struct(item_struct) => self.file_scope.add_type_struct(item_struct),
-                _ => {}
-            }
             self.visit_item(item);
         }
     }
@@ -126,7 +120,6 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) {
-        self.add_type_fn(item_fn);
         if let Some(block) = item_fn.fn_block.as_mut() {
             self.visit_block_expr(block);
         }
@@ -170,8 +163,8 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) {
-        block_expr.scope.set_father_from_non_null(self.cur_scope);
-        self.push_scope(&block_expr.scope);
+        block_expr.scope.set_father(self.cur_scope);
+        self.push_scope(&mut block_expr.scope);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt);
         }
@@ -259,11 +252,5 @@ impl Visit for SymbolResolver {
         if let Some(expr) = break_expr.0.as_mut() {
             self.visit_expr(expr);
         }
-    }
-}
-
-impl SymbolResolver {
-    fn add_type_fn(&mut self, item_fn: &ItemFn) {
-        unsafe { self.cur_scope.as_mut().add_type_fn(item_fn) }
     }
 }

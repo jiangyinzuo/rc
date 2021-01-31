@@ -183,7 +183,7 @@ pub mod prec {
             expr = match tk {
                 Token::LeftParen => {
                     cursor.bump_token()?;
-                    let mut call_expr =CallExpr::new(expr);
+                    let mut call_expr = CallExpr::new(expr);
 
                     if !cursor.eat_token_if_eq(Token::RightParen) {
                         let call_params = CallParams::parse(cursor)?;
@@ -233,17 +233,15 @@ pub mod prec {
 
 /// Primitive Expressions
 pub mod primitive {
-    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Path, While, Loop};
+    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Loop, Path, While};
     use crate::ast::expr::*;
+    use crate::ast::TokenStart;
     use crate::lexer::token::LiteralKind::*;
     use crate::lexer::token::Token;
     use crate::parser::expr::prec::range_expr;
+    use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
-    use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
-    use crate::ast::TokenStart;
-    use crate::ast::item::Item;
-    use crate::analyser::scope::Scope;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr
@@ -382,16 +380,12 @@ pub mod primitive {
             let mut block_expr = BlockExpr::new();
             while cursor.next_token()? != &Token::RightCurlyBraces {
                 match parse_stmt_or_expr_without_block(cursor)? {
-                    StmtOrExpr::Stmt(stmt ) => {
+                    StmtOrExpr::Stmt(stmt) => {
                         if let crate::ast::stmt::Stmt::Item(item) = &stmt {
-                            match item {
-                                Item::Fn(item_fn) => block_expr.scope.add_type_fn(item_fn),
-                                Item::Struct(item_struct) => block_expr.scope.add_type_struct(item_struct),
-                                _ => { /* TODO */ }
-                            }
+                            block_expr.scope.add_typedef(item);
                         }
                         block_expr.stmts.push(stmt)
-                    },
+                    }
                     StmtOrExpr::Expr(expr) => {
                         if block_expr.expr_without_block.is_none() {
                             block_expr.expr_without_block = Some(Box::new(expr));
@@ -449,7 +443,10 @@ pub mod primitive {
     impl Parse for WhileExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::While)?;
-            Ok(WhileExpr(Box::new(Expr::parse(cursor)?), Box::new(BlockExpr::parse(cursor)?)))
+            Ok(WhileExpr(
+                Box::new(Expr::parse(cursor)?),
+                Box::new(BlockExpr::parse(cursor)?),
+            ))
         }
     }
 
