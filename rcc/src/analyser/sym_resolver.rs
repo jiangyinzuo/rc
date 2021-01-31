@@ -1,16 +1,17 @@
-use super::scope::BULITIN_SCOPE;
 use crate::analyser::scope::Scope;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    FieldAccessExpr, GroupedExpr, IfExpr, LoopExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr,
-    TupleIndexExpr, UnAryExpr, WhileExpr,
+    FieldAccessExpr, GroupedExpr, IfExpr, LitExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
+    StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
 };
 use crate::ast::file::File;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct};
-use crate::ast::stmt::Stmt;
+use crate::ast::pattern::{IdentPattern, Pattern};
+use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{TypeAnnotation, TypeFnPtr};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
+use crate::rcc::RccError;
 use std::ptr::NonNull;
 
 pub enum VarKind {
@@ -105,13 +106,14 @@ impl SymbolResolver {
 }
 
 impl Visit for SymbolResolver {
-    fn visit_file(&mut self, file: &mut File) {
+    fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
         for item in file.items.iter_mut() {
             self.visit_item(item);
         }
+        Ok(())
     }
 
-    fn visit_item(&mut self, item: &mut Item) {
+    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError> {
         match item {
             Item::Fn(item_fn) => self.visit_item_fn(item_fn),
             Item::Struct(item_struct) => self.visit_item_struct(item_struct),
@@ -119,23 +121,49 @@ impl Visit for SymbolResolver {
         }
     }
 
-    fn visit_item_fn(&mut self, item_fn: &mut ItemFn) {
+    fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
         if let Some(block) = item_fn.fn_block.as_mut() {
             self.visit_block_expr(block);
         }
+        Ok(())
     }
 
-    fn visit_item_struct(&mut self, item_struct: &mut ItemStruct) {
-        unimplemented!()
+    fn visit_item_struct(&mut self, item_struct: &mut ItemStruct) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_stmt(&mut self, stmt: &mut Stmt) {
-        unimplemented!()
+    fn visit_stmt(&mut self, stmt: &mut Stmt) -> Result<(), RccError> {
+        match stmt {
+            Stmt::Semi => Ok(()),
+            Stmt::Item(item) => self.visit_item(item),
+            Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
+            Stmt::ExprStmt(expr) => self.visit_expr(expr),
+        }
+    }
+
+    fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
+        if let Some(expr) = &mut let_stmt.expr {
+            self.visit_expr(expr);
+        }
+        match &let_stmt.pattern {
+            Pattern::Identifier(ident_pattern) => {}
+        }
+        Ok(())
+    }
+
+    fn visit_pattern(&mut self, pattern: &mut Pattern) -> Result<(), RccError> {
+        Ok(())
+    }
+
+    fn visit_ident_pattern(&mut self, ident_pattern: &mut IdentPattern) -> Result<(), RccError> {
+        Ok(())
     }
 
     /// visit the expression which may contain block expression
-    fn visit_expr(&mut self, expr: &mut Expr) {
+    fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
         match expr {
+            Expr::Path(path_expr) => self.visit_path_expr(path_expr),
+            Expr::Lit(lit_expr) => self.visit_lit_expr(lit_expr),
             Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
@@ -154,15 +182,24 @@ impl Visit for SymbolResolver {
             Expr::If(if_expr) => self.visit_if_expr(if_expr),
             Expr::Return(return_expr) => self.visit_return_expr(return_expr),
             Expr::Break(break_expr) => self.visit_break_expr(break_expr),
-            _ => {}
+            _ => Ok(()),
         }
     }
 
-    fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) {
-        self.visit_expr(&mut unary_expr.expr);
+    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
+        path_expr.segments.last();
+        Ok(())
     }
 
-    fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) {
+    fn visit_lit_expr(&mut self, lit_expr: &mut LitExpr) -> Result<(), RccError> {
+        Ok(())
+    }
+
+    fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError> {
+        self.visit_expr(&mut unary_expr.expr)
+    }
+
+    fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
         block_expr.scope.set_father(self.cur_scope);
         self.push_scope(&mut block_expr.scope);
         for stmt in block_expr.stmts.iter_mut() {
@@ -172,85 +209,99 @@ impl Visit for SymbolResolver {
             self.visit_expr(expr);
         }
         self.pop_scope();
+        Ok(())
     }
 
-    fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) {
+    fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<(), RccError> {
         self.visit_expr(&mut assign_expr.lhs);
-        self.visit_expr(&mut assign_expr.rhs);
+        self.visit_expr(&mut assign_expr.rhs)
     }
 
-    fn visit_range_expr(&mut self, range_expr: &mut RangeExpr) {
+    fn visit_range_expr(&mut self, range_expr: &mut RangeExpr) -> Result<(), RccError> {
         if let Some(expr) = range_expr.lhs.as_mut() {
             self.visit_expr(expr);
         }
         if let Some(expr) = range_expr.rhs.as_mut() {
             self.visit_expr(expr);
         }
+        Ok(())
     }
 
-    fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) {
+    fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) -> Result<(), RccError> {
         self.visit_expr(&mut bin_op_expr.lhs);
-        self.visit_expr(&mut bin_op_expr.rhs);
+        self.visit_expr(&mut bin_op_expr.rhs)
     }
 
-    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) {
+    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<(), RccError> {
         self.visit_expr(grouped_expr)
     }
 
-    fn visit_array_expr(&mut self, array_expr: &mut ArrayExpr) {
+    fn visit_array_expr(&mut self, array_expr: &mut ArrayExpr) -> Result<(), RccError> {
         for e in array_expr.elems.iter_mut() {
             self.visit_expr(e);
         }
         if let Some(expr) = array_expr.len_expr.expr.as_mut() {
             self.visit_expr(expr);
         }
+        Ok(())
     }
 
-    fn visit_array_index_expr(&mut self, array_index_expr: &mut ArrayIndexExpr) {
-        unimplemented!()
+    fn visit_array_index_expr(
+        &mut self,
+        array_index_expr: &mut ArrayIndexExpr,
+    ) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_tuple_expr(&mut self, tuple_expr: &mut TupleExpr) {
-        unimplemented!()
+    fn visit_tuple_expr(&mut self, tuple_expr: &mut TupleExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_tuple_index_expr(&mut self, tuple_index_expr: &mut TupleIndexExpr) {
-        unimplemented!()
+    fn visit_tuple_index_expr(
+        &mut self,
+        tuple_index_expr: &mut TupleIndexExpr,
+    ) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_struct_expr(&mut self, struct_expr: &mut StructExpr) {
-        unimplemented!()
+    fn visit_struct_expr(&mut self, struct_expr: &mut StructExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_call_expr(&mut self, call_expr: &mut CallExpr) {
-        unimplemented!()
+    fn visit_call_expr(&mut self, call_expr: &mut CallExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_field_access_expr(&mut self, field_access_expr: &mut FieldAccessExpr) {
-        unimplemented!()
+    fn visit_field_access_expr(
+        &mut self,
+        field_access_expr: &mut FieldAccessExpr,
+    ) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr) {
-        unimplemented!()
+    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr) {
-        unimplemented!()
+    fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_if_expr(&mut self, if_expr: &mut IfExpr) {
-        unimplemented!()
+    fn visit_if_expr(&mut self, if_expr: &mut IfExpr) -> Result<(), RccError> {
+        Ok(())
     }
 
-    fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) {
+    fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<(), RccError> {
         if let Some(expr) = return_expr.0.as_mut() {
             self.visit_expr(expr);
         }
+        Ok(())
     }
 
-    fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) {
+    fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<(), RccError> {
         if let Some(expr) = break_expr.0.as_mut() {
             self.visit_expr(expr);
         }
+        Ok(())
     }
 }

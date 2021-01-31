@@ -1,11 +1,12 @@
-use super::parse_input;
 use crate::ast::expr::BlockExpr;
 use crate::ast::expr::Expr::Lit;
 use crate::ast::expr::LitExpr;
 use crate::ast::file::File;
 use crate::ast::item::{FnParams, Item, ItemFn};
-use crate::ast::types::TypeAnnotation;
+use crate::ast::types::{TypeLit, TypeAnnotation};
 use crate::ast::Visibility::Priv;
+
+use super::parse_input;
 
 #[test]
 fn file_test() {
@@ -16,7 +17,7 @@ fn file_test() {
         FnParams::new(),
         TypeAnnotation::Identifier("f64".into()),
         BlockExpr::new().expr_without_block(Lit(LitExpr {
-            ret_type: "f64".into(),
+            ret_type: TypeLit::F64,
             value: "3.14".into(),
         })),
     ))]));

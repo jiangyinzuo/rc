@@ -1,13 +1,15 @@
-use crate::ast::expr::Expr::Path;
-use crate::ast::stmt::Stmt;
-use crate::ast::{FromToken, TokenStart};
-use crate::lexer::token::Token;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::str::FromStr;
 use strenum::StrEnum;
-
 use crate::analyser::scope::Scope;
+use crate::ast::{FromToken, TokenStart};
+use crate::ast::expr::Expr::Path;
+use crate::ast::stmt::Stmt;
+use crate::ast::types::{TypeLit, TypeAnnotation, RetType};
+use crate::ast::types::TypeAnnotation::Unknown;
 use crate::from_token;
+use crate::lexer::token::Token;
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -52,6 +54,35 @@ impl From<&str> for Expr {
     }
 }
 
+impl RetType for Expr {
+    fn ret_type(&self) -> &TypeAnnotation {
+        match self {
+            Self::Path(e) => e.ret_type(),
+            // Self::Lit(e) => e.ret_type(),
+            // Self::LitBool(_) => TypeAnnotation::Bool,
+            // Self::Unary(e) => e.ret_type(),
+            // Self::Block(e) => e.ret_type(),
+            // Self::Assign(e) => e.ret_type(),
+            // Self::Range(e) => e.ret_type(),
+            // Self::BinOp(e) => e.ret_type(),
+            // Self::Grouped(e) => e.ret_type(),
+            // Self::Array(e) => e.ret_type(),
+            // Self::ArrayIndex(e) => e.ret_type(),
+            // Self::Tuple(e) => e.ret_type(),
+            // Self::TupleIndex(e) => e.ret_type(),
+            // Self::Struct(e) => e.ret_type(),
+            // Self::Call(e) => e.ret_type(),
+            // Self::FieldAccess(e) => e.ret_type(),
+            // Self::While(e) => e.ret_type(),
+            // Self::Loop(e) => e.ret_type(),
+            // Self::If(e) => e.ret_type(),
+            // Self::Return(e) => e.ret_type(),
+            // Self::Break(e) => e.ret_type(),
+            _ => unimplemented!()
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ConstantExpr<V> {
     pub expr: Option<Box<Expr>>,
@@ -90,6 +121,7 @@ pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
     pub scope: Scope,
+    pub ret_type: TypeAnnotation,
 }
 
 impl Debug for BlockExpr {
@@ -113,6 +145,7 @@ impl BlockExpr {
             stmts: vec![],
             expr_without_block: None,
             scope: Scope::new(),
+            ret_type: Unknown,
         }
     }
 
@@ -129,25 +162,21 @@ impl From<Vec<Stmt>> for BlockExpr {
             stmts,
             expr_without_block: None,
             scope: Scope::new(),
+            ret_type: Unknown
         }
     }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct LitExpr {
-    pub ret_type: String,
+    pub ret_type: TypeLit,
     pub value: String,
-}
-
-impl LitExpr {
-    pub const EMPTY_INT_TYPE: &'static str = "#i";
-    pub const EMPTY_FLOAT_TYPE: &'static str = "#f";
 }
 
 impl From<i32> for LitExpr {
     fn from(num: i32) -> Self {
         LitExpr {
-            ret_type: Self::EMPTY_INT_TYPE.to_string(),
+            ret_type: TypeLit::I,
             value: num.to_string(),
         }
     }
@@ -156,7 +185,7 @@ impl From<i32> for LitExpr {
 impl From<char> for LitExpr {
     fn from(c: char) -> Self {
         LitExpr {
-            ret_type: "char".to_string(),
+            ret_type: TypeLit::Char,
             value: format!("'{}'", c),
         }
     }
@@ -165,17 +194,30 @@ impl From<char> for LitExpr {
 #[derive(PartialEq, Debug)]
 pub struct PathExpr {
     pub segments: Vec<String>,
+    _type: TypeAnnotation,
 }
 
 impl PathExpr {
     pub fn new() -> Self {
-        PathExpr { segments: vec![] }
+        PathExpr {
+            segments: vec![],
+            _type: Unknown,
+        }
+    }
+}
+
+impl RetType for PathExpr {
+    fn ret_type(&self) -> &TypeAnnotation {
+        &self._type
     }
 }
 
 impl From<Vec<String>> for PathExpr {
     fn from(segments: Vec<String>) -> Self {
-        PathExpr { segments }
+        PathExpr {
+            segments,
+            _type: Unknown,
+        }
     }
 }
 
@@ -183,6 +225,7 @@ impl From<Vec<&str>> for PathExpr {
     fn from(segments: Vec<&str>) -> Self {
         PathExpr {
             segments: segments.iter().map(|s| s.to_string()).collect(),
+            _type: Unknown,
         }
     }
 }
@@ -191,6 +234,7 @@ impl From<&str> for PathExpr {
     fn from(s: &str) -> Self {
         PathExpr {
             segments: s.split("::").map(|s| s.to_string()).collect(),
+            _type: Unknown,
         }
     }
 }

@@ -20,9 +20,9 @@ impl From<Expr> for Stmt {
 
 #[derive(Debug, PartialEq)]
 pub struct LetStmt {
-    pattern: Pattern,
-    _type: Option<TypeAnnotation>,
-    expr: Option<Expr>,
+    pub pattern: Pattern,
+    pub _type: Option<TypeAnnotation>,
+    pub expr: Option<Expr>,
 }
 
 impl LetStmt {

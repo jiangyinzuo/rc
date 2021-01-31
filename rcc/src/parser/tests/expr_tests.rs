@@ -1,12 +1,10 @@
+use crate::ast::expr::{AssignExpr, AssignOp, BinOperator, BinOpExpr, BlockExpr, CallExpr, FieldAccessExpr, GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr};
+use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
-use crate::ast::expr::{
-    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, FieldAccessExpr,
-    GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
-};
-use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
+use crate::ast::types::TypeLit;
 use crate::parser::tests::parse_validate;
 
 #[test]
@@ -29,7 +27,7 @@ fn lit_expr_test() {
     parse_validate(
         vec!["123", "'c'", r#""hello""#],
         vec![Ok(LitExpr {
-            ret_type: LitExpr::EMPTY_INT_TYPE.into(),
+            ret_type: TypeLit::I,
             value: "123".to_string(),
         })],
     );
@@ -61,7 +59,7 @@ fn return_expr_test() {
         vec!["{ return 0;}"],
         vec![Ok(Block(BlockExpr::from(vec![
             Stmt::ExprStmt(Return(ReturnExpr(Some(Box::new(Lit(LitExpr {
-                ret_type: LitExpr::EMPTY_INT_TYPE.into(),
+                ret_type: TypeLit::I,
                 value: "0".into(),
             })))))),
         ])))],

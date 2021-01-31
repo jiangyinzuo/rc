@@ -14,17 +14,17 @@ impl Parse for Expr {
 
 /// Expression having precedences
 pub mod prec {
-    use crate::ast::expr::Expr::{ArrayIndex, Assign, Call, FieldAccess, Range, Unary};
-    use crate::ast::expr::UnOp::{Borrow, BorrowMut};
     use crate::ast::expr::{
-        ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr,
+        ArrayIndexExpr, AssignExpr, BinOperator, BinOpExpr, CallExpr, CallParams, Expr,
         FieldAccessExpr, Precedence, RangeExpr, UnAryExpr, UnOp,
     };
+    use crate::ast::expr::Expr::{ArrayIndex, Assign, Call, FieldAccess, Range, Unary};
+    use crate::ast::expr::UnOp::{Borrow, BorrowMut};
     use crate::ast::FromToken;
     use crate::ast::TokenStart;
     use crate::lexer::token::Token;
-    use crate::parser::expr::primitive::primitive_expr;
     use crate::parser::{Parse, ParseCursor};
+    use crate::parser::expr::primitive::primitive_expr;
     use crate::rcc::RccError;
 
     pub fn parse(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
@@ -233,14 +233,17 @@ pub mod prec {
 
 /// Primitive Expressions
 pub mod primitive {
-    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Loop, Path, While};
+    use std::str::FromStr;
+
     use crate::ast::expr::*;
+    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Loop, Path, While};
     use crate::ast::TokenStart;
+    use crate::ast::types::TypeLit;
     use crate::lexer::token::LiteralKind::*;
     use crate::lexer::token::Token;
+    use crate::parser::{Parse, ParseCursor};
     use crate::parser::expr::prec::range_expr;
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
-    use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | BlockExpr
@@ -347,20 +350,20 @@ pub mod primitive {
             Ok(LitExpr {
                 ret_type: {
                     match literal_kind {
-                        Char => "char",
-                        String => "&str",
+                        Char => TypeLit::Char,
+                        String => TypeLit::Str,
                         Integer { suffix } => {
                             if suffix.is_empty() {
-                                Self::EMPTY_INT_TYPE
+                                TypeLit::I
                             } else {
-                                suffix
+                                TypeLit::from_str(suffix).unwrap()
                             }
                         }
                         Float { suffix } => {
                             if suffix.is_empty() {
-                                Self::EMPTY_FLOAT_TYPE
+                                TypeLit::F
                             } else {
-                                suffix
+                                TypeLit::from_str(suffix).unwrap()
                             }
                         }
                     }

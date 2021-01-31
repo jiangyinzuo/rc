@@ -81,7 +81,8 @@ impl IRGen for LitExpr {
 impl LitExpr {
     fn to_data(&self) -> Data {
         Data {
-            _type: TypeAnnotation::Identifier(self.ret_type.clone()),
+            // FIXME
+            _type: TypeAnnotation::Identifier(self.ret_type.to_string()),
             value: self.value.to_string(),
         }
     }

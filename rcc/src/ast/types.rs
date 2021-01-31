@@ -1,6 +1,11 @@
-use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
 use std::fmt::{Debug, Formatter};
+use strenum::StrEnum;
 use crate::ast::item::ItemFn;
+use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
+
+pub trait RetType {
+    fn ret_type(&self) -> &TypeAnnotation; 
+}
 
 #[derive(PartialEq, Clone)]
 pub enum TypeAnnotation {
@@ -25,6 +30,11 @@ pub enum TypeAnnotation {
 
     /// !
     Never,
+
+    Bool,
+    Lit(TypeLit),
+
+    Unknown,
 }
 
 impl From<String> for TypeAnnotation {
@@ -49,6 +59,9 @@ impl Debug for TypeAnnotation {
             Self::FnPtr(fptr) => write!(f, "{:?}", fptr),
             Self::Ptr(ptr) => write!(f, "{:?}", ptr),
             Self::Never => write!(f, "!"),
+            Self::Bool => write!(f, "bool"),
+            Self::Lit(tl) => write!(f, "{:?}", tl),
+            Self::Unknown => write!(f, "[unknown]")
         }
     }
 }
@@ -105,4 +118,30 @@ pub enum PtrKind {
 pub struct TypePtr {
     ptr_kind: PtrKind,
     _type: Box<TypeAnnotation>,
+}
+
+#[derive(StrEnum, PartialEq, Debug, Clone)]
+pub enum TypeLit {
+    #[strenum(disabled)]
+    Char,
+    #[strenum(disabled)]
+    Str,
+    F32,
+    F64,
+    #[strenum(disabled)]
+    F,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    #[strenum(disabled)]
+    I,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
 }

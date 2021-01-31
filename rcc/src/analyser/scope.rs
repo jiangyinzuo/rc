@@ -1,17 +1,17 @@
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo};
-use crate::ast::item::{ItemFn, ItemStruct, Item};
+use crate::ast::item::{Item, ItemFn, ItemStruct};
 use std::collections::HashMap;
 
 pub struct Scope {
     father: Option<NonNull<Scope>>,
     pub(crate) types: HashMap<String, TypeInfo>,
-    variables: HashMap<String, VarInfo>,
+    variables: HashMap<String, Vec<VarInfo>>,
 }
 
 use crate::analyser::sym_resolver::TypeInfo::*;
 use lazy_static::lazy_static;
-use std::ptr::NonNull;
 use std::ops::Deref;
+use std::ptr::NonNull;
 
 lazy_static! {
     pub static ref BULITIN_SCOPE: Scope = {
@@ -45,6 +45,11 @@ impl Scope {
             types: HashMap::new(),
             variables: HashMap::new(),
         }
+    }
+
+    pub fn add_variable(&mut self, ident: &str) {
+        // TODO
+        // self.variables.insert(ident.to_string())
     }
 
     pub fn add_typedef(&mut self, item: &Item) {
