@@ -34,7 +34,7 @@ impl VarInfo {
         VarInfo {
             stmt_id,
             kind,
-            _type
+            _type,
         }
     }
 
@@ -126,7 +126,7 @@ impl SymbolResolver {
 impl Visit for SymbolResolver {
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
         for item in file.items.iter_mut() {
-            self.visit_item(item);
+            self.visit_item(item)?;
         }
         Ok(())
     }
@@ -141,7 +141,7 @@ impl Visit for SymbolResolver {
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
         if let Some(block) = item_fn.fn_block.as_mut() {
-            self.visit_block_expr(block);
+            self.visit_block_expr(block)?;
         }
         Ok(())
     }
@@ -161,7 +161,7 @@ impl Visit for SymbolResolver {
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
         if let Some(expr) = &mut let_stmt.expr {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         match &let_stmt.pattern {
             Pattern::Identifier(ident_pattern) => {}
@@ -206,11 +206,14 @@ impl Visit for SymbolResolver {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
         if let Some(ident) = path_expr.segments.last() {
-            unsafe {(*self.cur_scope).find_variable(ident);}
+            if let Some(var_info) = unsafe { (*self.cur_scope).find_variable(ident) } {
+                return Ok(())
+            } else {
+                return Err(format!("identifier `{}` not found", ident).into())
+            }
         } else {
-            return Err("invalid ident".into())
+            return Err("invalid ident".into());
         }
-        Ok(())
     }
 
     fn visit_lit_expr(&mut self, lit_expr: &mut LitExpr) -> Result<(), RccError> {
@@ -222,35 +225,34 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
-
-        self.enter_block( block_expr);
+        self.enter_block(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
-            self.visit_stmt(stmt);
+            self.visit_stmt(stmt)?;
         }
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         self.exit_block();
         Ok(())
     }
 
     fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<(), RccError> {
-        self.visit_expr(&mut assign_expr.lhs);
+        self.visit_expr(&mut assign_expr.lhs)?;
         self.visit_expr(&mut assign_expr.rhs)
     }
 
     fn visit_range_expr(&mut self, range_expr: &mut RangeExpr) -> Result<(), RccError> {
         if let Some(expr) = range_expr.lhs.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         if let Some(expr) = range_expr.rhs.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         Ok(())
     }
 
     fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) -> Result<(), RccError> {
-        self.visit_expr(&mut bin_op_expr.lhs);
+        self.visit_expr(&mut bin_op_expr.lhs)?;
         self.visit_expr(&mut bin_op_expr.rhs)
     }
 
@@ -260,10 +262,10 @@ impl Visit for SymbolResolver {
 
     fn visit_array_expr(&mut self, array_expr: &mut ArrayExpr) -> Result<(), RccError> {
         for e in array_expr.elems.iter_mut() {
-            self.visit_expr(e);
+            self.visit_expr(e)?;
         }
         if let Some(expr) = array_expr.len_expr.expr.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         Ok(())
     }
@@ -315,14 +317,14 @@ impl Visit for SymbolResolver {
 
     fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<(), RccError> {
         if let Some(expr) = return_expr.0.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         Ok(())
     }
 
     fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<(), RccError> {
         if let Some(expr) = break_expr.0.as_mut() {
-            self.visit_expr(expr);
+            self.visit_expr(expr)?;
         }
         Ok(())
     }

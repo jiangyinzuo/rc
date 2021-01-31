@@ -1,14 +1,6 @@
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo};
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use std::collections::HashMap;
-
-pub struct Scope {
-    father: Option<NonNull<Scope>>,
-    pub(crate) types: HashMap<String, TypeInfo>,
-    variables: HashMap<String, Vec<VarInfo>>,
-    pub cur_stmt_id: u64,
-}
-
 use crate::analyser::sym_resolver::TypeInfo::*;
 use lazy_static::lazy_static;
 use std::ops::Deref;
@@ -35,6 +27,13 @@ lazy_static! {
         s.types.insert("usize".into(), Usize);
         s
     };
+}
+
+pub struct Scope {
+    father: Option<NonNull<Scope>>,
+    pub(crate) types: HashMap<String, TypeInfo>,
+    variables: HashMap<String, Vec<VarInfo>>,
+    pub cur_stmt_id: u64,
 }
 
 unsafe impl std::marker::Sync for Scope {}
@@ -97,9 +96,7 @@ impl Scope {
     }
 
     pub fn set_father(&mut self, father: *mut Scope) {
-        unsafe {
-            self.father = Some(NonNull::new_unchecked(father));
-        }
+        self.father = Some(unsafe { NonNull::new_unchecked(father) });
     }
 
     pub fn set_father_as_builtin_scope(&mut self) {
