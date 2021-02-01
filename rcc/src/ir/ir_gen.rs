@@ -1,5 +1,5 @@
 use crate::ast::expr::Expr;
-use crate::ast::expr::{BlockExpr, LitExpr};
+use crate::ast::expr::{BlockExpr, LitNumExpr};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn};
 use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
@@ -71,14 +71,14 @@ impl IRGen for BlockExpr {
     }
 }
 
-impl IRGen for LitExpr {
+impl IRGen for LitNumExpr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         cxt.push_data(self.to_data());
         Ok(())
     }
 }
 
-impl LitExpr {
+impl LitNumExpr {
     fn to_data(&self) -> Data {
         Data {
             // FIXME
@@ -91,7 +91,7 @@ impl LitExpr {
 impl IRGen for Expr {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         match self {
-            Self::Lit(lit_expr) => lit_expr.generate(cxt)?,
+            Self::LitNum(lit_expr) => lit_expr.generate(cxt)?,
             _ => unimplemented!(),
         }
         Ok(())

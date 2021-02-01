@@ -1,8 +1,11 @@
-use crate::ast::expr::{AssignExpr, AssignOp, BinOperator, BinOpExpr, BlockExpr, CallExpr, FieldAccessExpr, GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr};
-use crate::ast::expr::{LitExpr, UnAryExpr, UnOp};
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
+use crate::ast::expr::{
+    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, Expr, FieldAccessExpr,
+    GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
+};
+use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLit;
 use crate::parser::tests::parse_validate;
@@ -24,12 +27,16 @@ fn path_expr_test() {
 
 #[test]
 fn lit_expr_test() {
-    parse_validate(
+    parse_validate::<Expr>(
         vec!["123", "'c'", r#""hello""#],
-        vec![Ok(LitExpr {
-            ret_type: TypeLit::I,
-            value: "123".to_string(),
-        })],
+        vec![
+            Ok(Expr::LitNum(LitNumExpr {
+                ret_type: TypeLit::I,
+                value: "123".to_string(),
+            })),
+            Ok(Expr::LitChar('c')),
+            Ok(Expr::LitStr("hello".to_string())),
+        ],
     );
 }
 
@@ -57,12 +64,12 @@ fn unary_expr_test() {
 fn return_expr_test() {
     parse_validate(
         vec!["{ return 0;}"],
-        vec![Ok(Block(BlockExpr::from(vec![
-            Stmt::ExprStmt(Return(ReturnExpr(Some(Box::new(Lit(LitExpr {
+        vec![Ok(Block(BlockExpr::from(vec![Stmt::ExprStmt(Return(
+            ReturnExpr(Some(Box::new(LitNum(LitNumExpr {
                 ret_type: TypeLit::I,
                 value: "0".into(),
-            })))))),
-        ])))],
+            })))),
+        ))])))],
     );
 }
 
@@ -109,10 +116,10 @@ fn range_test() {
         vec!["1..3", "..=2", "3.."],
         vec![
             Ok(Range(
-                RangeExpr::new(DotDot).lhs(Lit(1.into())).rhs(Lit(3.into())),
+                RangeExpr::new(DotDot).lhs(LitNum(1.into())).rhs(LitNum(3.into())),
             )),
-            Ok(Range(RangeExpr::new(DotDotEq).rhs(Lit(2.into())))),
-            Ok(Range(RangeExpr::new(DotDot).lhs(Lit(3.into())))),
+            Ok(Range(RangeExpr::new(DotDotEq).rhs(LitNum(2.into())))),
+            Ok(Range(RangeExpr::new(DotDot).lhs(LitNum(3.into())))),
         ],
     );
 }
@@ -122,10 +129,10 @@ fn left_paren_test() {
     parse_validate(
         vec!["('1',)", "(1)", "(1,2)", "(1,22,)"],
         vec![
-            Ok(Tuple(TupleExpr(vec![Lit('1'.into())]))),
-            Ok(Grouped(GroupedExpr::new(Lit(1.into())))),
-            Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(2.into())]))),
-            Ok(Tuple(TupleExpr(vec![Lit(1.into()), Lit(22.into())]))),
+            Ok(Tuple(TupleExpr(vec![LitChar('1')]))),
+            Ok(Grouped(GroupedExpr::new(LitNum(1.into())))),
+            Ok(Tuple(TupleExpr(vec![LitNum(1.into()), LitNum(2.into())]))),
+            Ok(Tuple(TupleExpr(vec![LitNum(1.into()), LitNum(22.into())]))),
         ],
     );
 }
@@ -137,16 +144,16 @@ fn bin_op_test() {
         vec![
             Ok(BinOp(BinOpExpr::new(
                 BinOp(BinOpExpr::new(
-                    Lit(1.into()),
+                    LitNum(1.into()),
                     BinOperator::Plus,
                     BinOp(BinOpExpr::new(
-                        Lit(2.into()),
+                        LitNum(2.into()),
                         BinOperator::Star,
-                        Lit(4.into()),
+                        LitNum(4.into()),
                     )),
                 )),
                 BinOperator::Plus,
-                Lit(6.into()),
+                LitNum(6.into()),
             ))),
             Err("Chained comparison operator require parentheses"),
         ],
@@ -175,7 +182,7 @@ fn call_expr_test() {
     parse_validate(
         vec!["1.hello()()"],
         vec![Ok(Call(CallExpr::new(Call(CallExpr::new(FieldAccess(
-            FieldAccessExpr::new(Lit(1.into()), "hello".into()),
+            FieldAccessExpr::new(LitNum(1.into()), "hello".into()),
         ))))))],
     );
 }

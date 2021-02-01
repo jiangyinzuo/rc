@@ -1,6 +1,6 @@
 use crate::ast::expr::{BinOperator, BinOpExpr, BlockExpr};
-use crate::ast::expr::Expr::{BinOp, Lit};
-use crate::ast::expr::LitExpr;
+use crate::ast::expr::Expr::{BinOp, LitNum};
+use crate::ast::expr::LitNumExpr;
 use crate::ast::item::{FnParam, FnParams, Item, ItemFn};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::Stmt;
@@ -26,7 +26,7 @@ fn item_fn_test() {
                 "main".into(),
                 FnParams::new(),
                 "i32".into(),
-                BlockExpr::new().expr_without_block(Lit(LitExpr {
+                BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
                     ret_type: TypeLit::I,
                     value: "0".into(),
                 })),

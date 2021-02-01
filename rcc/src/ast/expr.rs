@@ -14,8 +14,10 @@ use crate::lexer::token::Token;
 #[derive(Debug, PartialEq)]
 pub enum Expr {
     Path(PathExpr),
-    Lit(LitExpr),
+    LitNum(LitNumExpr),
     LitBool(bool),
+    LitChar(char),
+    LitStr(String),
     Unary(UnAryExpr),
     Block(BlockExpr),
     Assign(AssignExpr),
@@ -59,7 +61,7 @@ impl RetType for Expr {
         match self {
             Self::Path(e) => e.ret_type(),
             // Self::Lit(e) => e.ret_type(),
-            // Self::LitBool(_) => TypeAnnotation::Bool,
+            Self::LitBool(_) => &TypeAnnotation::Bool,
             // Self::Unary(e) => e.ret_type(),
             // Self::Block(e) => e.ret_type(),
             // Self::Assign(e) => e.ret_type(),
@@ -168,25 +170,30 @@ impl From<Vec<Stmt>> for BlockExpr {
 }
 
 #[derive(PartialEq, Debug)]
-pub struct LitExpr {
+pub struct LitNumExpr {
     pub ret_type: TypeLit,
     pub value: String,
 }
 
-impl From<i32> for LitExpr {
-    fn from(num: i32) -> Self {
-        LitExpr {
+impl LitNumExpr {
+    pub fn new(value: String) -> LitNumExpr {
+        LitNumExpr {
             ret_type: TypeLit::I,
-            value: num.to_string(),
+            value
         }
+    }
+
+    pub fn ret_type(mut self, ret_type: TypeLit) -> LitNumExpr {
+        self.ret_type = ret_type;
+        self
     }
 }
 
-impl From<char> for LitExpr {
-    fn from(c: char) -> Self {
-        LitExpr {
-            ret_type: TypeLit::Char,
-            value: format!("'{}'", c),
+impl From<i32> for LitNumExpr {
+    fn from(num: i32) -> Self {
+        LitNumExpr {
+            ret_type: TypeLit::I,
+            value: num.to_string(),
         }
     }
 }

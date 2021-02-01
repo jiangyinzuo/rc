@@ -1,6 +1,6 @@
 use crate::ast::expr::BlockExpr;
-use crate::ast::expr::Expr::Lit;
-use crate::ast::expr::LitExpr;
+use crate::ast::expr::Expr::LitNum;
+use crate::ast::expr::LitNumExpr;
 use crate::ast::file::File;
 use crate::ast::item::{FnParams, Item, ItemFn};
 use crate::ast::types::{TypeLit, TypeAnnotation};
@@ -16,7 +16,7 @@ fn file_test() {
         "pi".into(),
         FnParams::new(),
         TypeAnnotation::Identifier("f64".into()),
-        BlockExpr::new().expr_without_block(Lit(LitExpr {
+        BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
             ret_type: TypeLit::F64,
             value: "3.14".into(),
         })),

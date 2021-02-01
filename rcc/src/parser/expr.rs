@@ -236,7 +236,7 @@ pub mod primitive {
     use std::str::FromStr;
 
     use crate::ast::expr::*;
-    use crate::ast::expr::Expr::{Array, Block, If, Lit, LitBool, Loop, Path, While};
+    use crate::ast::expr::Expr::{Array, Block, If, LitNum, LitBool, Loop, Path, While};
     use crate::ast::TokenStart;
     use crate::ast::types::TypeLit;
     use crate::lexer::token::LiteralKind::*;
@@ -246,14 +246,14 @@ pub mod primitive {
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
     use crate::rcc::RccError;
 
-    /// PrimitiveExpr -> PathExpr | LitExpr | BlockExpr
+    /// PrimitiveExpr -> PathExpr | LitExpr | LitChar | LitStr | LitBool | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr
     ///                | ReturnExpr | BreakExpr
     ///                | RangeExpr(without lhs)
     pub fn primitive_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
         let expr = match cursor.next_token()? {
             Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
-            Token::Literal { .. } => Lit(LitExpr::parse(cursor)?),
+            Token::Literal { .. } => parse_literal(cursor)?,
             Token::True | Token::False => LitBool(*cursor.bump_token()? == Token::True),
             Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
             Token::LeftParen => parse_grouped_or_tuple_expr(cursor)?,
@@ -343,35 +343,26 @@ pub mod primitive {
         }
     }
 
-    /// LitExpr -> literal
-    impl Parse for LitExpr {
-        fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-            let (literal_kind, value) = cursor.eat_literal()?;
-            Ok(LitExpr {
-                ret_type: {
-                    match literal_kind {
-                        Char => TypeLit::Char,
-                        String => TypeLit::Str,
-                        Integer { suffix } => {
-                            if suffix.is_empty() {
-                                TypeLit::I
-                            } else {
-                                TypeLit::from_str(suffix).unwrap()
-                            }
-                        }
-                        Float { suffix } => {
-                            if suffix.is_empty() {
-                                TypeLit::F
-                            } else {
-                                TypeLit::from_str(suffix).unwrap()
-                            }
-                        }
-                    }
-                    .into()
-                },
-                value,
-            })
-        }
+    fn parse_literal(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
+        let (literal_kind, value) = cursor.eat_literal()?;
+        Ok(match literal_kind {
+            Char => Expr::LitChar(value.chars().nth(1).unwrap()),
+            String => Expr::LitStr(value[1..value.len() - 1].to_string()),
+            Integer { suffix } => {
+                Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
+                    TypeLit::I
+                } else {
+                    TypeLit::from_str(suffix).unwrap()
+                }))
+            }
+            Float { suffix } => {
+                Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
+                    TypeLit::F
+                } else {
+                    TypeLit::from_str(suffix).unwrap()
+                }))
+            }
+        })
     }
 
     /// Local type definitions are analysed here.

@@ -1,7 +1,7 @@
 use crate::analyser::scope::Scope;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    FieldAccessExpr, GroupedExpr, IfExpr, LitExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
+    FieldAccessExpr, GroupedExpr, IfExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
     StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
 };
 use crate::ast::file::File;
@@ -163,6 +163,7 @@ impl Visit for SymbolResolver {
         if let Some(expr) = &mut let_stmt.expr {
             self.visit_expr(expr)?;
         }
+        if let Some(type_anno) = &let_stmt._type {}
         match &let_stmt.pattern {
             Pattern::Identifier(ident_pattern) => {}
         }
@@ -180,8 +181,14 @@ impl Visit for SymbolResolver {
     /// visit the expression which may contain block expression
     fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
         match expr {
-            Expr::Path(path_expr) => self.visit_path_expr(path_expr),
-            Expr::Lit(lit_expr) => self.visit_lit_expr(lit_expr),
+            Expr::Path(path_expr) => {
+                self.visit_path_expr(path_expr)?;
+                Ok(())
+            },
+            Expr::LitNum(lit_expr) => self.visit_lit_num_expr(lit_expr),
+            Expr::LitBool(b) => {Ok(())}
+            Expr::LitChar(c) => {Ok(())}
+            Expr::LitStr(lit_str) => {Ok(())},
             Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
@@ -204,19 +211,19 @@ impl Visit for SymbolResolver {
         }
     }
 
-    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
+    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<&VarInfo, RccError> {
         if let Some(ident) = path_expr.segments.last() {
             if let Some(var_info) = unsafe { (*self.cur_scope).find_variable(ident) } {
-                return Ok(())
+                Ok(var_info)
             } else {
-                return Err(format!("identifier `{}` not found", ident).into())
+                Err(format!("identifier `{}` not found", ident).into())
             }
         } else {
-            return Err("invalid ident".into());
+            Err("invalid ident".into())
         }
     }
 
-    fn visit_lit_expr(&mut self, lit_expr: &mut LitExpr) -> Result<(), RccError> {
+    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<(), RccError> {
         Ok(())
     }
 

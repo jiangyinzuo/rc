@@ -9,7 +9,7 @@ use crate::rcc::RccError;
 #[test]
 #[should_panic]
 fn not_expr() {
-    parse_validate(vec![";"], vec![Ok(Expr::Lit(0.into()))]);
+    parse_validate(vec![";"], vec![Ok(Expr::LitNum(0.into()))]);
 }
 
 fn validate(inputs: Vec<&str>, outputs: Vec<Result<StmtOrExpr, RccError>>) {
@@ -26,12 +26,12 @@ fn let_stmt_test() {
     let outputs = vec![
         Ok(StmtOrExpr::Stmt(Stmt::Let(
             LetStmt::new(Identifier(IdentPattern::new_const("a".into())))
-                .expr(Expr::Lit(1.into())),
+                .expr(Expr::LitNum(1.into())),
         ))),
         Ok(StmtOrExpr::Stmt(Stmt::Let(
             LetStmt::new(Identifier(IdentPattern::new_const("a".into())))
                 ._type("i32".into())
-                .expr(Expr::Lit(4.into())),
+                .expr(Expr::LitNum(4.into())),
         ))),
         Ok(StmtOrExpr::Stmt(Stmt::Let(LetStmt::new(Identifier(
             IdentPattern::new_mut("bbb".into()),

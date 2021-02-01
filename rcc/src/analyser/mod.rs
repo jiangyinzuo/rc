@@ -4,7 +4,7 @@
 //! - Flow control check
 //!
 
-mod sym_resolver;
+pub mod sym_resolver;
 pub mod scope;
 #[cfg(test)]
 mod tests;

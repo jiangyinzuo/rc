@@ -1,6 +1,6 @@
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    FieldAccessExpr, GroupedExpr, IfExpr, LitExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
+    FieldAccessExpr, GroupedExpr, IfExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
     StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
 };
 use crate::ast::file::File;
@@ -8,6 +8,7 @@ use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::rcc::RccError;
+use crate::analyser::sym_resolver::VarInfo;
 
 pub trait Visit: Sized {
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError>;
@@ -28,9 +29,9 @@ pub trait Visit: Sized {
 
     fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError>;
 
-    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError>;
+    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<&VarInfo, RccError>;
 
-    fn visit_lit_expr(&mut self, lit_expr: &mut LitExpr) -> Result<(), RccError>;
+    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<(), RccError>;
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError>;
 
