@@ -6,7 +6,7 @@ use crate::analyser::scope::Scope;
 use crate::ast::{FromToken, TokenStart};
 use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
-use crate::ast::types::{TypeLit, TypeAnnotation, RetType};
+use crate::ast::types::{TypeLitNum, TypeAnnotation, RetType};
 use crate::ast::types::TypeAnnotation::Unknown;
 use crate::from_token;
 use crate::lexer::token::Token;
@@ -171,19 +171,19 @@ impl From<Vec<Stmt>> for BlockExpr {
 
 #[derive(PartialEq, Debug)]
 pub struct LitNumExpr {
-    pub ret_type: TypeLit,
+    pub ret_type: TypeLitNum,
     pub value: String,
 }
 
 impl LitNumExpr {
     pub fn new(value: String) -> LitNumExpr {
         LitNumExpr {
-            ret_type: TypeLit::I,
+            ret_type: TypeLitNum::I,
             value
         }
     }
 
-    pub fn ret_type(mut self, ret_type: TypeLit) -> LitNumExpr {
+    pub fn ret_type(mut self, ret_type: TypeLitNum) -> LitNumExpr {
         self.ret_type = ret_type;
         self
     }
@@ -192,7 +192,7 @@ impl LitNumExpr {
 impl From<i32> for LitNumExpr {
     fn from(num: i32) -> Self {
         LitNumExpr {
-            ret_type: TypeLit::I,
+            ret_type: TypeLitNum::I,
             value: num.to_string(),
         }
     }

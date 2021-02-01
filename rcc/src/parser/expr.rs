@@ -238,7 +238,7 @@ pub mod primitive {
     use crate::ast::expr::*;
     use crate::ast::expr::Expr::{Array, Block, If, LitNum, LitBool, Loop, Path, While};
     use crate::ast::TokenStart;
-    use crate::ast::types::TypeLit;
+    use crate::ast::types::TypeLitNum;
     use crate::lexer::token::LiteralKind::*;
     use crate::lexer::token::Token;
     use crate::parser::{Parse, ParseCursor};
@@ -350,16 +350,16 @@ pub mod primitive {
             String => Expr::LitStr(value[1..value.len() - 1].to_string()),
             Integer { suffix } => {
                 Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
-                    TypeLit::I
+                    TypeLitNum::I
                 } else {
-                    TypeLit::from_str(suffix).unwrap()
+                    TypeLitNum::from_str(suffix).unwrap()
                 }))
             }
             Float { suffix } => {
                 Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
-                    TypeLit::F
+                    TypeLitNum::F
                 } else {
-                    TypeLit::from_str(suffix).unwrap()
+                    TypeLitNum::from_str(suffix).unwrap()
                 }))
             }
         })

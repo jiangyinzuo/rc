@@ -1,7 +1,7 @@
 use proc_macro2::Ident;
 use proc_macro2::Span;
 use quote::*;
-use syn::{DataEnum, DeriveInput, Expr, ExprRange};
+use syn::{DataEnum, DeriveInput};
 
 const STR_ENUM: &str = "strenum";
 const DISABLED: &str = "disabled";

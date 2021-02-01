@@ -3,7 +3,7 @@ use crate::ast::expr::Expr::LitNum;
 use crate::ast::expr::LitNumExpr;
 use crate::ast::file::File;
 use crate::ast::item::{FnParams, Item, ItemFn};
-use crate::ast::types::{TypeLit, TypeAnnotation};
+use crate::ast::types::{TypeLitNum, TypeAnnotation};
 use crate::ast::Visibility::Priv;
 
 use super::parse_input;
@@ -17,7 +17,7 @@ fn file_test() {
         FnParams::new(),
         TypeAnnotation::Identifier("f64".into()),
         BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
-            ret_type: TypeLit::F64,
+            ret_type: TypeLitNum::F64,
             value: "3.14".into(),
         })),
     ))]));

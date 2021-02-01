@@ -1,8 +1,9 @@
-use crate::analyser::sym_resolver::{TypeInfo, VarInfo};
-use crate::ast::item::{Item, ItemFn, ItemStruct};
-use std::collections::HashMap;
 use crate::analyser::sym_resolver::TypeInfo::*;
+use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
+use crate::ast::item::{Item, ItemFn, ItemStruct};
+use crate::ast::types::TypeLitNum::*;
 use lazy_static::lazy_static;
+use std::collections::HashMap;
 use std::ops::Deref;
 use std::ptr::NonNull;
 
@@ -11,20 +12,20 @@ lazy_static! {
         let mut s = Scope::new();
         s.types.insert("bool".into(), Bool);
         s.types.insert("char".into(), Char);
-        s.types.insert("f32".into(), F32);
-        s.types.insert("f64".into(), F64);
-        s.types.insert("i8".into(), I8);
-        s.types.insert("i16".into(), I16);
-        s.types.insert("i32".into(), I32);
-        s.types.insert("i64".into(), I64);
-        s.types.insert("i128".into(), I128);
-        s.types.insert("isize".into(), Isize);
-        s.types.insert("u8".into(), U8);
-        s.types.insert("u16".into(), U16);
-        s.types.insert("u32".into(), U32);
-        s.types.insert("u64".into(), U64);
-        s.types.insert("u128".into(), U128);
-        s.types.insert("usize".into(), Usize);
+        s.types.insert("f32".into(), LitNum(F32));
+        s.types.insert("f64".into(), LitNum(F64));
+        s.types.insert("i8".into(), LitNum(I8));
+        s.types.insert("i16".into(), LitNum(I16));
+        s.types.insert("i32".into(), LitNum(I32));
+        s.types.insert("i64".into(), LitNum(I64));
+        s.types.insert("i128".into(), LitNum(I128));
+        s.types.insert("isize".into(), LitNum(Isize));
+        s.types.insert("u8".into(), LitNum(U8));
+        s.types.insert("u16".into(), LitNum(U16));
+        s.types.insert("u32".into(), LitNum(U32));
+        s.types.insert("u64".into(), LitNum(U64));
+        s.types.insert("u128".into(), LitNum(U128));
+        s.types.insert("usize".into(), LitNum(Usize));
         s
     };
 }
@@ -48,11 +49,12 @@ impl Scope {
         }
     }
 
-    pub fn add_variable(&mut self, ident: &str, info: VarInfo) {
+    pub fn add_variable(&mut self, ident: &str, kind: VarKind, type_info: TypeInfo) {
+        let var_info =VarInfo::new(self.cur_stmt_id, kind, type_info);
         if let Some(v) = self.variables.get_mut(ident) {
-            v.push(info);
+            v.push(var_info);
         } else {
-            self.variables.insert(ident.to_string(), vec![info]);
+            self.variables.insert(ident.to_string(), vec![var_info]);
         }
     }
 
@@ -74,6 +76,23 @@ impl Scope {
             Some(unsafe { v.get_unchecked(left) })
         } else {
             None
+        }
+    }
+
+    pub fn find_typedef(&self, ident: &str) -> TypeInfo {
+        let mut cur_scope: *const Scope = self;
+        loop {
+            let s = unsafe{&*cur_scope};
+            match s.types.get(ident) {
+                Some(ti) => return ti.clone(),
+                None => {
+                    if let Some(f) = s.father {
+                        cur_scope = f.as_ptr();
+                    } else {
+                        return Unknown
+                    }
+                }
+            }
         }
     }
 

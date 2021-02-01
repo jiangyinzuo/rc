@@ -14,7 +14,7 @@ impl Calculator {
         }
     }
 
-    pub fn interpret(&mut self, mut input: String) -> String {
+    pub fn interpret(&mut self, input: String) -> String {
         match tokenize(input) {
             Err(e) => return e,
             Ok(tokens) => {

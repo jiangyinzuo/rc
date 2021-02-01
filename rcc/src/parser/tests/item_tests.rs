@@ -4,7 +4,7 @@ use crate::ast::expr::LitNumExpr;
 use crate::ast::item::{FnParam, FnParams, Item, ItemFn};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::Stmt;
-use crate::ast::types::{TypeLit, TypeAnnotation};
+use crate::ast::types::{TypeLitNum, TypeAnnotation};
 use crate::ast::Visibility::Priv;
 use crate::parser::tests::parse_validate;
 
@@ -27,7 +27,7 @@ fn item_fn_test() {
                 FnParams::new(),
                 "i32".into(),
                 BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
-                    ret_type: TypeLit::I,
+                    ret_type: TypeLitNum::I,
                     value: "0".into(),
                 })),
             ))),

@@ -7,7 +7,7 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
-use crate::ast::types::TypeLit;
+use crate::ast::types::TypeLitNum;
 use crate::parser::tests::parse_validate;
 
 #[test]
@@ -31,7 +31,7 @@ fn lit_expr_test() {
         vec!["123", "'c'", r#""hello""#],
         vec![
             Ok(Expr::LitNum(LitNumExpr {
-                ret_type: TypeLit::I,
+                ret_type: TypeLitNum::I,
                 value: "123".to_string(),
             })),
             Ok(Expr::LitChar('c')),
@@ -66,7 +66,7 @@ fn return_expr_test() {
         vec!["{ return 0;}"],
         vec![Ok(Block(BlockExpr::from(vec![Stmt::ExprStmt(Return(
             ReturnExpr(Some(Box::new(LitNum(LitNumExpr {
-                ret_type: TypeLit::I,
+                ret_type: TypeLitNum::I,
                 value: "0".into(),
             })))),
         ))])))],

@@ -32,7 +32,9 @@ pub enum TypeAnnotation {
     Never,
 
     Bool,
-    Lit(TypeLit),
+    Str,
+    Char,
+    LitNum(TypeLitNum),
 
     Unknown,
 }
@@ -60,7 +62,9 @@ impl Debug for TypeAnnotation {
             Self::Ptr(ptr) => write!(f, "{:?}", ptr),
             Self::Never => write!(f, "!"),
             Self::Bool => write!(f, "bool"),
-            Self::Lit(tl) => write!(f, "{:?}", tl),
+            Self::Str => write!(f, "&str"),
+            Self::Char => write!(f, "char"),
+            Self::LitNum(tl) => write!(f, "{:?}", tl),
             Self::Unknown => write!(f, "[unknown]")
         }
     }
@@ -120,12 +124,8 @@ pub struct TypePtr {
     _type: Box<TypeAnnotation>,
 }
 
-#[derive(StrEnum, PartialEq, Debug, Clone)]
-pub enum TypeLit {
-    #[strenum(disabled)]
-    Char,
-    #[strenum(disabled)]
-    Str,
+#[derive(StrEnum, PartialEq, Debug, Clone, Copy)]
+pub enum TypeLitNum {
     F32,
     F64,
     #[strenum(disabled)]

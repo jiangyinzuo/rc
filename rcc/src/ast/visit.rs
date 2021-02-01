@@ -8,7 +8,7 @@ use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::rcc::RccError;
-use crate::analyser::sym_resolver::VarInfo;
+use crate::analyser::sym_resolver::{VarInfo, TypeInfo};
 
 pub trait Visit: Sized {
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError>;
@@ -31,7 +31,7 @@ pub trait Visit: Sized {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<&VarInfo, RccError>;
 
-    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<(), RccError>;
+    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<TypeInfo, RccError>;
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError>;
 
