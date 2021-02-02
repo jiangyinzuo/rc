@@ -1,3 +1,4 @@
+use crate::analyser::expr_visit::ExprVisit;
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo;
 use crate::ast::expr::Expr::Path;
@@ -7,12 +8,11 @@ use crate::ast::types::{TypeAnnotation, TypeLitNum};
 use crate::ast::{FromToken, TokenStart};
 use crate::from_token;
 use crate::lexer::token::Token;
+use crate::rcc::RccError;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use strenum::StrEnum;
-use crate::rcc::RccError;
-use crate::analyser::expr_visit::ExprVisit;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ExprKind {
@@ -69,29 +69,29 @@ impl From<&str> for Expr {
 
 #[derive(Debug, PartialEq)]
 pub enum LhsExpr {
-    Path(PathExpr),
-    ArrayIndex(ArrayIndexExpr),
-    TupleIndex(TupleIndexExpr),
-    FieldAccess(FieldAccessExpr),
-    Deref(Box<Expr>),
+    Path { inited: bool, expr: PathExpr },
+    ArrayIndex { inited: bool, expr: ArrayIndexExpr },
+    TupleIndex { inited: bool, expr: TupleIndexExpr },
+    FieldAccess { inited: bool, expr: FieldAccessExpr },
+    Deref { inited: bool, expr: Box<Expr> },
 }
 
 impl LhsExpr {
     pub fn from_expr(expr: Expr) -> Result<LhsExpr, RccError> {
         match expr {
-            Expr::Path(p) => Ok(LhsExpr::Path(p)),
+            Expr::Path(p) => Ok(LhsExpr::Path{inited: false, expr: p}),
             Expr::Unary(u) => {
                 if u.op == UnOp::Deref {
-                    Ok(LhsExpr::Deref(u.expr))
+                    Ok(LhsExpr::Deref{inited: false, expr: u.expr})
                 } else {
                     Err("invalid lhs expr".into())
                 }
             }
             Expr::Grouped(e) => LhsExpr::from_expr(*e),
-            Expr::ArrayIndex(e) => Ok(LhsExpr::ArrayIndex(e)),
-            Expr::TupleIndex(e) => Ok(LhsExpr::TupleIndex(e)),
-            Expr::FieldAccess(e) => Ok(LhsExpr::FieldAccess(e)),
-            e => Err("invalid lhs expr".into())
+            Expr::ArrayIndex(e) => Ok(LhsExpr::ArrayIndex{inited: false, expr: e}),
+            Expr::TupleIndex(e) => Ok(LhsExpr::TupleIndex{inited: false, expr: e}),
+            Expr::FieldAccess(e) => Ok(LhsExpr::FieldAccess{inited: false, expr: e}),
+            e => Err("invalid lhs expr".into()),
         }
     }
 }
@@ -187,7 +187,11 @@ pub struct LitNumExpr {
 }
 
 impl LitNumExpr {
-    pub fn new(value: String) -> LitNumExpr {
+    pub fn new(value: String, ret_type: TypeLitNum) -> LitNumExpr {
+        LitNumExpr { value, ret_type }
+    }
+
+    pub fn integer(value: String) -> LitNumExpr {
         LitNumExpr {
             ret_type: TypeLitNum::I,
             value,
@@ -438,8 +442,9 @@ from_token! {
 #[derive(Debug, PartialEq)]
 pub struct BinOpExpr {
     pub lhs: Box<Expr>,
-    bin_op: BinOperator,
+    pub bin_op: BinOperator,
     pub rhs: Box<Expr>,
+    pub type_info: TypeInfo,
 }
 
 impl BinOpExpr {
@@ -448,12 +453,13 @@ impl BinOpExpr {
             lhs: Box::new(lhs),
             bin_op,
             rhs: Box::new(rhs),
+            type_info: TypeInfo::Unknown,
         }
     }
 }
 
 from_token! {
-    #[derive(StrEnum, Debug, PartialEq, Clone)]
+    #[derive(StrEnum, Debug, PartialEq, Eq, Clone, Copy, Hash)]
     pub enum BinOperator {
         /// Arithmetic or logical operators
         #[strenum("+")]
@@ -617,6 +623,7 @@ pub struct BreakExpr(pub Option<Box<Expr>>);
 pub struct CallExpr {
     pub expr: Box<Expr>,
     pub call_params: CallParams,
+    pub type_info: TypeInfo,
 }
 
 pub type CallParams = Vec<Expr>;
@@ -626,6 +633,7 @@ impl CallExpr {
         CallExpr {
             expr: Box::new(expr),
             call_params: vec![],
+            type_info: TypeInfo::Unknown,
         }
     }
 

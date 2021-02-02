@@ -35,7 +35,7 @@ fn item_fn_test() {
                 Priv,
                 "oops".into(),
                 FnParams::new(),
-                TypeAnnotation::unit(),
+                TypeAnnotation::Unit,
                 BlockExpr::new(),
             ))),
             Ok(Item::Fn(ItemFn::new(

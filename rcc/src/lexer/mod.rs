@@ -254,6 +254,10 @@ impl<'a: 'b, 'b> Lexer<'a> {
     /// FLOAT_EXPONENT :
     ///     (e|E) (+|-)? (DEC_DIGIT|_)* DEC_DIGIT (DEC_DIGIT|_)*
     ///
+    /// INTEGER_SUFFIX :
+    ///       u8 | u16 | u32 | u64 | u128 | usize
+    ///     | i8 | i16 | i32 | i64 | i128 | isize
+    ///
     /// FLOAT_SUFFIX :
     ///     f32 | f64
     fn decimal_or_float_literal_no_prefix(&'b mut self, start: usize) -> Token<'a> {
@@ -309,6 +313,11 @@ impl<'a: 'b, 'b> Lexer<'a> {
                         self.lit(start, end, literal_kind)
                     }
                 }
+            }
+            'u' | 'i' | 'f' => {
+                let end = self.cursor.eaten_len();
+                let literal_kind = self.make_integer_or_float();
+                self.lit(start, end, literal_kind)
             }
             // FLOAT_EXPONENT
             'e' | 'E' => self.float_exponent(start),

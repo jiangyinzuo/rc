@@ -1,9 +1,9 @@
-use std::fmt::{Debug, Formatter};
-use strenum::StrEnum;
 use crate::ast::item::ItemFn;
 use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
+use std::fmt::{Debug, Formatter};
+use strenum::StrEnum;
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Eq, Hash)]
 pub enum TypeAnnotation {
     /// `char`, `u8`, `bool`,
     ///  `struct Foo;`, `enum Color(String);`, etc.
@@ -26,12 +26,11 @@ pub enum TypeAnnotation {
 
     /// !
     Never,
+    Unit,
 
     Bool,
     Str,
     Char,
-    LitNum(TypeLitNum),
-
     Unknown,
 }
 
@@ -57,34 +56,28 @@ impl Debug for TypeAnnotation {
             Self::FnPtr(fptr) => write!(f, "{:?}", fptr),
             Self::Ptr(ptr) => write!(f, "{:?}", ptr),
             Self::Never => write!(f, "!"),
+            Self::Unit => write!(f, "()"),
             Self::Bool => write!(f, "bool"),
             Self::Str => write!(f, "&str"),
             Self::Char => write!(f, "char"),
-            Self::LitNum(tl) => write!(f, "{:?}", tl),
-            Self::Unknown => write!(f, "[unknown]")
+            Self::Unknown => write!(f, "[unknown]"),
         }
-    }
-}
-
-impl TypeAnnotation {
-    pub fn unit() -> TypeAnnotation {
-        Tuple(vec![])
     }
 }
 
 pub type TypeTuple = Vec<TypeAnnotation>;
 pub type TypeSlice = Box<TypeAnnotation>;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct TypeArray {
     _type: Box<TypeAnnotation>,
     len: u32,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct TypeFnPtr {
-    params: Vec<TypeAnnotation>,
-    ret_type: Box<TypeAnnotation>,
+    pub params: Vec<TypeAnnotation>,
+    pub ret_type: Box<TypeAnnotation>,
 }
 
 impl TypeFnPtr {
@@ -100,27 +93,34 @@ impl TypeFnPtr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum PtrKind {
     /// &i32
     Ref,
     /// &mut i32
     MutRef,
-    /// *i32
-    RawPtr,
     /// *mut i32
     MutRawPtr,
     /// *const i32
     ConstRawPtr,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct TypePtr {
     pub ptr_kind: PtrKind,
-    pub _type: Box<TypeAnnotation>,
+    pub type_anno: Box<TypeAnnotation>,
 }
 
-#[derive(StrEnum, PartialEq, Debug, Clone, Copy)]
+impl TypePtr {
+    pub fn new(ptr_kind: PtrKind, type_anno: TypeAnnotation) -> TypePtr {
+        TypePtr {
+            ptr_kind,
+            type_anno: Box::new(type_anno),
+        }
+    }
+}
+
+#[derive(StrEnum, PartialEq, Eq, Debug, Clone, Copy, Hash)]
 pub enum TypeLitNum {
     F32,
     F64,
@@ -140,4 +140,19 @@ pub enum TypeLitNum {
     U64,
     U128,
     Usize,
+}
+
+impl TypeLitNum {
+    pub fn is_integer(&self) -> bool {
+        use TypeLitNum::*;
+        matches!(
+            self,
+            I8 | I16 | I32 | I64 | I128 | Isize | I | U8 | U16 | U32 | U64 | U128 | Usize
+        )
+    }
+
+    pub fn is_float(&self) -> bool {
+        use TypeLitNum::*;
+        matches!(self, F | F32 | F64)
+    }
 }

@@ -62,7 +62,7 @@ pub struct ItemFn {
     pub name: String,
     pub fn_params: FnParams,
     pub ret_type: TypeAnnotation,
-    pub fn_block: Option<BlockExpr>,
+    pub fn_block: BlockExpr,
 }
 
 impl ItemFn {
@@ -78,7 +78,7 @@ impl ItemFn {
             name,
             fn_params,
             ret_type,
-            fn_block: Some(fn_block),
+            fn_block,
         }
     }
 
@@ -89,7 +89,7 @@ impl ItemFn {
 
 #[derive(Debug, PartialEq)]
 pub struct FnParams {
-    params: Vec<FnParam>,
+    pub params: Vec<FnParam>,
 }
 
 impl FnParams {
@@ -117,8 +117,8 @@ impl From<Vec<FnParam>> for FnParams {
 
 #[derive(Debug, PartialEq)]
 pub struct FnParam {
-    pattern: Pattern,
-    _type: TypeAnnotation,
+    pub pattern: Pattern,
+    pub _type: TypeAnnotation,
 }
 
 impl FnParam {
@@ -186,20 +186,20 @@ impl ItemStruct {
 ///     Teacher(String),
 ///     Admin,
 /// }
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct TypeEnum {
     vis: Visibility,
     name: String,
     enum_items: Vec<EnumVariant>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub struct EnumVariant {
     name: String,
     fields: Fields,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum Fields {
     /// `struct Foo {a: i32}`
     Struct(Vec<StructField>),
@@ -209,14 +209,14 @@ pub enum Fields {
     None,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct StructField {
     pub vis: Visibility,
     pub name: String,
     pub _type: TypeAnnotation,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct TupleField {
     pub vis: Visibility,
     pub _type: TypeAnnotation,

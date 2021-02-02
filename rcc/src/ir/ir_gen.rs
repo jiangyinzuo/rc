@@ -2,9 +2,9 @@ use crate::ast::expr::Expr;
 use crate::ast::expr::{BlockExpr, LitNumExpr};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn};
-use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
-use crate::ast::types::TypeAnnotation;
 use crate::ast::stmt::Stmt;
+use crate::ast::types::TypeAnnotation;
+use crate::ir::{BasicBlock, Data, IRGen, IRGenContext, Quad};
 
 impl IRGen for File {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
@@ -28,27 +28,25 @@ impl IRGen for Item {
 impl IRGen for ItemFn {
     fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String> {
         let name = self.name.clone();
-        if let Some(block_expr) = self.fn_block.as_ref() {
-            block_expr.generate(cxt);
-            if let Some(ret_data) = cxt.pop_data() {
-                if self.ret_type != ret_data._type {
-                    return Err(format!(
-                        "invalid type: expect {:#?}, found {:#?}",
-                        self.ret_type, ret_data._type
-                    ));
-                }
-                let quad = Quad::ret(ret_data);
-                cxt.push_quad(quad);
-            } else {
-                unreachable!("no data at data_stack");
+        self.fn_block.generate(cxt);
+        if let Some(ret_data) = cxt.pop_data() {
+            if self.ret_type != ret_data._type {
+                return Err(format!(
+                    "invalid type: expect {:#?}, found {:#?}",
+                    self.ret_type, ret_data._type
+                ));
             }
-
-            let base_block = BasicBlock {
-                name: name.to_string(),
-                quads: cxt.swap_and_get_quads(),
-            };
-            cxt.add_basic_blocks(base_block);
+            let quad = Quad::ret(ret_data);
+            cxt.push_quad(quad);
+        } else {
+            unreachable!("no data at data_stack");
         }
+
+        let base_block = BasicBlock {
+            name: name.to_string(),
+            quads: cxt.swap_and_get_quads(),
+        };
+        cxt.add_basic_blocks(base_block);
         Ok(())
     }
 }

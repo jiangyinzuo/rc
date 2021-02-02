@@ -1,17 +1,22 @@
-use std::ptr::NonNull;
-
 use crate::analyser::expr_visit::ExprVisit;
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
-use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr, LhsExpr};
+use crate::ast::expr::Expr::BinOp;
+use crate::ast::expr::{
+    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
+    Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr,
+    RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr,
+};
 use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemFn, ItemStruct};
+use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
+use std::collections::{HashMap, HashSet};
+use std::ptr::NonNull;
 
 #[derive(Debug, PartialEq)]
 pub enum VarKind {
@@ -42,16 +47,21 @@ impl VarInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum TypeInfo {
     Fn {
         vis: Visibility,
         inner: TypeFnPtr,
     },
+
+    FnPtr(TypeFnPtr),
+
     Struct {
         vis: Visibility,
         fields: NonNull<Fields>,
     },
+
+    Enum(TypeEnum),
 
     Ptr {
         kind: PtrKind,
@@ -61,16 +71,33 @@ pub enum TypeInfo {
     /// primitive type
     /// !
     Never,
+    Str,
     /// ()
     Unit,
     Bool,
-    Str,
     Char,
     LitNum(TypeLitNum),
     Unknown,
 }
 
 impl TypeInfo {
+    pub(crate) fn from_type_anno(type_anno: &TypeAnnotation, cur_scope: &Scope) -> TypeInfo {
+        match type_anno {
+            TypeAnnotation::Identifier(s) => cur_scope.find_def_except_fn(s),
+            TypeAnnotation::Never => TypeInfo::Never,
+            TypeAnnotation::Unit => TypeInfo::Unit,
+            TypeAnnotation::Bool => TypeInfo::Bool,
+            TypeAnnotation::Str => TypeInfo::ref_str(),
+            TypeAnnotation::Char => TypeInfo::Char,
+            TypeAnnotation::Ptr(tp) => TypeInfo::Ptr {
+                kind: tp.ptr_kind,
+                type_info: Box::new(TypeInfo::from_type_anno(&tp.type_anno, cur_scope)),
+            },
+            TypeAnnotation::Unknown => TypeInfo::Unknown,
+            _ => todo!(),
+        }
+    }
+
     pub(crate) fn from_item_fn(item: &ItemFn) -> Self {
         let tp_fn_ptr = TypeFnPtr::from_item(item);
         Self::Fn {
@@ -85,29 +112,71 @@ impl TypeInfo {
             fields: NonNull::from(item.fields()),
         }
     }
-}
 
-fn to_type_info(type_anno: &TypeAnnotation, cur_scope: &Scope) -> TypeInfo {
-    match type_anno {
-        TypeAnnotation::Identifier(s) => cur_scope.find_typedef(s),
-        TypeAnnotation::Never => TypeInfo::Never,
-        TypeAnnotation::Bool => TypeInfo::Bool,
-        TypeAnnotation::Str => TypeInfo::Str,
-        TypeAnnotation::Char => TypeInfo::Char,
-        TypeAnnotation::LitNum(t) => TypeInfo::LitNum(*t),
-        TypeAnnotation::Ptr(tp) => TypeInfo::Ptr {
-            kind: tp.ptr_kind,
-            type_info: Box::new(to_type_info(&tp._type, cur_scope)),
-        },
-        TypeAnnotation::Unknown => TypeInfo::Unknown,
-        _ => todo!(),
+    pub fn ref_str() -> TypeInfo {
+        TypeInfo::Ptr {
+            kind: PtrKind::Ref,
+            type_info: Box::new(TypeInfo::Str),
+        }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        if let TypeInfo::LitNum(ln) = &self {
+            matches!(
+                ln,
+                TypeLitNum::I
+                    | TypeLitNum::I8
+                    | TypeLitNum::I16
+                    | TypeLitNum::I32
+                    | TypeLitNum::I64
+                    | TypeLitNum::I128
+                    | TypeLitNum::Isize
+                    | TypeLitNum::U8
+                    | TypeLitNum::U16
+                    | TypeLitNum::U32
+                    | TypeLitNum::U64
+                    | TypeLitNum::U128
+                    | TypeLitNum::Usize
+            )
+        } else {
+            false
+        }
+    }
+
+    pub fn is_number(&self) -> bool {
+        if let Self::LitNum(_) = &self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_i(&self) -> bool {
+        if let TypeInfo::LitNum(ln) = &self {
+            ln == &TypeLitNum::I
+        } else {
+            false
+        }
+    }
+
+    pub fn is_f(&self) -> bool {
+        if let TypeInfo::LitNum(ln) = &self {
+            ln == &TypeLitNum::F
+        } else {
+            false
+        }
     }
 }
 
+/// Fill the `type information` and `expr kind` attributes of the expr nodes on AST
 pub struct SymbolResolver<'ast> {
     cur_scope: *mut Scope,
     file_scope: Option<&'ast mut Scope>,
     scope_stack: Vec<*mut Scope>,
+
+    /// TODO: Operator override tables
+    pub override_bin_ops: HashSet<(BinOperator, TypeInfo, TypeInfo)>,
+    pub str_constants: HashMap<String, u64>,
 }
 
 impl<'ast> SymbolResolver<'ast> {
@@ -116,6 +185,51 @@ impl<'ast> SymbolResolver<'ast> {
             cur_scope: std::ptr::null_mut(),
             file_scope: None,
             scope_stack: vec![],
+            override_bin_ops: HashSet::new(),
+            str_constants: HashMap::new(),
+        }
+    }
+
+    /// return `TypeInfo::Unknown` if bin_op expr is invalid
+    fn primitive_bin_ops(lhs: &mut Expr, bin_op: BinOperator, rhs: &mut Expr) -> TypeInfo {
+        let l_type = lhs.type_info();
+        let r_type = rhs.type_info();
+        match bin_op {
+            // 3i64 << 2i32
+            BinOperator::Shl | BinOperator::Shr => {
+                if l_type.is_integer() && r_type.is_integer() {
+                    l_type
+                } else {
+                    Unknown
+                }
+            }
+            BinOperator::Plus | BinOperator::Minus | BinOperator::Star | BinOperator::Slash => {
+                if let TypeInfo::LitNum(l_lit) = l_type {
+                    if let TypeInfo::LitNum(r_lit) = l_type {
+                        return if l_lit == r_lit {
+                            l_type
+                        } else if l_lit == TypeLitNum::I && r_lit.is_integer()
+                            || l_lit == TypeLitNum::F && r_lit.is_float()
+                        {
+                            if let Expr::LitNum(expr) = lhs {
+                                expr.ret_type = r_lit;
+                            }
+                            r_type
+                        } else if r_lit == TypeLitNum::I && l_lit.is_integer()
+                            || r_lit == TypeLitNum::F && l_lit.is_float()
+                        {
+                            if let Expr::LitNum(expr) = rhs {
+                                expr.ret_type = l_lit;
+                            }
+                            l_type
+                        } else {
+                            Unknown
+                        };
+                    }
+                }
+                Unknown
+            }
+            _ => todo!(),
         }
     }
 
@@ -141,6 +255,7 @@ impl<'ast> SymbolResolver<'ast> {
             false
         }
     }
+
 }
 
 impl<'ast> SymbolResolver<'ast> {
@@ -163,9 +278,20 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        if let Some(block) = item_fn.fn_block.as_mut() {
-            self.visit_block_expr(block)?;
+        for param in item_fn.fn_params.params.iter() {
+            match &param.pattern {
+                Pattern::Identifier(ident_pattern) => item_fn.fn_block.scope.add_variable(
+                    ident_pattern.ident(),
+                    if ident_pattern.is_mut() {
+                        VarKind::LocalMut
+                    } else {
+                        VarKind::Local
+                    },
+                    TypeInfo::from_type_anno(&param._type, unsafe { &*self.cur_scope }),
+                ),
+            }
         }
+        self.visit_block_expr(&mut item_fn.fn_block)?;
         Ok(())
     }
 
@@ -225,20 +351,25 @@ impl<'ast> SymbolResolver<'ast> {
             Expr::LitNum(lit_expr) => Ok(()),
             Expr::LitBool(_) => Ok(()),
             Expr::LitChar(_) => Ok(()),
-            // TODO: add str constant
-            Expr::LitStr(_) => Ok(()),
+            Expr::LitStr(s) => {
+                if !self.str_constants.contains_key(s) {
+                    self.str_constants
+                        .insert(s.clone(), self.str_constants.len() as u64);
+                }
+                Ok(())
+            }
             Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
             // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
-            // Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr),
+            Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr),
             // Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr),
             // Expr::Array(array_expr) => self.visit_array_expr(array_expr),
             // Expr::ArrayIndex(array_index_expr) => self.visit_array_index_expr(array_index_expr),
             // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
             // Expr::TupleIndex(tuple_index_expr) => self.visit_tuple_index_expr(tuple_index_expr),
             // Expr::Struct(struct_expr) => self.visit_struct_expr(struct_expr),
-            // Expr::Call(call_expr) => self.visit_call_expr(call_expr),
+            Expr::Call(call_expr) => self.visit_call_expr(call_expr),
             // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
             // Expr::While(while_expr) => self.visit_while_expr(while_expr),
             // Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
@@ -247,21 +378,27 @@ impl<'ast> SymbolResolver<'ast> {
             // Expr::Break(break_expr) => self.visit_break_expr(break_expr),
             _ => Ok(()),
         };
-        debug_assert_ne!(ExprKind::Unknown, expr.kind());
+        debug_assert_ne!(
+            ExprKind::Unknown,
+            expr.kind(),
+            "unknown expr kind: {:?}",
+            expr
+        );
         res
     }
 
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
         match lhs_expr {
-            LhsExpr::Path(p) => self.visit_path_expr(p)?,
-            _ => todo!()
+            LhsExpr::Path{inited: _, expr} => self.visit_path_expr(expr)?,
+            _ => todo!(),
         }
         Ok(())
     }
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
         if let Some(ident) = path_expr.segments.last() {
-            if let Some(var_info) = unsafe { (*self.cur_scope).find_variable(ident) } {
+            let cur_scope = unsafe { &mut *self.cur_scope };
+            if let Some(var_info) = cur_scope.find_variable(ident) {
                 path_expr.type_info = var_info._type.clone();
                 path_expr.expr_kind = match var_info.kind {
                     VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
@@ -269,7 +406,14 @@ impl<'ast> SymbolResolver<'ast> {
                 };
                 Ok(())
             } else {
-                Err(format!("identifier `{}` not found", ident).into())
+                let type_info = cur_scope.find_fn(ident);
+                if type_info != Unknown {
+                    path_expr.type_info = type_info;
+                    path_expr.expr_kind = ExprKind::Value;
+                    Ok(())
+                } else {
+                    Err(format!("identifier `{}` not found", ident).into())
+                }
             }
         } else {
             Err("invalid ident".into())
@@ -282,7 +426,7 @@ impl<'ast> SymbolResolver<'ast> {
         match unary_expr.op {
             UnOp::Deref => {
                 if let TypeInfo::Ptr { kind: _, type_info } = type_info {
-                    unary_expr.type_info = *type_info.clone();
+                    unary_expr.type_info = *type_info;
                 } else {
                     return Err(format!("type `{:?}` can not be dereferenced", type_info).into());
                 }
@@ -296,7 +440,7 @@ impl<'ast> SymbolResolver<'ast> {
                 }
             },
             UnOp::Neg => match type_info {
-                TypeInfo::LitNum(t) => unary_expr.type_info = type_info.clone(),
+                TypeInfo::LitNum(_) => unary_expr.type_info = type_info.clone(),
                 t => {
                     return Err(format!("cannot apply unary operator `-` to type `{:?}`", t).into())
                 }
@@ -329,7 +473,7 @@ impl<'ast> SymbolResolver<'ast> {
         } else {
             block_expr.type_info = match block_expr.stmts.last().unwrap() {
                 Stmt::Semi | Stmt::Let(_) | Stmt::Item(_) => TypeInfo::Unit,
-                Stmt::ExprStmt(e) => e.type_info()
+                Stmt::ExprStmt(e) => e.type_info(),
             };
         }
 
@@ -347,7 +491,7 @@ impl<'ast> SymbolResolver<'ast> {
                 self.visit_expr(&mut assign_expr.rhs)?;
                 let l_type = assign_expr.lhs.type_info();
                 let r_type = assign_expr.rhs.type_info();
-                // TODO
+                // TODO type check and change
                 Ok(())
             }
         }
@@ -366,7 +510,24 @@ impl<'ast> SymbolResolver<'ast> {
     fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) -> Result<(), RccError> {
         self.visit_expr(&mut bin_op_expr.lhs)?;
         self.visit_expr(&mut bin_op_expr.rhs)?;
-        Ok(())
+
+        bin_op_expr.type_info = Self::primitive_bin_ops(
+            &mut bin_op_expr.lhs,
+            bin_op_expr.bin_op,
+            &mut bin_op_expr.rhs,
+        );
+        // primitive bin_op || override bin_op
+        if bin_op_expr.type_info != Unknown
+            || self.override_bin_ops.contains(&(
+                bin_op_expr.bin_op,
+                bin_op_expr.lhs.type_info(),
+                bin_op_expr.rhs.type_info(),
+            ))
+        {
+            Ok(())
+        } else {
+            Err(format!("invalid operand for `{:?}`", bin_op_expr.bin_op).into())
+        }
     }
 
     fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<(), RccError> {
@@ -387,25 +548,71 @@ impl<'ast> SymbolResolver<'ast> {
         &mut self,
         array_index_expr: &mut ArrayIndexExpr,
     ) -> Result<(), RccError> {
-        Ok(())
+        todo!()
     }
 
     fn visit_tuple_expr(&mut self, tuple_expr: &mut TupleExpr) -> Result<(), RccError> {
-        Ok(())
+        todo!()
     }
 
     fn visit_tuple_index_expr(
         &mut self,
         tuple_index_expr: &mut TupleIndexExpr,
     ) -> Result<(), RccError> {
-        Ok(())
+        todo!()
     }
 
     fn visit_struct_expr(&mut self, struct_expr: &mut StructExpr) -> Result<(), RccError> {
-        Ok(())
+        todo!()
     }
 
     fn visit_call_expr(&mut self, call_expr: &mut CallExpr) -> Result<(), RccError> {
+        self.visit_expr(&mut call_expr.expr)?;
+        if !call_expr.expr.is_callable() {
+            return Err("expr is not callable".into());
+        }
+
+        let type_fn_ptr = match call_expr.expr.type_info() {
+            TypeInfo::FnPtr(fn_ptr) => fn_ptr,
+            TypeInfo::Fn { vis: _, inner } => inner,
+            _ => unreachable!("callable type can only be fn_ptr or fn"),
+        };
+
+        for (expr, param) in call_expr
+            .call_params
+            .iter_mut()
+            .zip(type_fn_ptr.params.iter())
+        {
+            self.visit_expr(expr)?;
+            let excepted_info = TypeInfo::from_type_anno(param, unsafe { &*self.cur_scope });
+
+            fn check_and_change_type_info(expr_chg: &mut Expr, excepted_info: &TypeInfo) -> Result<(), RccError> {
+                if excepted_info != &expr_chg.type_info() {
+                    if let Expr::LitNum(lit_expr) = expr_chg {
+                        if let TypeInfo::LitNum(p) = excepted_info {
+                            if lit_expr.ret_type == TypeLitNum::I && p.is_integer()
+                                || lit_expr.ret_type == TypeLitNum::F && p.is_integer()
+                            {
+                                lit_expr.ret_type = *p;
+                                return Ok(())
+                            }
+                        }
+                    }
+                    return Err(format!(
+                        "invalid type: execpted {:?}, found: {:?}",
+                        excepted_info,
+                        expr_chg.type_info()
+                    )
+                        .into());
+                } else {
+                    Ok(())
+                }
+            }
+
+            check_and_change_type_info(expr, &excepted_info)?;
+        }
+        call_expr.type_info =
+            TypeInfo::from_type_anno(&type_fn_ptr.ret_type, unsafe { &*self.cur_scope });
         Ok(())
     }
 

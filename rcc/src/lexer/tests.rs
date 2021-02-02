@@ -130,8 +130,12 @@ mod lexer_tests {
     #[test]
     fn number_literal_test() {
         validate_tokenize(
-            vec!["0o", "0b__", "12.3 1e9 0x37ffhello2  1usize"],
+            vec!["3f32", "0o", "0b__", "12.3 1e9 0x37ffhello2  1usize"],
             vec![
+                vec![Literal {
+                    literal_kind: LiteralKind::f32(),
+                    value: "3",
+                }],
                 vec![Unknown],
                 vec![Unknown],
                 vec![

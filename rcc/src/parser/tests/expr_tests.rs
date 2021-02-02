@@ -1,7 +1,10 @@
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
-use crate::ast::expr::{AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, Expr, FieldAccessExpr, GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr, LhsExpr};
+use crate::ast::expr::{
+    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, Expr, FieldAccessExpr,
+    GroupedExpr, IfExpr, LhsExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
+};
 use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
@@ -25,8 +28,12 @@ fn path_expr_test() {
 #[test]
 fn lit_expr_test() {
     parse_validate::<Expr>(
-        vec!["123", "'c'", r#""hello""#],
+        vec!["2f32", "123", "'c'", r#""hello""#],
         vec![
+            Ok(Expr::LitNum(LitNumExpr::new(
+                "2".to_string(),
+                TypeLitNum::F32,
+            ))),
             Ok(Expr::LitNum(LitNumExpr {
                 ret_type: TypeLitNum::I,
                 value: "123".to_string(),
@@ -86,13 +93,13 @@ fn assign_op_test() {
     parse_validate(
         vec!["a = b = c &= d"],
         vec![Ok(Assign(AssignExpr::new(
-            LhsExpr::Path("a".into()),
+            LhsExpr::Path{inited: false, expr: "a".into()},
             AssignOp::Eq,
             Assign(AssignExpr::new(
-                LhsExpr::Path("b".into()),
+                LhsExpr::Path{inited: false, expr: "b".into()},
                 AssignOp::Eq,
                 Assign(AssignExpr::new(
-                    LhsExpr::Path("c".into()),
+                    LhsExpr::Path{inited: false, expr: "c".into()},
                     AssignOp::AndEq,
                     Path("d".into()),
                 )),

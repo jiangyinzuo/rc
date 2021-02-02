@@ -256,6 +256,11 @@ pub enum LiteralKind<'a> {
 }
 
 impl<'a> LiteralKind<'a> {
+    pub const fn f32() -> LiteralKind<'a> {
+        Float {
+            suffix: "f32"
+        }
+    }
     pub const fn integer_no_suffix() -> LiteralKind<'a> {
         Integer { suffix: "" }
     }

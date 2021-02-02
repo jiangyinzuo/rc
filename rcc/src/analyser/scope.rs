@@ -12,6 +12,7 @@ lazy_static! {
         let mut s = Scope::new();
         s.types.insert("bool".into(), Bool);
         s.types.insert("char".into(), Char);
+        s.types.insert("str".into(), Str);
         s.types.insert("f32".into(), LitNum(F32));
         s.types.insert("f64".into(), LitNum(F64));
         s.types.insert("i8".into(), LitNum(I8));
@@ -50,7 +51,7 @@ impl Scope {
     }
 
     pub fn add_variable(&mut self, ident: &str, kind: VarKind, type_info: TypeInfo) {
-        let var_info =VarInfo::new(self.cur_stmt_id, kind, type_info);
+        let var_info = VarInfo::new(self.cur_stmt_id, kind, type_info);
         if let Some(v) = self.variables.get_mut(ident) {
             v.push(var_info);
         } else {
@@ -79,19 +80,37 @@ impl Scope {
         }
     }
 
-    pub fn find_typedef(&self, ident: &str) -> TypeInfo {
+    pub fn find_def_except_fn(&self, ident: &str) -> TypeInfo {
         let mut cur_scope: *const Scope = self;
         loop {
-            let s = unsafe{&*cur_scope};
-            match s.types.get(ident) {
-                Some(ti) => return ti.clone(),
-                None => {
-                    if let Some(f) = s.father {
-                        cur_scope = f.as_ptr();
-                    } else {
-                        return Unknown
-                    }
+            let s = unsafe { &*cur_scope };
+            if let Some(ti) = s.types.get(ident) {
+                if let TypeInfo::Fn { .. } = ti {
+                } else {
+                    return ti.clone();
                 }
+            }
+            if let Some(f) = s.father {
+                cur_scope = f.as_ptr();
+            } else {
+                return Unknown;
+            }
+        }
+    }
+
+    pub fn find_fn(&mut self, ident: &str) -> TypeInfo {
+        let mut cur_scope: *const Scope = self;
+        loop {
+            let s = unsafe { &*cur_scope };
+            if let Some(ti) = s.types.get(ident) {
+                if let TypeInfo::Fn { .. } = ti {
+                    return ti.clone();
+                }
+            }
+            if let Some(f) = s.father {
+                cur_scope = f.as_ptr();
+            } else {
+                return Unknown;
             }
         }
     }

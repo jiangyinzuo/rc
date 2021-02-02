@@ -89,7 +89,7 @@ impl ItemFn {
                 TypeAnnotation::parse(cursor)?
             }
             Token::Semi => unimplemented!("fn declaration without block not implemented"),
-            Token::LeftCurlyBraces => TypeAnnotation::unit(),
+            Token::LeftCurlyBraces => TypeAnnotation::Unit,
             _ => return Err("except '->' or '{'".into()),
         };
         let fn_block = BlockExpr::parse(cursor)?;

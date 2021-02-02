@@ -1,5 +1,8 @@
 use crate::ast::item::{StructField, TupleField, TypeEnum};
-use crate::ast::types::{TypeAnnotation, TypeArray, TypeFnPtr, TypePtr, TypeSlice, TypeTuple};
+use crate::ast::types::TypeAnnotation::Ptr;
+use crate::ast::types::{
+    PtrKind, TypeAnnotation, TypeArray, TypeFnPtr, TypePtr, TypeSlice, TypeTuple,
+};
 use crate::ast::Visibility;
 use crate::lexer::token::Token;
 use crate::lexer::token::Token::{Comma, LeftParen, RightParen, Semi};
@@ -32,8 +35,11 @@ impl Parse for TypeAnnotation {
                 }
             }
             Token::Fn => Ok(Self::FnPtr(TypeFnPtr::parse(cursor)?)),
-            Token::Ref | Token::Star => Ok(Self::Ptr(TypePtr::parse(cursor)?)),
-            _ => Err("invalid type".into())
+            tk if matches!(tk, Token::And | Token::AndAnd | Token::Star) => {
+                let tk = tk.clone();
+                Ok(Self::Ptr(TypePtr::parse_from_first(cursor, tk)?))
+            }
+            _ => Err("invalid type in type annotation".into()),
         }
     }
 }
@@ -56,9 +62,38 @@ impl Parse for TypeFnPtr {
     }
 }
 
-impl Parse for TypePtr {
-    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        unimplemented!()
+impl TypePtr {
+    pub fn parse_from_first(cursor: &mut ParseCursor, first_tk: Token) -> Result<Self, RccError> {
+        let next_is_mut = cursor.eat_token_if_eq(Token::Mut);
+
+        let parse_and = |cursor: &mut ParseCursor| {
+            Ok(TypePtr::new(
+                if next_is_mut {
+                    PtrKind::MutRef
+                } else {
+                    PtrKind::Ref
+                },
+                TypeAnnotation::parse(cursor)?,
+            ))
+        };
+
+        match first_tk {
+            Token::And => parse_and(cursor),
+            Token::AndAnd => Ok(TypePtr::new(
+                PtrKind::Ref,
+                TypeAnnotation::Ptr(parse_and(cursor)?),
+            )),
+            Token::Star => Ok(TypePtr::new(
+                if next_is_mut {
+                    PtrKind::MutRawPtr
+                } else {
+                    cursor.eat_token_eq(Token::Const)?;
+                    PtrKind::ConstRawPtr
+                },
+                TypeAnnotation::parse(cursor)?,
+            )),
+            _ => Err("invalid token of type ptr".into()),
+        }
     }
 }
 

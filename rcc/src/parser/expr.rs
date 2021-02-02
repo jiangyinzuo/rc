@@ -349,14 +349,14 @@ pub mod primitive {
             Char => Expr::LitChar(value.chars().nth(1).unwrap()),
             String => Expr::LitStr(value[1..value.len() - 1].to_string()),
             Integer { suffix } => {
-                Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
+                Expr::LitNum(LitNumExpr::integer(value).ret_type(if suffix.is_empty() {
                     TypeLitNum::I
                 } else {
                     TypeLitNum::from_str(suffix).unwrap()
                 }))
             }
             Float { suffix } => {
-                Expr::LitNum(LitNumExpr::new(value).ret_type(if suffix.is_empty() {
+                Expr::LitNum(LitNumExpr::integer(value).ret_type(if suffix.is_empty() {
                     TypeLitNum::F
                 } else {
                     TypeLitNum::from_str(suffix).unwrap()

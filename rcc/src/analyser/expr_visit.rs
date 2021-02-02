@@ -1,17 +1,21 @@
 use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{AssignExpr, BlockExpr, Expr, ExprKind, LhsExpr, PathExpr, UnAryExpr};
+use crate::ast::expr::{AssignExpr, BlockExpr, Expr, ExprKind, LhsExpr, PathExpr, UnAryExpr, CallExpr, BinOpExpr};
 
 pub trait ExprVisit {
     fn type_info(&self) -> TypeInfo;
     /// mutable place expr, immutable place expr or value expr
     fn kind(&self) -> ExprKind;
+
+    fn is_callable(&self) -> bool {
+        matches!(self.type_info(), TypeInfo::Fn {..} | TypeInfo::FnPtr(_))
+    }
 }
 
 impl ExprVisit for Expr {
     fn type_info(&self) -> TypeInfo {
         match self {
             Self::Path(e) => e.type_info(),
-            Self::LitStr(_) => TypeInfo::Str,
+            Self::LitStr(_) => TypeInfo::ref_str(),
             Self::LitChar(_) => TypeInfo::Char,
             Self::LitBool(_) => TypeInfo::Bool,
             Self::LitNum(ln) => TypeInfo::LitNum(ln.ret_type),
@@ -19,21 +23,21 @@ impl ExprVisit for Expr {
             Self::Block(e) => e.type_info(),
             Self::Assign(e) => e.type_info(),
             // Self::Range(e) => e.ret_type(),
-            // Self::BinOp(e) => e.ret_type(),
+            Self::BinOp(e) => e.type_info(),
             // Self::Grouped(e) => e.ret_type(),
             // Self::Array(e) => e.ret_type(),
             // Self::ArrayIndex(e) => e.ret_type(),
             // Self::Tuple(e) => e.ret_type(),
             // Self::TupleIndex(e) => e.ret_type(),
             // Self::Struct(e) => e.ret_type(),
-            // Self::Call(e) => e.ret_type(),
+            Self::Call(e) => e.type_info(),
             // Self::FieldAccess(e) => e.ret_type(),
             // Self::While(e) => e.ret_type(),
             // Self::Loop(e) => e.ret_type(),
             // Self::If(e) => e.ret_type(),
             // Self::Return(e) => e.ret_type(),
             // Self::Break(e) => e.ret_type(),
-            _ => todo!(),
+            _ => unimplemented!("{:?}", self),
         }
     }
 
@@ -44,7 +48,9 @@ impl ExprVisit for Expr {
             Self::Unary(u) => u.kind(),
             Self::Block(b) => b.kind(),
             Self::Assign(a) => a.kind(),
-            _ => todo!(),
+            Self::BinOp(b) => b.kind(),
+            Self::Call(c) => c.kind(),
+            _ => unimplemented!("{:?}", self),
         }
     }
 }
@@ -52,14 +58,14 @@ impl ExprVisit for Expr {
 impl ExprVisit for LhsExpr {
     fn type_info(&self) -> TypeInfo {
         match self {
-            LhsExpr::Path(p) => p.type_info(),
+            LhsExpr::Path{inited: _, expr} => expr.type_info(),
             _ => todo!(),
         }
     }
 
     fn kind(&self) -> ExprKind {
         match self {
-            LhsExpr::Path(p) => p.kind(),
+            LhsExpr::Path{inited: _, expr} => expr.kind(),
             _ => todo!(),
         }
     }
@@ -104,3 +110,24 @@ impl ExprVisit for AssignExpr {
         ExprKind::Place
     }
 }
+
+impl ExprVisit for BinOpExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Place
+    }
+}
+
+impl ExprVisit for CallExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
+}
+
