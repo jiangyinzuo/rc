@@ -1,15 +1,25 @@
+use crate::analyser::scope::Scope;
+use crate::analyser::sym_resolver::TypeInfo;
+use crate::ast::expr::Expr::Path;
+use crate::ast::stmt::Stmt;
+use crate::ast::types::TypeAnnotation::Unknown;
+use crate::ast::types::{TypeAnnotation, TypeLitNum};
+use crate::ast::{FromToken, TokenStart};
+use crate::from_token;
+use crate::lexer::token::Token;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use strenum::StrEnum;
-use crate::analyser::scope::Scope;
-use crate::ast::{FromToken, TokenStart};
-use crate::ast::expr::Expr::Path;
-use crate::ast::stmt::Stmt;
-use crate::ast::types::{TypeLitNum, TypeAnnotation, RetType};
-use crate::ast::types::TypeAnnotation::Unknown;
-use crate::from_token;
-use crate::lexer::token::Token;
+use crate::rcc::RccError;
+
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum ExprKind {
+    MutablePlace,
+    Place,
+    Value,
+    Unknown,
+}
 
 #[derive(Debug, PartialEq)]
 pub enum Expr {
@@ -56,31 +66,31 @@ impl From<&str> for Expr {
     }
 }
 
-impl RetType for Expr {
-    fn ret_type(&self) -> &TypeAnnotation {
-        match self {
-            Self::Path(e) => e.ret_type(),
-            // Self::Lit(e) => e.ret_type(),
-            Self::LitBool(_) => &TypeAnnotation::Bool,
-            // Self::Unary(e) => e.ret_type(),
-            // Self::Block(e) => e.ret_type(),
-            // Self::Assign(e) => e.ret_type(),
-            // Self::Range(e) => e.ret_type(),
-            // Self::BinOp(e) => e.ret_type(),
-            // Self::Grouped(e) => e.ret_type(),
-            // Self::Array(e) => e.ret_type(),
-            // Self::ArrayIndex(e) => e.ret_type(),
-            // Self::Tuple(e) => e.ret_type(),
-            // Self::TupleIndex(e) => e.ret_type(),
-            // Self::Struct(e) => e.ret_type(),
-            // Self::Call(e) => e.ret_type(),
-            // Self::FieldAccess(e) => e.ret_type(),
-            // Self::While(e) => e.ret_type(),
-            // Self::Loop(e) => e.ret_type(),
-            // Self::If(e) => e.ret_type(),
-            // Self::Return(e) => e.ret_type(),
-            // Self::Break(e) => e.ret_type(),
-            _ => unimplemented!()
+#[derive(Debug, PartialEq)]
+pub enum LhsExpr {
+    Path(PathExpr),
+    ArrayIndex(ArrayIndexExpr),
+    TupleIndex(TupleIndexExpr),
+    FieldAccess(FieldAccessExpr),
+    Deref(Box<Expr>),
+}
+
+impl LhsExpr {
+    pub fn from_expr(expr: Expr) -> Result<LhsExpr, RccError> {
+        match expr {
+            Expr::Path(p) => Ok(LhsExpr::Path(p)),
+            Expr::Unary(u) => {
+                if u.op == UnOp::Deref {
+                    Ok(LhsExpr::Deref(u.expr))
+                } else {
+                    Err("invalid lhs expr".into())
+                }
+            }
+            Expr::Grouped(e) => LhsExpr::from_expr(*e),
+            Expr::ArrayIndex(e) => Ok(LhsExpr::ArrayIndex(e)),
+            Expr::TupleIndex(e) => Ok(LhsExpr::TupleIndex(e)),
+            Expr::FieldAccess(e) => Ok(LhsExpr::FieldAccess(e)),
+            e => Err("invalid lhs expr".into())
         }
     }
 }
@@ -123,7 +133,7 @@ pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
     pub scope: Scope,
-    pub ret_type: TypeAnnotation,
+    pub type_info: TypeInfo,
 }
 
 impl Debug for BlockExpr {
@@ -147,7 +157,7 @@ impl BlockExpr {
             stmts: vec![],
             expr_without_block: None,
             scope: Scope::new(),
-            ret_type: Unknown,
+            type_info: TypeInfo::Unknown,
         }
     }
 
@@ -164,7 +174,7 @@ impl From<Vec<Stmt>> for BlockExpr {
             stmts,
             expr_without_block: None,
             scope: Scope::new(),
-            ret_type: Unknown
+            type_info: TypeInfo::Unknown,
         }
     }
 }
@@ -179,7 +189,7 @@ impl LitNumExpr {
     pub fn new(value: String) -> LitNumExpr {
         LitNumExpr {
             ret_type: TypeLitNum::I,
-            value
+            value,
         }
     }
 
@@ -201,21 +211,17 @@ impl From<i32> for LitNumExpr {
 #[derive(PartialEq, Debug)]
 pub struct PathExpr {
     pub segments: Vec<String>,
-    _type: TypeAnnotation,
+    pub(crate) type_info: TypeInfo,
+    pub(crate) expr_kind: ExprKind,
 }
 
 impl PathExpr {
     pub fn new() -> Self {
         PathExpr {
             segments: vec![],
-            _type: Unknown,
+            type_info: TypeInfo::Unknown,
+            expr_kind: ExprKind::Unknown,
         }
-    }
-}
-
-impl RetType for PathExpr {
-    fn ret_type(&self) -> &TypeAnnotation {
-        &self._type
     }
 }
 
@@ -223,7 +229,8 @@ impl From<Vec<String>> for PathExpr {
     fn from(segments: Vec<String>) -> Self {
         PathExpr {
             segments,
-            _type: Unknown,
+            type_info: TypeInfo::Unknown,
+            expr_kind: ExprKind::Unknown,
         }
     }
 }
@@ -232,7 +239,8 @@ impl From<Vec<&str>> for PathExpr {
     fn from(segments: Vec<&str>) -> Self {
         PathExpr {
             segments: segments.iter().map(|s| s.to_string()).collect(),
-            _type: Unknown,
+            type_info: TypeInfo::Unknown,
+            expr_kind: ExprKind::Unknown,
         }
     }
 }
@@ -241,7 +249,8 @@ impl From<&str> for PathExpr {
     fn from(s: &str) -> Self {
         PathExpr {
             segments: s.split("::").map(|s| s.to_string()).collect(),
-            _type: Unknown,
+            type_info: TypeInfo::Unknown,
+            expr_kind: ExprKind::Unknown,
         }
     }
 }
@@ -250,6 +259,7 @@ impl From<&str> for PathExpr {
 pub struct UnAryExpr {
     pub op: UnOp,
     pub expr: Box<Expr>,
+    pub type_info: TypeInfo,
 }
 
 impl UnAryExpr {
@@ -257,6 +267,7 @@ impl UnAryExpr {
         UnAryExpr {
             op,
             expr: Box::new(expr),
+            type_info: TypeInfo::Unknown,
         }
     }
 }
@@ -314,15 +325,15 @@ impl FromToken for UnOp {
 
 #[derive(Debug, PartialEq)]
 pub struct AssignExpr {
-    pub lhs: Box<Expr>,
+    pub lhs: LhsExpr,
     pub assign_op: AssignOp,
     pub rhs: Box<Expr>,
 }
 
 impl AssignExpr {
-    pub fn new(lhs: Expr, assign_op: AssignOp, rhs: Expr) -> Self {
+    pub fn new(lhs: LhsExpr, assign_op: AssignOp, rhs: Expr) -> Self {
         AssignExpr {
-            lhs: Box::new(lhs),
+            lhs,
             assign_op,
             rhs: Box::new(rhs),
         }

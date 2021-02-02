@@ -14,17 +14,17 @@ impl Parse for Expr {
 
 /// Expression having precedences
 pub mod prec {
-    use crate::ast::expr::{
-        ArrayIndexExpr, AssignExpr, BinOperator, BinOpExpr, CallExpr, CallParams, Expr,
-        FieldAccessExpr, Precedence, RangeExpr, UnAryExpr, UnOp,
-    };
     use crate::ast::expr::Expr::{ArrayIndex, Assign, Call, FieldAccess, Range, Unary};
     use crate::ast::expr::UnOp::{Borrow, BorrowMut};
+    use crate::ast::expr::{
+        ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, CallExpr, CallParams, Expr,
+        FieldAccessExpr, LhsExpr, Precedence, RangeExpr, UnAryExpr, UnOp,
+    };
     use crate::ast::FromToken;
     use crate::ast::TokenStart;
     use crate::lexer::token::Token;
-    use crate::parser::{Parse, ParseCursor};
     use crate::parser::expr::primitive::primitive_expr;
+    use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
 
     pub fn parse(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
@@ -32,16 +32,16 @@ pub mod prec {
     }
 
     /// AssignExpr -> RangeExpr
-    ///             | RangeExpr AssignOp AssignExpr
+    ///             | RangeExpr(lhs expr) AssignOp AssignExpr
     /// (Associativity: right to left)
     fn assign_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
-        let mut lhs = range_expr(cursor)?;
-
-        if let Some(assign_op) = cursor.eat_token_if_from() {
+        let mut expr = range_expr(cursor)?;
+        while let Some(assign_op) = cursor.eat_token_if_from() {
+            let lhs = LhsExpr::from_expr(expr)?;
             let rhs = assign_expr(cursor)?;
-            lhs = Assign(AssignExpr::new(lhs, assign_op, rhs));
+            expr = Assign(AssignExpr::new(lhs, assign_op, rhs));
         }
-        Ok(lhs)
+        Ok(expr)
     }
 
     /// RangeExpr -> BinOpExpr
@@ -235,15 +235,15 @@ pub mod prec {
 pub mod primitive {
     use std::str::FromStr;
 
+    use crate::ast::expr::Expr::{Array, Block, If, LitBool, LitNum, Loop, Path, While};
     use crate::ast::expr::*;
-    use crate::ast::expr::Expr::{Array, Block, If, LitNum, LitBool, Loop, Path, While};
-    use crate::ast::TokenStart;
     use crate::ast::types::TypeLitNum;
+    use crate::ast::TokenStart;
     use crate::lexer::token::LiteralKind::*;
     use crate::lexer::token::Token;
-    use crate::parser::{Parse, ParseCursor};
     use crate::parser::expr::prec::range_expr;
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
+    use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | LitChar | LitStr | LitBool | BlockExpr

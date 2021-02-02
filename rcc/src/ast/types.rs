@@ -3,10 +3,6 @@ use strenum::StrEnum;
 use crate::ast::item::ItemFn;
 use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
 
-pub trait RetType {
-    fn ret_type(&self) -> &TypeAnnotation;
-}
-
 #[derive(PartialEq, Clone)]
 pub enum TypeAnnotation {
     /// `char`, `u8`, `bool`,
@@ -104,7 +100,7 @@ impl TypeFnPtr {
     }
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum PtrKind {
     /// &i32
     Ref,
@@ -120,8 +116,8 @@ pub enum PtrKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct TypePtr {
-    ptr_kind: PtrKind,
-    _type: Box<TypeAnnotation>,
+    pub ptr_kind: PtrKind,
+    pub _type: Box<TypeAnnotation>,
 }
 
 #[derive(StrEnum, PartialEq, Debug, Clone, Copy)]

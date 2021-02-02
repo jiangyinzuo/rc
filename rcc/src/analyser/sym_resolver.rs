@@ -1,19 +1,18 @@
+use std::ptr::NonNull;
+
+use crate::analyser::expr_visit::ExprVisit;
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
-use crate::ast::expr::{
-    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    FieldAccessExpr, GroupedExpr, IfExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr,
-    StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
-};
+use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr, LhsExpr};
 use crate::ast::file::File;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
-use crate::ast::types::{TypeAnnotation, TypeFnPtr, TypeLitNum};
+use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
-use std::ptr::NonNull;
+use std::convert::TryInto;
 
 #[derive(Debug, PartialEq)]
 pub enum VarKind {
@@ -55,6 +54,11 @@ pub enum TypeInfo {
         fields: NonNull<Fields>,
     },
 
+    Ptr {
+        kind: PtrKind,
+        type_info: Box<TypeInfo>,
+    },
+
     /// primitive type
     /// !
     Never,
@@ -92,6 +96,10 @@ fn to_type_info(type_anno: &TypeAnnotation, cur_scope: &Scope) -> TypeInfo {
         TypeAnnotation::Str => TypeInfo::Str,
         TypeAnnotation::Char => TypeInfo::Char,
         TypeAnnotation::LitNum(t) => TypeInfo::LitNum(*t),
+        TypeAnnotation::Ptr(tp) => TypeInfo::Ptr {
+            kind: tp.ptr_kind,
+            type_info: Box::new(to_type_info(&tp._type, cur_scope)),
+        },
         TypeAnnotation::Unknown => TypeInfo::Unknown,
         _ => todo!(),
     }
@@ -180,7 +188,8 @@ impl<'ast> SymbolResolver<'ast> {
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
         let mut type_info = if let Some(expr) = &mut let_stmt.expr {
-            self.visit_expr(expr)?
+            self.visit_expr(expr)?;
+            expr.type_info()
         } else {
             Unknown
         };
@@ -196,7 +205,7 @@ impl<'ast> SymbolResolver<'ast> {
                     } else {
                         VarKind::Local
                     },
-                    type_info,
+                    type_info.clone(),
                 );
             },
         }
@@ -211,14 +220,15 @@ impl<'ast> SymbolResolver<'ast> {
         Ok(())
     }
 
-    fn visit_expr(&mut self, expr: &mut Expr) -> Result<TypeInfo, RccError> {
+    fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
         match expr {
             Expr::Path(path_expr) => self.visit_path_expr(path_expr),
-            Expr::LitNum(lit_expr) => Ok(TypeInfo::LitNum(lit_expr.ret_type)),
-            Expr::LitBool(_) => Ok(TypeInfo::Bool),
-            Expr::LitChar(_) => Ok(TypeInfo::Char),
-            Expr::LitStr(_) => Ok(TypeInfo::Str),
-            // Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
+            Expr::LitNum(lit_expr) => Ok(()),
+            Expr::LitBool(_) => Ok(()),
+            Expr::LitChar(_) => Ok(()),
+            // TODO: add str constant
+            Expr::LitStr(_) => Ok(()),
+            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
             // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
@@ -236,14 +246,27 @@ impl<'ast> SymbolResolver<'ast> {
             // Expr::If(if_expr) => self.visit_if_expr(if_expr),
             // Expr::Return(return_expr) => self.visit_return_expr(return_expr),
             // Expr::Break(break_expr) => self.visit_break_expr(break_expr),
-            _ => Ok(TypeInfo::Unknown),
+            _ => Ok(()),
         }
     }
 
-    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<TypeInfo, RccError> {
+    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
+        match lhs_expr {
+            LhsExpr::Path(p) => self.visit_path_expr(p)?,
+            _ => todo!()
+        }
+        Ok(())
+    }
+
+    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
         if let Some(ident) = path_expr.segments.last() {
             if let Some(var_info) = unsafe { (*self.cur_scope).find_variable(ident) } {
-                Ok(var_info._type.clone())
+                path_expr.type_info = var_info._type.clone();
+                path_expr.expr_kind = match var_info.kind {
+                    VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
+                    VarKind::Const | VarKind::Local => ExprKind::Place,
+                };
+                Ok(())
             } else {
                 Err(format!("identifier `{}` not found", ident).into())
             }
@@ -252,11 +275,45 @@ impl<'ast> SymbolResolver<'ast> {
         }
     }
 
-    fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<TypeInfo, RccError> {
-        self.visit_expr(&mut unary_expr.expr)
+    fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError> {
+        self.visit_expr(&mut unary_expr.expr)?;
+        let type_info = unary_expr.expr.type_info();
+        match unary_expr.op {
+            UnOp::Deref => {
+                if let TypeInfo::Ptr { kind: _, type_info } = type_info {
+                    unary_expr.type_info = *type_info.clone();
+                } else {
+                    return Err(format!("type `{:?}` can not be dereferenced", type_info).into());
+                }
+            }
+            UnOp::Not => match type_info {
+                TypeInfo::Bool | TypeInfo::LitNum(_) => {
+                    unary_expr.type_info = type_info.clone();
+                }
+                t => {
+                    return Err(format!("cannot apply unary operator `!` to type `{:?}`", t).into())
+                }
+            },
+            UnOp::Neg => match type_info {
+                TypeInfo::LitNum(t) => unary_expr.type_info = type_info.clone(),
+                t => {
+                    return Err(format!("cannot apply unary operator `-` to type `{:?}`", t).into())
+                }
+            },
+            UnOp::Borrow => {
+                unary_expr.type_info = TypeInfo::Ptr {
+                    kind: PtrKind::Ref,
+                    type_info: Box::new(type_info.clone()),
+                };
+            }
+            UnOp::BorrowMut => {
+                // TODO
+            }
+        }
+        Ok(())
     }
 
-    fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<TypeInfo, RccError> {
+    fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
         self.enter_block(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt)?;
@@ -267,13 +324,23 @@ impl<'ast> SymbolResolver<'ast> {
             unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
         }
         self.exit_block();
-        Ok(Unknown)
+        Ok(())
     }
 
-    fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<TypeInfo, RccError> {
-        self.visit_expr(&mut assign_expr.lhs)?;
-        self.visit_expr(&mut assign_expr.rhs)?;
-        Ok(TypeInfo::Unit)
+    fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<(), RccError> {
+        self.visit_lhs_expr(&mut assign_expr.lhs)?;
+        match assign_expr.lhs.kind() {
+            ExprKind::Place => Err(RccError("lhs is not mutable".into())),
+            ExprKind::Value => Err(RccError("can not assign to lhs".into())),
+            ExprKind::Unknown => unreachable!("lhs kind should not be unknown"),
+            ExprKind::MutablePlace => {
+                self.visit_expr(&mut assign_expr.rhs)?;
+                let l_type = assign_expr.lhs.type_info();
+                let r_type = assign_expr.rhs.type_info();
+                // TODO
+                Ok(())
+            }
+        }
     }
 
     fn visit_range_expr(&mut self, range_expr: &mut RangeExpr) -> Result<(), RccError> {
@@ -286,12 +353,13 @@ impl<'ast> SymbolResolver<'ast> {
         Ok(())
     }
 
-    fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) -> Result<TypeInfo, RccError> {
+    fn visit_bin_op_expr(&mut self, bin_op_expr: &mut BinOpExpr) -> Result<(), RccError> {
         self.visit_expr(&mut bin_op_expr.lhs)?;
-        self.visit_expr(&mut bin_op_expr.rhs)
+        self.visit_expr(&mut bin_op_expr.rhs)?;
+        Ok(())
     }
 
-    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<TypeInfo, RccError> {
+    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<(), RccError> {
         self.visit_expr(grouped_expr)
     }
 

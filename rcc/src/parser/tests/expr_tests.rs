@@ -1,10 +1,7 @@
 use crate::ast::expr::Expr::*;
 use crate::ast::expr::RangeOp::{DotDot, DotDotEq};
 use crate::ast::expr::UnOp::{Borrow, BorrowMut};
-use crate::ast::expr::{
-    AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, Expr, FieldAccessExpr,
-    GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr,
-};
+use crate::ast::expr::{AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, CallExpr, Expr, FieldAccessExpr, GroupedExpr, IfExpr, PathExpr, RangeExpr, ReturnExpr, TupleExpr, LhsExpr};
 use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
@@ -45,17 +42,11 @@ fn unary_expr_test() {
     parse_validate(
         vec!["!abc", "--cc::a::b"],
         vec![
-            Ok(Unary(UnAryExpr {
-                op: UnOp::Not,
-                expr: Box::new(Path(vec!["abc"].into())),
-            })),
-            Ok(Unary(UnAryExpr {
-                op: UnOp::Neg,
-                expr: Box::new(Unary(UnAryExpr {
-                    op: UnOp::Neg,
-                    expr: Box::new(Path(vec!["cc", "a", "b"].into())),
-                })),
-            })),
+            Ok(Unary(UnAryExpr::new(UnOp::Not, Path(vec!["abc"].into())))),
+            Ok(Unary(UnAryExpr::new(
+                UnOp::Neg,
+                Unary(UnAryExpr::new(UnOp::Neg, Path(vec!["cc", "a", "b"].into()))),
+            ))),
         ],
     )
 }
@@ -95,13 +86,13 @@ fn assign_op_test() {
     parse_validate(
         vec!["a = b = c &= d"],
         vec![Ok(Assign(AssignExpr::new(
-            Path("a".into()),
+            LhsExpr::Path("a".into()),
             AssignOp::Eq,
             Assign(AssignExpr::new(
-                Path("b".into()),
+                LhsExpr::Path("b".into()),
                 AssignOp::Eq,
                 Assign(AssignExpr::new(
-                    Path("c".into()),
+                    LhsExpr::Path("c".into()),
                     AssignOp::AndEq,
                     Path("d".into()),
                 )),
@@ -116,7 +107,9 @@ fn range_test() {
         vec!["1..3", "..=2", "3.."],
         vec![
             Ok(Range(
-                RangeExpr::new(DotDot).lhs(LitNum(1.into())).rhs(LitNum(3.into())),
+                RangeExpr::new(DotDot)
+                    .lhs(LitNum(1.into()))
+                    .rhs(LitNum(3.into())),
             )),
             Ok(Range(RangeExpr::new(DotDotEq).rhs(LitNum(2.into())))),
             Ok(Range(RangeExpr::new(DotDot).lhs(LitNum(3.into())))),
