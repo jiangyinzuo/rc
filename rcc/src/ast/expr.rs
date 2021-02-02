@@ -12,6 +12,7 @@ use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use strenum::StrEnum;
 use crate::rcc::RccError;
+use crate::analyser::expr_visit::ExprVisit;
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ExprKind {

@@ -1,6 +1,5 @@
 use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{Expr, ExprKind, PathExpr, UnAryExpr, AssignExpr, BlockExpr, LhsExpr};
-use crate::ast::types::TypeAnnotation;
+use crate::ast::expr::{AssignExpr, BlockExpr, Expr, ExprKind, LhsExpr, PathExpr, UnAryExpr};
 
 pub trait ExprVisit {
     fn type_info(&self) -> TypeInfo;
@@ -41,7 +40,10 @@ impl ExprVisit for Expr {
     fn kind(&self) -> ExprKind {
         match self {
             Self::Path(e) => e.kind(),
-            Self::LitBool(_) => ExprKind::Value,
+            Self::LitStr(_) | Self::LitChar(_) | Self::LitBool(_) | Self::LitNum(_) => ExprKind::Value,
+            Self::Unary(u) => u.kind(),
+            Self::Block(b) => b.kind(),
+            Self::Assign(a) => a.kind(),
             _ => todo!(),
         }
     }
@@ -51,14 +53,14 @@ impl ExprVisit for LhsExpr {
     fn type_info(&self) -> TypeInfo {
         match self {
             LhsExpr::Path(p) => p.type_info(),
-            _ => todo!()
+            _ => todo!(),
         }
     }
 
     fn kind(&self) -> ExprKind {
         match self {
             LhsExpr::Path(p) => p.kind(),
-            _ => todo!()
+            _ => todo!(),
         }
     }
 }
@@ -85,11 +87,11 @@ impl ExprVisit for UnAryExpr {
 
 impl ExprVisit for BlockExpr {
     fn type_info(&self) -> TypeInfo {
-       self.type_info.clone()
+        self.type_info.clone()
     }
 
     fn kind(&self) -> ExprKind {
-       ExprKind::Value
+        ExprKind::Value
     }
 }
 

@@ -12,7 +12,6 @@ use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
-use std::convert::TryInto;
 
 #[derive(Debug, PartialEq)]
 pub enum VarKind {
@@ -221,7 +220,7 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
-        match expr {
+        let res = match expr {
             Expr::Path(path_expr) => self.visit_path_expr(path_expr),
             Expr::LitNum(lit_expr) => Ok(()),
             Expr::LitBool(_) => Ok(()),
@@ -247,7 +246,9 @@ impl<'ast> SymbolResolver<'ast> {
             // Expr::Return(return_expr) => self.visit_return_expr(return_expr),
             // Expr::Break(break_expr) => self.visit_break_expr(break_expr),
             _ => Ok(()),
-        }
+        };
+        debug_assert_ne!(ExprKind::Unknown, expr.kind());
+        res
     }
 
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
@@ -322,7 +323,16 @@ impl<'ast> SymbolResolver<'ast> {
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
             self.visit_expr(expr)?;
             unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
+            block_expr.type_info = expr.type_info();
+        } else if block_expr.stmts.is_empty() {
+            block_expr.type_info = TypeInfo::Unit;
+        } else {
+            block_expr.type_info = match block_expr.stmts.last().unwrap() {
+                Stmt::Semi | Stmt::Let(_) | Stmt::Item(_) => TypeInfo::Unit,
+                Stmt::ExprStmt(e) => e.type_info()
+            };
         }
+
         self.exit_block();
         Ok(())
     }
