@@ -1,7 +1,6 @@
 use crate::analyser::expr_visit::ExprVisit;
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
-use crate::ast::expr::Expr::BinOp;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
     Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr,
@@ -143,12 +142,16 @@ impl TypeInfo {
         }
     }
 
-    pub fn is_number(&self) -> bool {
-        if let Self::LitNum(_) = &self {
-            true
+    pub fn is_float(&self) -> bool {
+        if let TypeInfo::LitNum(ln) = &self {
+            matches!(ln, TypeLitNum::F | TypeLitNum::F32 | TypeLitNum::F64)
         } else {
             false
         }
+    }
+
+    pub fn is_number(&self) -> bool {
+        matches!(&self, Self::LitNum(_))
     }
 
     pub fn is_i(&self) -> bool {
@@ -205,7 +208,7 @@ impl<'ast> SymbolResolver<'ast> {
             }
             BinOperator::Plus | BinOperator::Minus | BinOperator::Star | BinOperator::Slash => {
                 if let TypeInfo::LitNum(l_lit) = l_type {
-                    if let TypeInfo::LitNum(r_lit) = l_type {
+                    if let TypeInfo::LitNum(r_lit) = r_type {
                         return if l_lit == r_lit {
                             l_type
                         } else if l_lit == TypeLitNum::I && r_lit.is_integer()
@@ -255,7 +258,6 @@ impl<'ast> SymbolResolver<'ast> {
             false
         }
     }
-
 }
 
 impl<'ast> SymbolResolver<'ast> {
@@ -348,7 +350,7 @@ impl<'ast> SymbolResolver<'ast> {
     fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
         let res = match expr {
             Expr::Path(path_expr) => self.visit_path_expr(path_expr),
-            Expr::LitNum(lit_expr) => Ok(()),
+            Expr::LitNum(_) => Ok(()),
             Expr::LitBool(_) => Ok(()),
             Expr::LitChar(_) => Ok(()),
             Expr::LitStr(s) => {
@@ -389,7 +391,7 @@ impl<'ast> SymbolResolver<'ast> {
 
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
         match lhs_expr {
-            LhsExpr::Path{inited: _, expr} => self.visit_path_expr(expr)?,
+            LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
             _ => todo!(),
         }
         Ok(())
@@ -491,7 +493,31 @@ impl<'ast> SymbolResolver<'ast> {
                 self.visit_expr(&mut assign_expr.rhs)?;
                 let l_type = assign_expr.lhs.type_info();
                 let r_type = assign_expr.rhs.type_info();
-                // TODO type check and change
+
+                debug_assert_ne!(TypeInfo::Unknown, r_type);
+
+                // let mut a; a = 32;
+                if l_type == TypeInfo::Unknown {
+                    assign_expr.lhs.set_type_info(r_type);
+                } else if l_type != r_type {
+                    if l_type.is_integer() && r_type.is_integer() {
+                        // let mut a = 32; a = 64i128;
+                        if l_type.is_i() {
+                            assign_expr.lhs.set_type_info(r_type);
+                        } else { // let mut a: i64; a = 32;
+                           assign_expr.rhs.set_type_info(l_type);
+                        }
+                    } else if l_type.is_float() && r_type.is_float() {
+                        // let mut a = 32.3; a = 33f32;
+                        if l_type.is_f() {
+                            assign_expr.lhs.set_type_info(r_type);
+                        } else { // let mut a: f32; a = 33.2;
+                            assign_expr.rhs.set_type_info(l_type);
+                        }
+                    } else {
+                        return Err("invalid type in assign expr".into());
+                    }
+                }
                 Ok(())
             }
         }
@@ -586,7 +612,10 @@ impl<'ast> SymbolResolver<'ast> {
             self.visit_expr(expr)?;
             let excepted_info = TypeInfo::from_type_anno(param, unsafe { &*self.cur_scope });
 
-            fn check_and_change_type_info(expr_chg: &mut Expr, excepted_info: &TypeInfo) -> Result<(), RccError> {
+            fn check_and_change_type_info(
+                expr_chg: &mut Expr,
+                excepted_info: &TypeInfo,
+            ) -> Result<(), RccError> {
                 if excepted_info != &expr_chg.type_info() {
                     if let Expr::LitNum(lit_expr) = expr_chg {
                         if let TypeInfo::LitNum(p) = excepted_info {
@@ -594,7 +623,7 @@ impl<'ast> SymbolResolver<'ast> {
                                 || lit_expr.ret_type == TypeLitNum::F && p.is_integer()
                             {
                                 lit_expr.ret_type = *p;
-                                return Ok(())
+                                return Ok(());
                             }
                         }
                     }
@@ -603,7 +632,7 @@ impl<'ast> SymbolResolver<'ast> {
                         excepted_info,
                         expr_chg.type_info()
                     )
-                        .into());
+                    .into());
                 } else {
                     Ok(())
                 }

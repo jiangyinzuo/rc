@@ -93,13 +93,13 @@ fn assign_op_test() {
     parse_validate(
         vec!["a = b = c &= d"],
         vec![Ok(Assign(AssignExpr::new(
-            LhsExpr::Path{inited: false, expr: "a".into()},
+            LhsExpr::Path("a".into()),
             AssignOp::Eq,
             Assign(AssignExpr::new(
-                LhsExpr::Path{inited: false, expr: "b".into()},
+                LhsExpr::Path("b".into()),
                 AssignOp::Eq,
                 Assign(AssignExpr::new(
-                    LhsExpr::Path{inited: false, expr: "c".into()},
+                    LhsExpr::Path("c".into()),
                     AssignOp::AndEq,
                     Path("d".into()),
                 )),

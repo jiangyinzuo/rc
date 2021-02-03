@@ -59,6 +59,13 @@ impl Expr {
             Self::Block(_) | Self::Struct(_) | Self::While(_) |
             Self::Loop(_)  | Self::If(_) | Self::Match | Self::For)
     }
+
+    pub fn set_type_info(&mut self, type_info: TypeInfo) {
+        match self {
+            Self::Path(p) => p.type_info = type_info,
+            e => unimplemented!("set type_info on {:?}", e)
+        }
+    }
 }
 
 impl From<&str> for Expr {
@@ -69,29 +76,39 @@ impl From<&str> for Expr {
 
 #[derive(Debug, PartialEq)]
 pub enum LhsExpr {
-    Path { inited: bool, expr: PathExpr },
-    ArrayIndex { inited: bool, expr: ArrayIndexExpr },
-    TupleIndex { inited: bool, expr: TupleIndexExpr },
-    FieldAccess { inited: bool, expr: FieldAccessExpr },
-    Deref { inited: bool, expr: Box<Expr> },
+    Path(PathExpr),
+    ArrayIndex(ArrayIndexExpr),
+    TupleIndex(TupleIndexExpr),
+    FieldAccess(FieldAccessExpr),
+    Deref(Box<Expr>),
 }
 
 impl LhsExpr {
     pub fn from_expr(expr: Expr) -> Result<LhsExpr, RccError> {
         match expr {
-            Expr::Path(p) => Ok(LhsExpr::Path{inited: false, expr: p}),
+            Expr::Path(p) => Ok(LhsExpr::Path(p)),
             Expr::Unary(u) => {
                 if u.op == UnOp::Deref {
-                    Ok(LhsExpr::Deref{inited: false, expr: u.expr})
+                    Ok(LhsExpr::Deref(u.expr))
                 } else {
                     Err("invalid lhs expr".into())
                 }
             }
             Expr::Grouped(e) => LhsExpr::from_expr(*e),
-            Expr::ArrayIndex(e) => Ok(LhsExpr::ArrayIndex{inited: false, expr: e}),
-            Expr::TupleIndex(e) => Ok(LhsExpr::TupleIndex{inited: false, expr: e}),
-            Expr::FieldAccess(e) => Ok(LhsExpr::FieldAccess{inited: false, expr: e}),
-            e => Err("invalid lhs expr".into()),
+            Expr::ArrayIndex(e) => Ok(LhsExpr::ArrayIndex(e)),
+            Expr::TupleIndex(e) => Ok(LhsExpr::TupleIndex(e)),
+            Expr::FieldAccess(e) => Ok(LhsExpr::FieldAccess(e)),
+            _ => Err("invalid lhs expr".into()),
+        }
+    }
+
+    pub fn set_type_info(&mut self, type_info: TypeInfo) {
+        match self {
+            Self::Path(p) => p.type_info = type_info,
+            Self::ArrayIndex(a) => unimplemented!("set array index type info"),
+            Self::TupleIndex(t) => unimplemented!("set tuple index type info"),
+            Self::FieldAccess(f) => unimplemented!("set tuple field type info"),
+            Self::Deref(e) => unimplemented!("set tuple deref type info"),
         }
     }
 }
@@ -216,8 +233,8 @@ impl From<i32> for LitNumExpr {
 #[derive(PartialEq, Debug)]
 pub struct PathExpr {
     pub segments: Vec<String>,
-    pub(crate) type_info: TypeInfo,
-    pub(crate) expr_kind: ExprKind,
+    pub type_info: TypeInfo,
+    pub expr_kind: ExprKind,
 }
 
 impl PathExpr {
@@ -459,7 +476,7 @@ impl BinOpExpr {
 }
 
 from_token! {
-    #[derive(StrEnum, Debug, PartialEq, Eq, Clone, Copy, Hash)]
+    #[derive(StrEnum, PartialEq, Eq, Clone, Copy, Hash)]
     pub enum BinOperator {
         /// Arithmetic or logical operators
         #[strenum("+")]
@@ -520,6 +537,12 @@ from_token! {
 
         #[strenum("<=")]
         Le,
+    }
+}
+
+impl Debug for BinOperator {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Display>::fmt(self, f)
     }
 }
 

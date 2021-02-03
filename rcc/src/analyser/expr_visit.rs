@@ -1,5 +1,7 @@
 use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{AssignExpr, BlockExpr, Expr, ExprKind, LhsExpr, PathExpr, UnAryExpr, CallExpr, BinOpExpr};
+use crate::ast::expr::{
+    AssignExpr, BinOpExpr, BlockExpr, CallExpr, Expr, ExprKind, LhsExpr, PathExpr, UnAryExpr,
+};
 
 pub trait ExprVisit {
     fn type_info(&self) -> TypeInfo;
@@ -44,7 +46,9 @@ impl ExprVisit for Expr {
     fn kind(&self) -> ExprKind {
         match self {
             Self::Path(e) => e.kind(),
-            Self::LitStr(_) | Self::LitChar(_) | Self::LitBool(_) | Self::LitNum(_) => ExprKind::Value,
+            Self::LitStr(_) | Self::LitChar(_) | Self::LitBool(_) | Self::LitNum(_) => {
+                ExprKind::Value
+            }
             Self::Unary(u) => u.kind(),
             Self::Block(b) => b.kind(),
             Self::Assign(a) => a.kind(),
@@ -58,14 +62,14 @@ impl ExprVisit for Expr {
 impl ExprVisit for LhsExpr {
     fn type_info(&self) -> TypeInfo {
         match self {
-            LhsExpr::Path{inited: _, expr} => expr.type_info(),
+            LhsExpr::Path(expr) => expr.type_info(),
             _ => todo!(),
         }
     }
 
     fn kind(&self) -> ExprKind {
         match self {
-            LhsExpr::Path{inited: _, expr} => expr.kind(),
+            LhsExpr::Path(expr) => expr.kind(),
             _ => todo!(),
         }
     }
@@ -130,4 +134,3 @@ impl ExprVisit for CallExpr {
         ExprKind::Value
     }
 }
-

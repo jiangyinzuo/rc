@@ -63,6 +63,9 @@ impl Scope {
         if let Some(v) = self.variables.get(ident) {
             let mut left = 0;
             let mut right = v.len();
+            if right == 1 {
+                return Some(unsafe {v.get_unchecked(0)});
+            }
             while left < right {
                 let mid = (left + right + 1) / 2;
                 let stmt_id = unsafe { (*v.get_unchecked(mid)).stmt_id() };
