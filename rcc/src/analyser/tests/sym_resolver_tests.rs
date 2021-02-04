@@ -5,11 +5,11 @@ use crate::rcc::RccError;
 
 fn file_validate(inputs: &[&str], expecteds: &[Result<(), RccError>]) {
     assert_eq!(inputs.len(), expecteds.len());
-    for (input, expected) in inputs.iter().zip(expecteds) {
+    for (i, (input, expected)) in inputs.iter().zip(expecteds).enumerate() {
         let mut sym_resolver = SymbolResolver::new();
         let mut ast_file = get_ast_file(input).expect("invalid ast file");
         let actual = sym_resolver.visit_file(&mut ast_file);
-        assert_eq!(expected, &actual);
+        assert_eq!(expected, &actual, "{}th test case", i);
     }
 }
 
@@ -77,8 +77,9 @@ fn fn_param_test() {
     let mut sym_resolver = SymbolResolver::new();
     let mut ast_file = get_ast_file(
         r#"
-        fn add(a: i32, b: i32) {
-           a + b
+        fn add(a: i32, b: i32) -> i32 {
+           let c: i32 = a + b;
+           c
         }
 
         fn main() {
@@ -101,11 +102,23 @@ fn assign_expr_test() {
             a = 64i64;
         }
     "#,
-            r#"fn sub(a: i32, b: i64) -> i64 {
-        a - b
-    }"#,
+            r#"
+        fn sub(a: i32, b: i64) -> i64 {
+            a - b
+        }
+    "#,
+            r#"
+        fn foo() {
+            let a = 3;
+            a=4;
+        }
+    "#,
         ],
-        &[Ok(()), Err("invalid operand for `-`".into())],
+        &[
+            Ok(()),
+            Err("invalid operand for `-`".into()),
+            Err("lhs is not mutable".into()),
+        ],
     );
 }
 
@@ -116,7 +129,7 @@ fn loop_test() {
             r#"
         fn foo() {
             loop {
-            }
+            };
         }
     "#,
             r#"
@@ -133,7 +146,67 @@ fn loop_test() {
             a = 64;
         }
     "#,
+            r#"
+        fn foo() {
+            let a = true;
+            while !a {
+                break;
+            }
+        }
+    "#,
+            r#"
+        fn bar() {
+            let b = false;
+            let c = true;
+            let a = while b ^ c {
+                break 3;
+            };
+        }
+    "#,
+            r#"
+        fn bar() {
+            let b = false;
+            let c = true;
+            let a = while b ^ c {
+                break;
+            };
+        }
+    "#,
         ],
-        &[Ok(()), Ok(()), Err("invalid type in assign expr".into())],
+        &[
+            Ok(()),
+            Ok(()),
+            Err("invalid type in assign expr".into()),
+            Ok(()),
+            Err("only loop can return values".into()),
+            Ok(()),
+        ],
+    );
+}
+
+#[test]
+fn return_test() {
+    file_validate(
+        &[
+            r#"
+        fn add(a: i32, b: i32) -> i32 { a+b }
+    "#,
+            r#"fn add(a: i32, b: i32) -> i64 { a+b}"#,
+            r#"fn add(a: i32, b: i32) -> i64 {return a+b;}"#,
+            r#"fn add(a: i32, b: i32) -> i32 {return a+b;}"#,
+            r#"fn never_return() -> ! {loop{}}"#,
+            r#"fn never_return() -> ! {
+            let a = loop{};
+            a
+           }"#,
+        ],
+        &[
+            Ok(()),
+            Err("invalid return type: excepted `LitNum(I64)`, found `LitNum(I32)`".into()),
+            Err("invalid return type: excepted `LitNum(I64)`, found `LitNum(I32)`".into()),
+            Ok(()),
+            Ok(()),
+            Ok(()),
+        ],
     );
 }

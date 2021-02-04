@@ -35,11 +35,12 @@ impl Parse for TypeAnnotation {
                 }
             }
             Token::Fn => Ok(Self::FnPtr(TypeFnPtr::parse(cursor)?)),
+            Token::Not => Ok(Self::Never),
             tk if matches!(tk, Token::And | Token::AndAnd | Token::Star) => {
                 let tk = tk.clone();
                 Ok(Self::Ptr(TypePtr::parse_from_first(cursor, tk)?))
             }
-            _ => Err("invalid type in type annotation".into()),
+            tk => Err(format!("invalid token `{:?}` for type annotation", tk).into()),
         }
     }
 }

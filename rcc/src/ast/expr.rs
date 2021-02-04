@@ -1,6 +1,7 @@
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo;
 use crate::ast::expr::Expr::Path;
+use crate::ast::item::Item::Type;
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
 use crate::ast::{FromToken, TokenStart};
@@ -103,10 +104,10 @@ impl ExprVisit for Expr {
             // Self::Struct(e) => e.ret_type(),
             Self::Call(e) => e.type_info(),
             // Self::FieldAccess(e) => e.ret_type(),
-            // Self::While(e) => e.ret_type(),
+            Self::While(e) => e.type_info(),
             Self::Loop(e) => e.type_info(),
             // Self::If(e) => e.ret_type(),
-            // Self::Return(e) => e.ret_type(),
+            Self::Return(e) => e.type_info(),
             Self::Break(e) => e.type_info(),
             _ => unimplemented!("{:?}", self),
         }
@@ -123,7 +124,9 @@ impl ExprVisit for Expr {
             Self::Assign(a) => a.kind(),
             Self::BinOp(b) => b.kind(),
             Self::Call(c) => c.kind(),
+            Self::While(w) => w.kind(),
             Self::Loop(l) => l.kind(),
+            Self::Return(r) => r.kind(),
             Self::Break(b) => b.kind(),
             _ => unimplemented!("{:?}", self),
         }
@@ -374,6 +377,7 @@ pub struct UnAryExpr {
     pub op: UnOp,
     pub expr: Box<Expr>,
     pub type_info: TypeInfo,
+    pub expr_kind: ExprKind,
 }
 
 impl UnAryExpr {
@@ -382,6 +386,7 @@ impl UnAryExpr {
             op,
             expr: Box::new(expr),
             type_info: TypeInfo::Unknown,
+            expr_kind: ExprKind::Unknown,
         }
     }
 }
@@ -392,7 +397,7 @@ impl ExprVisit for UnAryExpr {
     }
 
     fn kind(&self) -> ExprKind {
-        todo!()
+        self.expr_kind
     }
 }
 
@@ -761,15 +766,22 @@ pub struct StructExpr;
 #[derive(Debug, PartialEq)]
 pub struct ReturnExpr(pub Option<Box<Expr>>);
 
+impl ExprVisit for ReturnExpr {
+    fn type_info(&self) -> TypeInfo {
+        TypeInfo::Never
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct BreakExpr(pub Option<Box<Expr>>);
 
 impl ExprVisit for BreakExpr {
     fn type_info(&self) -> TypeInfo {
-        match &self.0 {
-            Some(e) => e.type_info(),
-            None => TypeInfo::Unit,
-        }
+        TypeInfo::Never
     }
 
     fn kind(&self) -> ExprKind {
@@ -855,6 +867,16 @@ impl IfExpr {
 
 #[derive(Debug, PartialEq)]
 pub struct WhileExpr(pub Box<Expr>, pub Box<BlockExpr>);
+
+impl ExprVisit for WhileExpr {
+    fn type_info(&self) -> TypeInfo {
+        TypeInfo::Unit
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
+}
 
 #[derive(Debug, PartialEq)]
 pub struct LoopExpr {

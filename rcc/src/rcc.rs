@@ -36,6 +36,8 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
         let mut cursor = ParseCursor::new(token_stream);
         let ast_file = File::parse(&mut cursor)?;
 
+        // TODO semantic analyser
+
         // generate ir
         let mut ir_gen_cxt = IRGenContext::new();
         ast_file.generate(&mut ir_gen_cxt)?;
