@@ -6,6 +6,5 @@
 
 pub mod sym_resolver;
 pub mod scope;
-pub mod expr_visit;
 #[cfg(test)]
 mod tests;

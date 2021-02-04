@@ -3,6 +3,16 @@ use crate::analyser::tests::get_ast_file;
 use crate::ast::visit::Visit;
 use crate::rcc::RccError;
 
+fn file_validate(inputs: &[&str], expecteds: &[Result<(), RccError>]) {
+    assert_eq!(inputs.len(), expecteds.len());
+    for (input, expected) in inputs.iter().zip(expecteds) {
+        let mut sym_resolver = SymbolResolver::new();
+        let mut ast_file = get_ast_file(input).expect("invalid ast file");
+        let actual = sym_resolver.visit_file(&mut ast_file);
+        assert_eq!(expected, &actual);
+    }
+}
+
 #[test]
 fn ident_not_found_test() {
     let mut sym_resolver = SymbolResolver::new();
@@ -84,24 +94,46 @@ fn fn_param_test() {
 #[test]
 fn assign_expr_test() {
     file_validate(
-        &[r#"
+        &[
+            r#"
         fn main() {
             let mut a = 32;
             a = 64i64;
         }
-    "#, r#"fn sub(a: i32, b: i64) -> i64 {
+    "#,
+            r#"fn sub(a: i32, b: i64) -> i64 {
         a - b
-    }"#],
+    }"#,
+        ],
         &[Ok(()), Err("invalid operand for `-`".into())],
     );
 }
 
-fn file_validate(inputs: &[&str], expecteds: &[Result<(), RccError>]) {
-    assert_eq!(inputs.len(), expecteds.len());
-    for (input, expected) in inputs.iter().zip(expecteds) {
-        let mut sym_resolver = SymbolResolver::new();
-        let mut ast_file = get_ast_file(input).expect("invalid ast file");
-        let actual = sym_resolver.visit_file(&mut ast_file);
-        assert_eq!(expected, &actual);
-    }
+#[test]
+fn loop_test() {
+    file_validate(
+        &[
+            r#"
+        fn foo() {
+            loop {
+            }
+        }
+    "#,
+            r#"
+        fn foo() {
+            let mut a = loop {
+                break 32;
+            };
+            a = 30i64;
+        }
+    "#,
+            r#"
+        fn foo() {
+            let mut a = loop { break };
+            a = 64;
+        }
+    "#,
+        ],
+        &[Ok(()), Ok(()), Err("invalid type in assign expr".into())],
+    );
 }

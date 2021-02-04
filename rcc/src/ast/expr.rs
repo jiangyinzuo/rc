@@ -1,10 +1,8 @@
-use crate::analyser::expr_visit::ExprVisit;
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo;
 use crate::ast::expr::Expr::Path;
 use crate::ast::stmt::Stmt;
-use crate::ast::types::TypeAnnotation::Unknown;
-use crate::ast::types::{TypeAnnotation, TypeLitNum};
+use crate::ast::types::TypeLitNum;
 use crate::ast::{FromToken, TokenStart};
 use crate::from_token;
 use crate::lexer::token::Token;
@@ -13,6 +11,16 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::str::FromStr;
 use strenum::StrEnum;
+
+pub trait ExprVisit {
+    fn type_info(&self) -> TypeInfo;
+    /// mutable place expr, immutable place expr or value expr
+    fn kind(&self) -> ExprKind;
+
+    fn is_callable(&self) -> bool {
+        matches!(self.type_info(), TypeInfo::Fn {..} | TypeInfo::FnPtr(_))
+    }
+}
 
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ExprKind {
@@ -63,7 +71,7 @@ impl Expr {
     pub fn set_type_info(&mut self, type_info: TypeInfo) {
         match self {
             Self::Path(p) => p.type_info = type_info,
-            e => unimplemented!("set type_info on {:?}", e)
+            e => unimplemented!("set type_info on {:?}", e),
         }
     }
 }
@@ -71,6 +79,54 @@ impl Expr {
 impl From<&str> for Expr {
     fn from(ident: &str) -> Self {
         Path(ident.into())
+    }
+}
+
+impl ExprVisit for Expr {
+    fn type_info(&self) -> TypeInfo {
+        match self {
+            Self::Path(e) => e.type_info(),
+            Self::LitStr(_) => TypeInfo::ref_str(),
+            Self::LitChar(_) => TypeInfo::Char,
+            Self::LitBool(_) => TypeInfo::Bool,
+            Self::LitNum(ln) => TypeInfo::LitNum(ln.ret_type),
+            Self::Unary(e) => e.type_info(),
+            Self::Block(e) => e.type_info(),
+            Self::Assign(e) => e.type_info(),
+            // Self::Range(e) => e.ret_type(),
+            Self::BinOp(e) => e.type_info(),
+            // Self::Grouped(e) => e.ret_type(),
+            // Self::Array(e) => e.ret_type(),
+            // Self::ArrayIndex(e) => e.ret_type(),
+            // Self::Tuple(e) => e.ret_type(),
+            // Self::TupleIndex(e) => e.ret_type(),
+            // Self::Struct(e) => e.ret_type(),
+            Self::Call(e) => e.type_info(),
+            // Self::FieldAccess(e) => e.ret_type(),
+            // Self::While(e) => e.ret_type(),
+            Self::Loop(e) => e.type_info(),
+            // Self::If(e) => e.ret_type(),
+            // Self::Return(e) => e.ret_type(),
+            Self::Break(e) => e.type_info(),
+            _ => unimplemented!("{:?}", self),
+        }
+    }
+
+    fn kind(&self) -> ExprKind {
+        match self {
+            Self::Path(e) => e.kind(),
+            Self::LitStr(_) | Self::LitChar(_) | Self::LitBool(_) | Self::LitNum(_) => {
+                ExprKind::Value
+            }
+            Self::Unary(u) => u.kind(),
+            Self::Block(b) => b.kind(),
+            Self::Assign(a) => a.kind(),
+            Self::BinOp(b) => b.kind(),
+            Self::Call(c) => c.kind(),
+            Self::Loop(l) => l.kind(),
+            Self::Break(b) => b.kind(),
+            _ => unimplemented!("{:?}", self),
+        }
     }
 }
 
@@ -113,6 +169,22 @@ impl LhsExpr {
     }
 }
 
+impl ExprVisit for LhsExpr {
+    fn type_info(&self) -> TypeInfo {
+        match self {
+            LhsExpr::Path(expr) => expr.type_info(),
+            _ => todo!(),
+        }
+    }
+
+    fn kind(&self) -> ExprKind {
+        match self {
+            LhsExpr::Path(expr) => expr.kind(),
+            _ => todo!(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ConstantExpr<V> {
     pub expr: Option<Box<Expr>>,
@@ -141,7 +213,7 @@ impl TokenStart for Expr {
             Token::Identifier(_) | Token::Literal {..} | Token::True | Token::False | Token::DotDot |
             Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
             Token::For | Token::Loop | Token::While |
-            Token::If | Token::Match | Token::Return
+            Token::If | Token::Match | Token::Break | Token::Return
         ) || UnAryExpr::is_token_start(tk)
             || RangeExpr::is_token_start(tk)
     }
@@ -152,6 +224,16 @@ pub struct BlockExpr {
     pub expr_without_block: Option<Box<Expr>>,
     pub scope: Scope,
     pub type_info: TypeInfo,
+}
+
+impl ExprVisit for BlockExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
 }
 
 impl Debug for BlockExpr {
@@ -247,6 +329,16 @@ impl PathExpr {
     }
 }
 
+impl ExprVisit for PathExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        self.expr_kind
+    }
+}
+
 impl From<Vec<String>> for PathExpr {
     fn from(segments: Vec<String>) -> Self {
         PathExpr {
@@ -291,6 +383,16 @@ impl UnAryExpr {
             expr: Box::new(expr),
             type_info: TypeInfo::Unknown,
         }
+    }
+}
+
+impl ExprVisit for UnAryExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        todo!()
     }
 }
 
@@ -359,6 +461,16 @@ impl AssignExpr {
             assign_op,
             rhs: Box::new(rhs),
         }
+    }
+}
+
+impl ExprVisit for AssignExpr {
+    fn type_info(&self) -> TypeInfo {
+        TypeInfo::Unit
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Place
     }
 }
 
@@ -472,6 +584,16 @@ impl BinOpExpr {
             rhs: Box::new(rhs),
             type_info: TypeInfo::Unknown,
         }
+    }
+}
+
+impl ExprVisit for BinOpExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Place
     }
 }
 
@@ -642,6 +764,19 @@ pub struct ReturnExpr(pub Option<Box<Expr>>);
 #[derive(Debug, PartialEq)]
 pub struct BreakExpr(pub Option<Box<Expr>>);
 
+impl ExprVisit for BreakExpr {
+    fn type_info(&self) -> TypeInfo {
+        match &self.0 {
+            Some(e) => e.type_info(),
+            None => TypeInfo::Unit,
+        }
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct CallExpr {
     pub expr: Box<Expr>,
@@ -663,6 +798,16 @@ impl CallExpr {
     pub fn call_params(mut self, call_params: Vec<Expr>) -> Self {
         self.call_params = call_params;
         self
+    }
+}
+
+impl ExprVisit for CallExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
     }
 }
 
@@ -712,4 +857,26 @@ impl IfExpr {
 pub struct WhileExpr(pub Box<Expr>, pub Box<BlockExpr>);
 
 #[derive(Debug, PartialEq)]
-pub struct LoopExpr(pub Box<BlockExpr>);
+pub struct LoopExpr {
+    pub expr: Box<BlockExpr>,
+    pub type_info: TypeInfo,
+}
+
+impl LoopExpr {
+    pub fn new(expr: BlockExpr) -> LoopExpr {
+        LoopExpr {
+            expr: Box::new(expr),
+            type_info: TypeInfo::Unknown,
+        }
+    }
+}
+
+impl ExprVisit for LoopExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
+    }
+}

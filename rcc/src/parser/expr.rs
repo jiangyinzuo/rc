@@ -447,7 +447,7 @@ pub mod primitive {
     impl Parse for LoopExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::Loop)?;
-            Ok(LoopExpr(Box::new(BlockExpr::parse(cursor)?)))
+            Ok(LoopExpr::new(BlockExpr::parse(cursor)?))
         }
     }
 

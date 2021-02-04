@@ -33,7 +33,7 @@ pub(super) fn parse_stmt_or_expr_without_block(cursor: &mut ParseCursor) -> Resu
             }
             Stmt::ExprStmt(expr)
         }
-        _ => unimplemented!(),
+        tk => unimplemented!("{}", tk),
     }))
 }
 

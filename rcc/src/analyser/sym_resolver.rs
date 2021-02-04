@@ -1,5 +1,6 @@
-use crate::analyser::expr_visit::ExprVisit;
+use crate::ast::expr::ExprVisit;
 use crate::analyser::scope::Scope;
+use crate::analyser::sym_resolver::LoopKind::NotIn;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
@@ -16,6 +17,7 @@ use crate::ast::Visibility;
 use crate::rcc::RccError;
 use std::collections::{HashMap, HashSet};
 use std::ptr::NonNull;
+use crate::ast::item::Item::Type;
 
 #[derive(Debug, PartialEq)]
 pub enum VarKind {
@@ -171,11 +173,28 @@ impl TypeInfo {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+enum LoopKind {
+    NotIn,
+    While,
+    Loop(*mut LoopExpr),
+}
+
+impl LoopKind {
+    fn is_in_loop(&self) -> bool {
+        self != &NotIn
+    }
+}
+
 /// Fill the `type information` and `expr kind` attributes of the expr nodes on AST
 pub struct SymbolResolver<'ast> {
     cur_scope: *mut Scope,
     file_scope: Option<&'ast mut Scope>,
     scope_stack: Vec<*mut Scope>,
+
+    /// super scope attrs
+    loop_kind: LoopKind,
+    loop_kind_stack: Vec<LoopKind>,
 
     /// TODO: Operator override tables
     pub override_bin_ops: HashSet<(BinOperator, TypeInfo, TypeInfo)>,
@@ -188,6 +207,8 @@ impl<'ast> SymbolResolver<'ast> {
             cur_scope: std::ptr::null_mut(),
             file_scope: None,
             scope_stack: vec![],
+            loop_kind: NotIn,
+            loop_kind_stack: vec![],
             override_bin_ops: HashSet::new(),
             str_constants: HashMap::new(),
         }
@@ -374,10 +395,10 @@ impl<'ast> SymbolResolver<'ast> {
             Expr::Call(call_expr) => self.visit_call_expr(call_expr),
             // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
             // Expr::While(while_expr) => self.visit_while_expr(while_expr),
-            // Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
+            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
             // Expr::If(if_expr) => self.visit_if_expr(if_expr),
             // Expr::Return(return_expr) => self.visit_return_expr(return_expr),
-            // Expr::Break(break_expr) => self.visit_break_expr(break_expr),
+            Expr::Break(break_expr) => self.visit_break_expr(break_expr),
             _ => Ok(()),
         };
         debug_assert_ne!(
@@ -504,14 +525,16 @@ impl<'ast> SymbolResolver<'ast> {
                         // let mut a = 32; a = 64i128;
                         if l_type.is_i() {
                             assign_expr.lhs.set_type_info(r_type);
-                        } else { // let mut a: i64; a = 32;
-                           assign_expr.rhs.set_type_info(l_type);
+                        } else {
+                            // let mut a: i64; a = 32;
+                            assign_expr.rhs.set_type_info(l_type);
                         }
                     } else if l_type.is_float() && r_type.is_float() {
                         // let mut a = 32.3; a = 33f32;
                         if l_type.is_f() {
                             assign_expr.lhs.set_type_info(r_type);
-                        } else { // let mut a: f32; a = 33.2;
+                        } else {
+                            // let mut a: f32; a = 33.2;
                             assign_expr.rhs.set_type_info(l_type);
                         }
                     } else {
@@ -627,12 +650,12 @@ impl<'ast> SymbolResolver<'ast> {
                             }
                         }
                     }
-                    return Err(format!(
-                        "invalid type: execpted {:?}, found: {:?}",
+                    Err(format!(
+                        "invalid type: expected {:?}, found: {:?}",
                         excepted_info,
                         expr_chg.type_info()
                     )
-                    .into());
+                    .into())
                 } else {
                     Ok(())
                 }
@@ -657,11 +680,15 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr) -> Result<(), RccError> {
+        self.loop_kind_stack.push(self.loop_kind);
+        self.loop_kind = LoopKind::Loop(loop_expr);
+        self.visit_block_expr(&mut loop_expr.expr)?;
+        self.loop_kind = self.loop_kind_stack.pop().expect("empty loop kind stack!");
         Ok(())
     }
 
     fn visit_if_expr(&mut self, if_expr: &mut IfExpr) -> Result<(), RccError> {
-        Ok(())
+        todo!()
     }
 
     fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<(), RccError> {
@@ -672,8 +699,20 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<(), RccError> {
+        if !self.loop_kind.is_in_loop() {
+            return Err("break expr can not be out of loop block".into())
+        }
+
         if let Some(expr) = break_expr.0.as_mut() {
-            self.visit_expr(expr)?;
+            match self.loop_kind {
+                LoopKind::Loop(loop_expr) => {
+                    self.visit_expr(expr)?;
+                    unsafe {&mut *loop_expr}.type_info = expr.type_info();
+                },
+                _ => return Err("only loop can return values".into())
+            }
+        } else if let LoopKind::Loop(loop_expr) = self.loop_kind {
+            unsafe {&mut *loop_expr}.type_info = TypeInfo::Unit;
         }
         Ok(())
     }
