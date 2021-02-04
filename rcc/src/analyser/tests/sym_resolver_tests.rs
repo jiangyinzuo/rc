@@ -50,6 +50,22 @@ fn let_stmt_add_ident_test() {
 }
 
 #[test]
+fn type_annotation_test() {
+    file_validate(&[
+        r#"
+        fn foo() {
+            let a: char = 'c';
+            let b: i64 = 34;
+            let b: i128 = 33i128;
+        }
+    "#, r#"
+        fn foo() {
+            let a: i32 = 4i64;
+        }
+    "#], &[Ok(()), Err("invalid type in let stmt: expected `LitNum(i32)`, found `LitNum(i64)`".into())]);
+}
+
+#[test]
 fn str_test() {
     let mut sym_resolver = SymbolResolver::new();
     let mut ast_file = get_ast_file(
@@ -202,11 +218,31 @@ fn return_test() {
         ],
         &[
             Ok(()),
-            Err("invalid return type: excepted `LitNum(I64)`, found `LitNum(I32)`".into()),
-            Err("invalid return type: excepted `LitNum(I64)`, found `LitNum(I32)`".into()),
+            Err("invalid return type: excepted `LitNum(i64)`, found `LitNum(i32)`".into()),
+            Err("invalid return type: excepted `LitNum(i64)`, found `LitNum(i32)`".into()),
             Ok(()),
             Ok(()),
             Ok(()),
         ],
     );
+}
+
+#[test]
+fn never_type_test() {
+    file_validate(&[r#"
+        fn foo() -> i32 {
+            let a = loop {};
+            a
+        }
+    "#, r#"
+        fn foo() -> i64 {
+            if loop {} && true {
+                loop {
+                    return 3;
+                }
+            } else {
+                return loop {}
+            }
+        }
+    "#], &[Ok(()), Ok(())]);
 }

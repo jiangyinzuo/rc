@@ -23,6 +23,10 @@ pub trait ExprVisit {
     }
 }
 
+pub trait TypeInfoSetter {
+    fn set_type_info(&mut self, type_info: TypeInfo);
+}
+
 #[derive(Debug, PartialEq, Copy, Clone)]
 pub enum ExprKind {
     MutablePlace,
@@ -68,13 +72,6 @@ impl Expr {
             Self::Block(_) | Self::Struct(_) | Self::While(_) |
             Self::Loop(_)  | Self::If(_) | Self::Match | Self::For)
     }
-
-    pub fn set_type_info(&mut self, type_info: TypeInfo) {
-        match self {
-            Self::Path(p) => p.type_info = type_info,
-            e => unimplemented!("set type_info on {:?}", e),
-        }
-    }
 }
 
 impl From<&str> for Expr {
@@ -106,7 +103,7 @@ impl ExprVisit for Expr {
             // Self::FieldAccess(e) => e.ret_type(),
             Self::While(e) => e.type_info(),
             Self::Loop(e) => e.type_info(),
-            // Self::If(e) => e.ret_type(),
+            Self::If(e) => e.type_info(),
             Self::Return(e) => e.type_info(),
             Self::Break(e) => e.type_info(),
             _ => unimplemented!("{:?}", self),
@@ -126,9 +123,23 @@ impl ExprVisit for Expr {
             Self::Call(c) => c.kind(),
             Self::While(w) => w.kind(),
             Self::Loop(l) => l.kind(),
+            Self::If(i) => i.kind(),
             Self::Return(r) => r.kind(),
             Self::Break(b) => b.kind(),
             _ => unimplemented!("{:?}", self),
+        }
+    }
+}
+
+impl TypeInfoSetter for Expr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        match self {
+            Self::Path(p) => p.type_info = type_info,
+            Self::LitNum(l) => match type_info {
+                TypeInfo::LitNum(new_type) => l.ret_type = new_type,
+                _ => unreachable!("can not change lit num to other type"),
+            },
+            e => unimplemented!("set type_info on {:?}", e),
         }
     }
 }
@@ -226,7 +237,7 @@ pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
     pub scope: Scope,
-    pub type_info: TypeInfo,
+    type_info: TypeInfo,
 }
 
 impl ExprVisit for BlockExpr {
@@ -236,6 +247,12 @@ impl ExprVisit for BlockExpr {
 
     fn kind(&self) -> ExprKind {
         ExprKind::Value
+    }
+}
+
+impl TypeInfoSetter for BlockExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info = type_info;
     }
 }
 
@@ -840,8 +857,9 @@ impl FieldAccessExpr {
 
 #[derive(Debug, PartialEq)]
 pub struct IfExpr {
-    conditions: Vec<Expr>,
-    blocks: Vec<BlockExpr>,
+    pub conditions: Vec<Expr>,
+    pub blocks: Vec<BlockExpr>,
+    pub type_info: TypeInfo,
 }
 
 impl IfExpr {
@@ -849,11 +867,16 @@ impl IfExpr {
         IfExpr {
             conditions: vec![],
             blocks: vec![],
+            type_info: TypeInfo::Unknown,
         }
     }
 
     pub fn from_exprs(conditions: Vec<Expr>, blocks: Vec<BlockExpr>) -> IfExpr {
-        IfExpr { conditions, blocks }
+        IfExpr {
+            conditions,
+            blocks,
+            type_info: TypeInfo::Unknown,
+        }
     }
 
     pub fn add_cond(&mut self, expr: Expr) {
@@ -862,6 +885,16 @@ impl IfExpr {
 
     pub fn add_block(&mut self, block_expr: BlockExpr) {
         self.blocks.push(block_expr);
+    }
+}
+
+impl ExprVisit for IfExpr {
+    fn type_info(&self) -> TypeInfo {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        ExprKind::Value
     }
 }
 

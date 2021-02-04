@@ -120,7 +120,7 @@ impl TypePtr {
     }
 }
 
-#[derive(StrEnum, PartialEq, Eq, Debug, Clone, Copy, Hash)]
+#[derive(StrEnum, PartialEq, Eq, Clone, Copy, Hash)]
 pub enum TypeLitNum {
     F32,
     F64,
@@ -154,5 +154,15 @@ impl TypeLitNum {
     pub fn is_float(&self) -> bool {
         use TypeLitNum::*;
         matches!(self, F | F32 | F64)
+    }
+}
+
+impl Debug for TypeLitNum {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::F => write!(f, "#f"),
+            Self::I => write!(f, "#i"),
+            _ => <Self as std::fmt::Display>::fmt(self, f),
+        }
     }
 }

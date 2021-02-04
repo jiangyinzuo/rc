@@ -1,12 +1,12 @@
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::LoopKind::NotIn;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
-use crate::ast::expr::ExprVisit;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
     Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr,
     RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr,
 };
+use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
 use crate::ast::item::Item::Type;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
@@ -48,7 +48,7 @@ impl VarInfo {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum TypeInfo {
     Fn {
         vis: Visibility,
@@ -171,6 +171,19 @@ impl TypeInfo {
             false
         }
     }
+
+    /// type `!` can be coerced into any other type.
+    pub fn is(&self, other: &Self) -> bool {
+        self == &Self::Never || self == other
+    }
+
+    pub fn eq_or_never(&self, other: &Self) -> bool {
+        self == other || self == &Self::Never || other == &Self::Never
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        self == &TypeInfo::Unknown
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -276,13 +289,13 @@ impl<'ast> SymbolResolver<'ast> {
                             Unknown
                         };
                     }
-                } else if l_type == TypeInfo::Bool && r_type == TypeInfo::Bool {
+                } else if l_type.is(&TypeInfo::Bool) && r_type.is(&TypeInfo::Bool) {
                     return TypeInfo::Bool;
                 }
                 Unknown
             }
             BinOperator::AndAnd | BinOperator::OrOr => {
-                if l_type == TypeInfo::Bool && r_type == TypeInfo::Bool {
+                if l_type.is(&TypeInfo::Bool) && r_type.is(&TypeInfo::Bool) {
                     return TypeInfo::Bool;
                 }
                 Unknown
@@ -318,8 +331,20 @@ impl<'ast> SymbolResolver<'ast> {
         }
     }
 
-    fn validate_ret_type(&self, type_info: TypeInfo) -> Result<(), RccError> {
-        if self.cur_fn_ret_type == type_info {
+    fn try_determine_number_type(
+        expected_num_type: &TypeInfo,
+        expr: &mut (impl ExprVisit + TypeInfoSetter),
+    ) {
+        let type_info = expr.type_info();
+        if expected_num_type.is_integer() && type_info.is_i()
+            || expected_num_type.is_float() && type_info.is_f()
+        {
+            expr.set_type_info(expected_num_type.clone());
+        }
+    }
+
+    fn validate_ret_type(&self, type_info: &mut TypeInfo) -> Result<(), RccError> {
+        if type_info.is(&self.cur_fn_ret_type) {
             Ok(())
         } else {
             Err(format!(
@@ -373,7 +398,8 @@ impl<'ast> SymbolResolver<'ast> {
         }
         self.visit_block_expr(&mut item_fn.fn_block)?;
         if item_fn.fn_block.expr_without_block.is_some() {
-            self.validate_ret_type(item_fn.fn_block.type_info())?;
+            Self::try_determine_number_type(&self.cur_fn_ret_type, &mut item_fn.fn_block);
+            self.validate_ret_type(&mut item_fn.fn_block.type_info())?;
         }
 
         // restore
@@ -401,14 +427,25 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
-        let mut type_info = if let Some(expr) = &mut let_stmt.expr {
+        let expr_type_info = if let Some(expr) = &mut let_stmt.expr {
             self.visit_expr(expr)?;
+            if let Some(type_anno) = &let_stmt._type {
+                let anno_type_info =
+                    TypeInfo::from_type_anno(type_anno, unsafe { &*self.cur_scope });
+                Self::try_determine_number_type(&anno_type_info, expr);
+                let expr_type_info = expr.type_info();
+                if !expr_type_info.is(&anno_type_info) {
+                    return Err(format!(
+                        "invalid type in let stmt: expected `{:?}`, found `{:?}`",
+                        anno_type_info, expr_type_info
+                    )
+                    .into());
+                }
+            }
             expr.type_info()
         } else {
             Unknown
         };
-        // TODO: process type annotation
-        // if let Some(type_anno) = &let_stmt._type {}
 
         match &let_stmt.pattern {
             Pattern::Identifier(ident_pattern) => unsafe {
@@ -419,7 +456,7 @@ impl<'ast> SymbolResolver<'ast> {
                     } else {
                         VarKind::Local
                     },
-                    type_info.clone(),
+                    expr_type_info,
                 );
             },
         }
@@ -496,7 +533,7 @@ impl<'ast> SymbolResolver<'ast> {
                 Ok(())
             } else {
                 let type_info = cur_scope.find_fn(ident);
-                if type_info != Unknown {
+                if !type_info.is_unknown() {
                     path_expr.type_info = type_info;
                     path_expr.expr_kind = ExprKind::Value;
                     Ok(())
@@ -562,14 +599,15 @@ impl<'ast> SymbolResolver<'ast> {
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
             self.visit_expr(expr)?;
             unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
-            block_expr.type_info = expr.type_info();
+            let type_info = expr.type_info();
+            block_expr.set_type_info(type_info);
         } else if block_expr.stmts.is_empty() {
-            block_expr.type_info = TypeInfo::Unit;
+            block_expr.set_type_info(TypeInfo::Unit);
         } else {
-            block_expr.type_info = match block_expr.stmts.last().unwrap() {
+            block_expr.set_type_info(match block_expr.stmts.last().unwrap() {
                 Stmt::Semi | Stmt::Let(_) | Stmt::Item(_) => TypeInfo::Unit,
                 Stmt::ExprStmt(e) => e.type_info(),
-            };
+            });
         }
 
         self.exit_block();
@@ -587,12 +625,11 @@ impl<'ast> SymbolResolver<'ast> {
                 let l_type = assign_expr.lhs.type_info();
                 let r_type = assign_expr.rhs.type_info();
 
-                debug_assert_ne!(TypeInfo::Unknown, r_type);
-
+                debug_assert!(!r_type.is_unknown());
                 // let mut a; a = 32;
-                if l_type == TypeInfo::Unknown {
+                if l_type.is_unknown() {
                     assign_expr.lhs.set_type_info(r_type);
-                } else if l_type != r_type {
+                } else if !r_type.is(&l_type) {
                     if l_type.is_integer() && r_type.is_integer() {
                         // let mut a = 32; a = 64i128;
                         if l_type.is_i() {
@@ -638,7 +675,7 @@ impl<'ast> SymbolResolver<'ast> {
             &mut bin_op_expr.rhs,
         );
         // primitive bin_op || override bin_op
-        if bin_op_expr.type_info != Unknown
+        if !bin_op_expr.type_info.is_unknown()
             || self.override_bin_ops.contains(&(
                 bin_op_expr.bin_op,
                 bin_op_expr.lhs.type_info(),
@@ -711,7 +748,7 @@ impl<'ast> SymbolResolver<'ast> {
                 expr_chg: &mut Expr,
                 excepted_info: &TypeInfo,
             ) -> Result<(), RccError> {
-                if excepted_info != &expr_chg.type_info() {
+                if !expr_chg.type_info().is(excepted_info) {
                     if let Expr::LitNum(lit_expr) = expr_chg {
                         if let TypeInfo::LitNum(p) = excepted_info {
                             if lit_expr.ret_type == TypeLitNum::I && p.is_integer()
@@ -754,7 +791,7 @@ impl<'ast> SymbolResolver<'ast> {
         self.loop_kind = LoopKind::While;
 
         let cond_type = while_expr.0.type_info();
-        if cond_type != TypeInfo::Bool {
+        if !cond_type.is(&TypeInfo::Bool) {
             return Err(format!(
                 "invalid type in while condition: expected `bool`, found {:?}",
                 cond_type
@@ -772,7 +809,7 @@ impl<'ast> SymbolResolver<'ast> {
         self.loop_kind = LoopKind::Loop(loop_expr);
         self.visit_block_expr(&mut loop_expr.expr)?;
         // never return, example: `let a = loop {};`
-        if loop_expr.type_info == TypeInfo::Unknown {
+        if loop_expr.type_info.is_unknown() {
             loop_expr.type_info = TypeInfo::Never;
         }
         self.exit_loop();
@@ -780,18 +817,45 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_if_expr(&mut self, if_expr: &mut IfExpr) -> Result<(), RccError> {
-        todo!()
+        debug_assert!(
+            if_expr.conditions.len() == if_expr.blocks.len()
+                || if_expr.conditions.len() + 1 == if_expr.blocks.len(),
+            "len cond: {}; len block: {}",
+            if_expr.conditions.len(),
+            if_expr.blocks.len()
+        );
+        debug_assert!(!if_expr.conditions.is_empty());
+        debug_assert!(!if_expr.blocks.is_empty());
+
+        for cond in if_expr.conditions.iter_mut() {
+            self.visit_expr(cond)?;
+            let cond_type_info = cond.type_info();
+            if !cond_type_info.is(&TypeInfo::Bool) {
+                return Err(format!(
+                    "invalid type of condition expr: expected `bool`, found: {:?}",
+                    cond_type_info
+                )
+                .into());
+            }
+        }
+
+        for block in if_expr.blocks.iter_mut() {
+            self.visit_block_expr(block)?;
+        }
+
+        Ok(())
     }
 
     fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<(), RccError> {
-        let ret_type = match return_expr.0.as_mut() {
+        let mut ret_type = match return_expr.0.as_mut() {
             Some(expr) => {
                 self.visit_expr(expr)?;
+                Self::try_determine_number_type(&self.cur_fn_ret_type, expr.as_mut());
                 expr.type_info()
             }
             None => TypeInfo::Unit,
         };
-        self.validate_ret_type(ret_type)
+        self.validate_ret_type(&mut ret_type)
     }
 
     fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<(), RccError> {
@@ -800,10 +864,11 @@ impl<'ast> SymbolResolver<'ast> {
             type_info: TypeInfo,
         ) -> Result<(), RccError> {
             let loop_expr = unsafe { &mut *loop_expr };
-            if loop_expr.type_info == TypeInfo::Unknown {
+
+            if loop_expr.type_info.is_unknown() {
                 loop_expr.type_info = type_info;
                 Ok(())
-            } else if loop_expr.type_info != type_info {
+            } else if !type_info.is(&loop_expr.type_info) {
                 Err(format!(
                     "invalid type for break expr: expected `{:?}`, found {:?}",
                     loop_expr.type_info, type_info
@@ -822,6 +887,10 @@ impl<'ast> SymbolResolver<'ast> {
             return match self.loop_kind {
                 LoopKind::Loop(loop_expr) => {
                     self.visit_expr(expr)?;
+                    Self::try_determine_number_type(
+                        unsafe { &(*loop_expr).type_info() },
+                        expr.as_mut(),
+                    );
                     try_set_type_info(loop_expr, expr.type_info())
                 }
                 _ => Err("only loop can return values".into()),
