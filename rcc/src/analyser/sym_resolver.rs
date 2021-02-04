@@ -2,13 +2,13 @@ use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::LoopKind::NotIn;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
 use crate::ast::expr::{
-    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
-    Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr,
-    RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr,
+    ArrayExpr, ArrayIndexExpr, AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, BreakExpr,
+    CallExpr, Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
+    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp,
+    WhileExpr,
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::Item::Type;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
@@ -211,7 +211,7 @@ pub struct SymbolResolver<'ast> {
     cur_fn_ret_type: TypeInfo,
     cur_fn_ret_type_stack: Vec<TypeInfo>,
 
-    /// TODO: Operator override tables
+    // TODO: Operator override tables
     pub override_bin_ops: HashSet<(BinOperator, TypeInfo, TypeInfo)>,
     pub str_constants: HashMap<String, u64>,
 }
@@ -615,10 +615,23 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<(), RccError> {
+        fn invalid_type_error(
+            type_info: &TypeInfo,
+            assign_expr: &AssignExpr,
+        ) -> Result<(), RccError> {
+            Err(format!(
+                "invalid type `{:?}` for `{:?}`",
+                type_info, assign_expr.assign_op
+            )
+            .into())
+        }
+
         self.visit_lhs_expr(&mut assign_expr.lhs)?;
+
+        // check the mutability of place expr lhs
         match assign_expr.lhs.kind() {
-            ExprKind::Place => Err(RccError("lhs is not mutable".into())),
-            ExprKind::Value => Err(RccError("can not assign to lhs".into())),
+            ExprKind::Place => return Err(RccError("lhs is not mutable".into())),
+            ExprKind::Value => return Err(RccError("can not assign to lhs".into())),
             ExprKind::Unknown => unreachable!("lhs kind should not be unknown"),
             ExprKind::MutablePlace => {
                 self.visit_expr(&mut assign_expr.rhs)?;
@@ -626,6 +639,17 @@ impl<'ast> SymbolResolver<'ast> {
                 let r_type = assign_expr.rhs.type_info();
 
                 debug_assert!(!r_type.is_unknown());
+
+                if matches!(assign_expr.assign_op, AssignOp::ShlEq | AssignOp::ShrEq) {
+                    return if l_type.is_integer() && r_type.is_integer() {
+                        Ok(())
+                    } else {
+                        invalid_type_error(&l_type, assign_expr)
+                    };
+                }
+
+                // set type_info of lhs or rhs
+
                 // let mut a; a = 32;
                 if l_type.is_unknown() {
                     assign_expr.lhs.set_type_info(r_type);
@@ -647,12 +671,31 @@ impl<'ast> SymbolResolver<'ast> {
                             assign_expr.rhs.set_type_info(l_type);
                         }
                     } else {
-                        return Err("invalid type in assign expr".into());
+                        return invalid_type_error(&l_type, assign_expr);
                     }
                 }
-                Ok(())
             }
         }
+
+        debug_assert_eq!(assign_expr.lhs.type_info(), assign_expr.rhs.type_info());
+        let type_info = assign_expr.lhs.type_info();
+        // check compound assignment operators
+        // TODO: operator override
+        match assign_expr.assign_op {
+            AssignOp::PlusEq | AssignOp::MinusEq | AssignOp::StarEq | AssignOp::SlashEq => {
+                if !type_info.is_number() {
+                    return invalid_type_error(&type_info, assign_expr);
+                }
+            }
+            AssignOp::PercentEq | AssignOp::AndEq | AssignOp::OrEq | AssignOp::CaretEq => {
+                if !type_info.is_integer() && type_info != TypeInfo::Bool {
+                    return invalid_type_error(&type_info, assign_expr);
+                }
+            }
+            AssignOp::ShlEq | AssignOp::ShrEq => unreachable!(),
+            AssignOp::Eq => {}
+        }
+        Ok(())
     }
 
     fn visit_range_expr(&mut self, range_expr: &mut RangeExpr) -> Result<(), RccError> {

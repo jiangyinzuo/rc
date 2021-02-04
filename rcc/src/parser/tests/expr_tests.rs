@@ -9,6 +9,7 @@ use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
 use crate::parser::tests::parse_validate;
+use crate::rcc::RccError;
 
 #[test]
 fn path_expr_test() {
@@ -185,4 +186,17 @@ fn call_expr_test() {
             FieldAccessExpr::new(LitNum(1.into()), "hello".into()),
         ))))))],
     );
+}
+
+#[test]
+fn place_expr_test() {
+    let expecteds: Vec<Result<Expr, &str>> = vec![
+        Err("invalid lhs expr"),
+        Ok(Expr::Assign(AssignExpr::new(
+            LhsExpr::Deref(Box::new("a".into())),
+            AssignOp::Eq,
+            Expr::LitNum(4.into()),
+        ))),
+    ];
+    parse_validate(vec!["if true {1} else {3} = 3", "*a = 4"], expecteds);
 }

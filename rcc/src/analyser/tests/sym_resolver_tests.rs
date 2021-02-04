@@ -116,6 +116,11 @@ fn assign_expr_test() {
         fn main() {
             let mut a = 32;
             a = 64i64;
+            a >>= 1usize;
+            a += 128i64;
+            let mut b = true;
+            b ^= false;
+            b |= true;
         }
     "#,
             r#"
@@ -129,11 +134,19 @@ fn assign_expr_test() {
             a=4;
         }
     "#,
+            r#"
+        fn foo() {
+            let mut a = 3;
+            a>>=4;
+            a^=3f32;
+        }
+    "#,
         ],
         &[
             Ok(()),
             Err("invalid operand for `-`".into()),
             Err("lhs is not mutable".into()),
+            Err("invalid type `LitNum(#i)` for `^=`".into()),
         ],
     );
 }
@@ -192,7 +205,7 @@ fn loop_test() {
         &[
             Ok(()),
             Ok(()),
-            Err("invalid type in assign expr".into()),
+            Err("invalid type `Unit` for `=`".into()),
             Ok(()),
             Err("only loop can return values".into()),
             Ok(()),
@@ -231,6 +244,11 @@ fn return_test() {
 fn never_type_test() {
     file_validate(&[r#"
         fn foo() -> i32 {
+            let b: char = loop {
+            };
+            let c: u64 = loop {
+                return loop {};
+            };
             let a = loop {};
             a
         }

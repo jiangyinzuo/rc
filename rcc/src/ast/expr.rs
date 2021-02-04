@@ -497,7 +497,7 @@ impl ExprVisit for AssignExpr {
 }
 
 from_token! {
-    #[derive(StrEnum, Debug, PartialEq)]
+    #[derive(StrEnum, PartialEq)]
     pub enum AssignOp {
         /// Compound assignment operators
         #[strenum("+=")]
@@ -533,6 +533,12 @@ from_token! {
         /// Assignment operators
         #[strenum("=")]
         Eq,
+    }
+}
+
+impl Debug for AssignOp {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        <Self as std::fmt::Display>::fmt(self, f)
     }
 }
 
