@@ -60,27 +60,34 @@ impl Scope {
     }
 
     pub fn find_variable(&mut self, ident: &str) -> Option<&VarInfo> {
-        if let Some(v) = self.variables.get(ident) {
-            let mut left = 0;
-            let mut right = v.len();
-            if right == 1 {
-                return Some(unsafe {v.get_unchecked(0)});
-            }
-            while left < right {
-                let mid = (left + right + 1) / 2;
-                let stmt_id = unsafe { (*v.get_unchecked(mid)).stmt_id() };
-                // Let stmt and variable using stmt is impossible to be the same.
-                debug_assert_ne!(stmt_id, self.cur_stmt_id);
-                if self.cur_stmt_id < stmt_id {
-                    right = mid - 1;
-                } else {
-                    left = mid;
+        let mut cur_scope: *const Scope = self;
+        loop {
+            let s = unsafe { &*cur_scope };
+            if let Some(v) = s.variables.get(ident) {
+                let mut left = 0;
+                let mut right = v.len();
+                if right == 1 {
+                    return Some(unsafe {v.get_unchecked(0)});
                 }
+                while left < right {
+                    let mid = (left + right + 1) / 2;
+                    let stmt_id = unsafe { (*v.get_unchecked(mid)).stmt_id() };
+                    // Let stmt and variable using stmt is impossible to be the same.
+                    debug_assert_ne!(stmt_id, self.cur_stmt_id);
+                    if self.cur_stmt_id < stmt_id {
+                        right = mid - 1;
+                    } else {
+                        left = mid;
+                    }
+                }
+                return Some(unsafe { v.get_unchecked(left) });
+            } else if let Some(f) = s.father {
+                cur_scope = f.as_ptr();
+            } else {
+                return None;
             }
-            Some(unsafe { v.get_unchecked(left) })
-        } else {
-            None
         }
+
     }
 
     pub fn find_def_except_fn(&self, ident: &str) -> TypeInfo {

@@ -1,4 +1,5 @@
-use crate::ast::expr::Expr;
+use crate::ast::expr::Expr::{Block, For, If, Loop, While};
+use crate::ast::expr::{BlockExpr, Expr, IfExpr, LoopExpr, WhileExpr};
 use crate::ast::item::Item;
 use crate::ast::pattern::Pattern;
 use crate::ast::stmt::{LetStmt, Stmt};
@@ -14,11 +15,28 @@ pub(super) enum StmtOrExpr {
     Expr(Expr),
 }
 
+impl Expr {
+    pub fn parse_with_block(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+        debug_assert!(Self::is_with_block_token_start(cursor.next_token()?));
+        match cursor.next_token()? {
+            Token::LeftCurlyBraces => Ok(Block(BlockExpr::parse(cursor)?)),
+            Token::While => Ok(While(WhileExpr::parse(cursor)?)),
+            Token::Loop => Ok(Loop(LoopExpr::parse(cursor)?)),
+            Token::For => todo!("parse for expr"),
+            Token::If => Ok(If(IfExpr::parse(cursor)?)),
+            Token::Match => todo!("parse match expr"),
+            _ => unreachable!(),
+        }
+    }
+}
+
 /// Stmt -> Semi
 ///       | LetStmt
 ///       | Item
 ///       | ExprStmt
-pub(super) fn parse_stmt_or_expr_without_block(cursor: &mut ParseCursor) -> Result<StmtOrExpr, RccError> {
+pub(super) fn parse_stmt_or_expr_without_block(
+    cursor: &mut ParseCursor,
+) -> Result<StmtOrExpr, RccError> {
     Ok(StmtOrExpr::Stmt(match cursor.next_token()? {
         Token::Semi => {
             cursor.bump_token()?;
@@ -26,9 +44,13 @@ pub(super) fn parse_stmt_or_expr_without_block(cursor: &mut ParseCursor) -> Resu
         }
         Token::Let => Stmt::Let(LetStmt::parse(cursor)?),
         tk if Item::is_token_start(tk) => Stmt::Item(Item::parse(cursor)?),
+        tk if Expr::is_with_block_token_start(tk) => {
+            Stmt::ExprStmt(Expr::parse_with_block(cursor)?)
+        }
         tk if Expr::is_token_start(tk) => {
             let expr = Expr::parse(cursor)?;
-            if !expr.with_block() && !cursor.eat_token_if_eq(Token::Semi) {
+            debug_assert!(!expr.with_block());
+            if !cursor.eat_token_if_eq(Token::Semi) {
                 return Ok(StmtOrExpr::Expr(expr));
             }
             Stmt::ExprStmt(expr)

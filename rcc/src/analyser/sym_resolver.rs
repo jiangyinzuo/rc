@@ -9,6 +9,7 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
+use crate::ast::item::Item::Type;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
@@ -16,6 +17,7 @@ use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
+use std::any::Any;
 use std::collections::{HashMap, HashSet};
 use std::ptr::NonNull;
 
@@ -184,6 +186,10 @@ impl TypeInfo {
     pub fn is_unknown(&self) -> bool {
         self == &TypeInfo::Unknown
     }
+
+    pub fn is_never(&self) -> bool {
+        self == &TypeInfo::Never
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -270,6 +276,40 @@ impl<'ast> SymbolResolver<'ast> {
                 }
                 Unknown
             }
+            BinOperator::Percent => {
+                todo!()
+            }
+            BinOperator::Lt
+            | BinOperator::Gt
+            | BinOperator::Le
+            | BinOperator::Ge
+            | BinOperator::EqEq
+            | BinOperator::Ne => {
+                if let TypeInfo::LitNum(l_lit) = l_type {
+                    if let TypeInfo::LitNum(r_lit) = r_type {
+                        return if l_lit == r_lit {
+                            TypeInfo::Bool
+                        } else if l_lit == TypeLitNum::I && r_lit.is_integer()
+                            || l_lit == TypeLitNum::F && r_lit.is_float()
+                        {
+                            if let Expr::LitNum(expr) = lhs {
+                                expr.ret_type = r_lit;
+                            }
+                            TypeInfo::Bool
+                        } else if r_lit == TypeLitNum::I && l_lit.is_integer()
+                            || r_lit == TypeLitNum::F && l_lit.is_float()
+                        {
+                            if let Expr::LitNum(expr) = rhs {
+                                expr.ret_type = l_lit;
+                            }
+                            TypeInfo::Bool
+                        } else {
+                            Unknown
+                        };
+                    }
+                }
+                Unknown
+            }
             BinOperator::And | BinOperator::Or | BinOperator::Caret => {
                 if let TypeInfo::LitNum(l_lit) = l_type {
                     if let TypeInfo::LitNum(r_lit) = r_type {
@@ -289,18 +329,21 @@ impl<'ast> SymbolResolver<'ast> {
                             Unknown
                         };
                     }
-                } else if l_type.is(&TypeInfo::Bool) && r_type.is(&TypeInfo::Bool) {
+                } else if l_type == TypeInfo::Bool && r_type == TypeInfo::Bool {
                     return TypeInfo::Bool;
                 }
                 Unknown
             }
             BinOperator::AndAnd | BinOperator::OrOr => {
+                // if loop {} && true {}
                 if l_type.is(&TypeInfo::Bool) && r_type.is(&TypeInfo::Bool) {
                     return TypeInfo::Bool;
                 }
                 Unknown
             }
-            op => unimplemented!("{}", op),
+            BinOperator::As => {
+                todo!()
+            }
         }
     }
 
@@ -421,6 +464,14 @@ impl<'ast> SymbolResolver<'ast> {
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
                 self.visit_expr(expr)?;
+                let type_info = expr.type_info();
+                if type_info != TypeInfo::Unit && !type_info.is_never() {
+                    return Err(format!(
+                        "invalid type for expr stmt: expected `()`, found {:?}",
+                        type_info
+                    )
+                    .into());
+                }
                 Ok(())
             }
         }
@@ -489,7 +540,7 @@ impl<'ast> SymbolResolver<'ast> {
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
             // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
             Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr),
-            // Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr),
+            Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr),
             // Expr::Array(array_expr) => self.visit_array_expr(array_expr),
             // Expr::ArrayIndex(array_index_expr) => self.visit_array_index_expr(array_index_expr),
             // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
@@ -727,7 +778,13 @@ impl<'ast> SymbolResolver<'ast> {
         {
             Ok(())
         } else {
-            Err(format!("invalid operand for `{:?}`", bin_op_expr.bin_op).into())
+            Err(format!(
+                "invalid operand type `{:?}` and `{:?}` for `{:?}`",
+                bin_op_expr.lhs.type_info(),
+                bin_op_expr.rhs.type_info(),
+                bin_op_expr.bin_op
+            )
+            .into())
         }
     }
 
@@ -779,6 +836,14 @@ impl<'ast> SymbolResolver<'ast> {
             _ => unreachable!("callable type can only be fn_ptr or fn"),
         };
 
+        if call_expr.call_params.len() != type_fn_ptr.params.len() {
+            return Err(format!(
+                "This function takes {} parameters but {} parameters was supplied",
+                type_fn_ptr.params.len(),
+                call_expr.call_params.len(),
+            )
+            .into());
+        }
         for (expr, param) in call_expr
             .call_params
             .iter_mut()
@@ -787,33 +852,15 @@ impl<'ast> SymbolResolver<'ast> {
             self.visit_expr(expr)?;
             let excepted_info = TypeInfo::from_type_anno(param, unsafe { &*self.cur_scope });
 
-            fn check_and_change_type_info(
-                expr_chg: &mut Expr,
-                excepted_info: &TypeInfo,
-            ) -> Result<(), RccError> {
-                if !expr_chg.type_info().is(excepted_info) {
-                    if let Expr::LitNum(lit_expr) = expr_chg {
-                        if let TypeInfo::LitNum(p) = excepted_info {
-                            if lit_expr.ret_type == TypeLitNum::I && p.is_integer()
-                                || lit_expr.ret_type == TypeLitNum::F && p.is_integer()
-                            {
-                                lit_expr.ret_type = *p;
-                                return Ok(());
-                            }
-                        }
-                    }
-                    Err(format!(
-                        "invalid type: expected {:?}, found: {:?}",
-                        excepted_info,
-                        expr_chg.type_info()
-                    )
-                    .into())
-                } else {
-                    Ok(())
-                }
+            Self::try_determine_number_type(&excepted_info, expr);
+            let actual_info = expr.type_info();
+            if !actual_info.is(&excepted_info) {
+                return Err(format!(
+                    "invalid type for call expr: expected {:?}, found: {:?}",
+                    excepted_info, actual_info
+                )
+                .into());
             }
-
-            check_and_change_type_info(expr, &excepted_info)?;
         }
         call_expr.type_info =
             TypeInfo::from_type_anno(&type_fn_ptr.ret_type, unsafe { &*self.cur_scope });
@@ -882,10 +929,28 @@ impl<'ast> SymbolResolver<'ast> {
             }
         }
 
+        let mut block_type = TypeInfo::Unknown;
         for block in if_expr.blocks.iter_mut() {
             self.visit_block_expr(block)?;
+            let type_info = block.type_info();
+            debug_assert_ne!(TypeInfo::Unknown, type_info);
+            if block_type != TypeInfo::Unknown && !block_type.eq_or_never(&type_info) {
+                return Err(format!(
+                    "different type of if block: `{:?}`, `{:?}`",
+                    block_type, type_info
+                )
+                .into());
+            }
+            if type_info != TypeInfo::Never {
+                block_type = type_info;
+            }
         }
 
+        if_expr.set_type_info(if block_type == TypeInfo::Unknown {
+            TypeInfo::Never
+        } else {
+            block_type
+        });
         Ok(())
     }
 

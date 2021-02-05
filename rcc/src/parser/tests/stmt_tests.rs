@@ -1,9 +1,13 @@
-use crate::ast::expr::Expr;
+use crate::ast::expr::Expr::{Block, LitBool, Loop};
+use crate::ast::expr::UnOp::Borrow;
+use crate::ast::expr::{BlockExpr, Expr, LoopExpr, UnAryExpr, UnOp};
 use crate::ast::pattern::IdentPattern;
 use crate::ast::pattern::Pattern::Identifier;
+use crate::ast::stmt::Stmt::ExprStmt;
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
 use crate::parser::tests::{get_parser, parse_validate};
+use crate::parser::Parse;
 use crate::rcc::RccError;
 
 #[test]
@@ -50,5 +54,18 @@ fn not_end_with_semicolon() {
             Err("EOF token".into()),
             Err("EOF token".into()),
         ],
+    );
+}
+
+#[test]
+fn expr_stmt_test() {
+    let mut cursor = get_parser("{loop {} & true}");
+    let res = Expr::parse(&mut cursor);
+    assert_eq!(
+        res,
+        Ok(Expr::Block(
+            BlockExpr::from(vec![ExprStmt(Expr::Loop(LoopExpr::new(BlockExpr::new()))),])
+                .expr_without_block(Expr::Unary(UnAryExpr::new(UnOp::Borrow, LitBool(true))))
+        ))
     );
 }

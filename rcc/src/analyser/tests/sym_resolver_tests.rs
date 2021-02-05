@@ -51,18 +51,26 @@ fn let_stmt_add_ident_test() {
 
 #[test]
 fn type_annotation_test() {
-    file_validate(&[
-        r#"
+    file_validate(
+        &[
+            r#"
         fn foo() {
             let a: char = 'c';
             let b: i64 = 34;
             let b: i128 = 33i128;
         }
-    "#, r#"
+    "#,
+            r#"
         fn foo() {
             let a: i32 = 4i64;
         }
-    "#], &[Ok(()), Err("invalid type in let stmt: expected `LitNum(i32)`, found `LitNum(i64)`".into())]);
+    "#,
+        ],
+        &[
+            Ok(()),
+            Err("invalid type in let stmt: expected `LitNum(i32)`, found `LitNum(i64)`".into()),
+        ],
+    );
 }
 
 #[test]
@@ -144,7 +152,7 @@ fn assign_expr_test() {
         ],
         &[
             Ok(()),
-            Err("invalid operand for `-`".into()),
+            Err("invalid operand type `LitNum(i32)` and `LitNum(i64)` for `-`".into()),
             Err("lhs is not mutable".into()),
             Err("invalid type `LitNum(#i)` for `^=`".into()),
         ],
@@ -242,7 +250,9 @@ fn return_test() {
 
 #[test]
 fn never_type_test() {
-    file_validate(&[r#"
+    file_validate(
+        &[
+            r#"
         fn foo() -> i32 {
             let b: char = loop {
             };
@@ -252,9 +262,12 @@ fn never_type_test() {
             let a = loop {};
             a
         }
-    "#, r#"
+    "#,
+            r#"
         fn foo() -> i64 {
-            if loop {} && true {
+            let b = !false;
+            if b && true {
+                if loop {} && false {}
                 loop {
                     return 3;
                 }
@@ -262,5 +275,88 @@ fn never_type_test() {
                 return loop {}
             }
         }
-    "#], &[Ok(()), Ok(())]);
+    "#,
+            r#"fn foo() -> bool{ let a = loop{};a&true}"#,
+            r#"
+        fn add() {
+            let a = loop {} + 1;
+        }
+    "#,
+        ],
+        &[
+            Ok(()),
+            Ok(()),
+            Err("invalid operand type `Never` and `Bool` for `&`".into()),
+            Err("invalid operand type `Never` and `LitNum(#i)` for `+`".into()),
+        ],
+    );
+}
+
+#[test]
+fn control_flow_test() {
+    file_validate(
+        &[r#"
+        fn guess(mid: i32) -> i32 {
+            mid
+        }
+        fn foo123() -> i32 {
+            let actual_value = 23 + 4 - 5 + 6 - 77 + 77;
+            let mut left = 0;
+            let mut right = 100;
+            while left < right {
+                let mid = (left + right) / 2;
+                if guess(mid) < actual_value {
+                    left = mid + 1;
+                } else if guess(mid) > actual_value {
+                    right = mid - 1;
+                } else {
+                    return actual_value;
+                }
+            }
+            return -1;
+        }
+    "#],
+        &[Ok(())],
+    );
+}
+
+#[test]
+fn call_test() {
+    file_validate(
+        &[
+            r#"
+        fn add(a: i32, b: i32) -> i32 {a+b}
+        fn foo() {}
+        fn main() {
+            let a = foo();
+            let b = add(1, 2);
+            let c: i32 = b + 3i32;
+        }
+    "#,
+            r#"fn foo(a: i32) {}
+        fn main() {
+            foo(3i64);
+        }
+    "#,
+            r#"
+                fn foo() {
+                }
+                fn add() {
+                    foo(3);
+                }
+            "#,
+            r#"
+                fn main() {
+                    let a = 1;
+                    a();
+                }
+            "#
+        ],
+        &[
+            Ok(()),
+            Err("invalid type for call expr: expected LitNum(i32), found: LitNum(i64)".into()),
+            Err("This function takes 0 parameters but 1 parameters was supplied".into()),
+            Err("expr is not callable".into()),
+        ],
+    );
 }

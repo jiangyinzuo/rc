@@ -72,6 +72,18 @@ impl Expr {
             Self::Block(_) | Self::Struct(_) | Self::While(_) |
             Self::Loop(_)  | Self::If(_) | Self::Match | Self::For)
     }
+    pub fn is_with_block_token_start(tk: &Token) -> bool {
+        matches!(
+            tk,
+            Token::LeftCurlyBraces
+                | Token::While
+                | Token::Loop
+                | Token::For
+                | Token::If
+                | Token::Match
+        )
+    }
+
 }
 
 impl From<&str> for Expr {
@@ -93,7 +105,7 @@ impl ExprVisit for Expr {
             Self::Assign(e) => e.type_info(),
             // Self::Range(e) => e.ret_type(),
             Self::BinOp(e) => e.type_info(),
-            // Self::Grouped(e) => e.ret_type(),
+            Self::Grouped(e) => e.type_info(),
             // Self::Array(e) => e.ret_type(),
             // Self::ArrayIndex(e) => e.ret_type(),
             // Self::Tuple(e) => e.ret_type(),
@@ -120,6 +132,7 @@ impl ExprVisit for Expr {
             Self::Block(b) => b.kind(),
             Self::Assign(a) => a.kind(),
             Self::BinOp(b) => b.kind(),
+            Self::Grouped(e) => e.kind(),
             Self::Call(c) => c.kind(),
             Self::While(w) => w.kind(),
             Self::Loop(l) => l.kind(),
@@ -139,6 +152,7 @@ impl TypeInfoSetter for Expr {
                 TypeInfo::LitNum(new_type) => l.ret_type = new_type,
                 _ => unreachable!("can not change lit num to other type"),
             },
+            Self::Unary(u) => u.set_type_info(type_info),
             e => unimplemented!("set type_info on {:?}", e),
         }
     }
@@ -424,6 +438,12 @@ impl TokenStart for UnAryExpr {
             tk,
             Token::Not | Token::Star | Token::Minus | Token::And | Token::AndAnd
         )
+    }
+}
+
+impl TypeInfoSetter for UnAryExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info = type_info;
     }
 }
 
@@ -903,6 +923,13 @@ impl ExprVisit for IfExpr {
         ExprKind::Value
     }
 }
+
+impl TypeInfoSetter for IfExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info = type_info; 
+    }
+}
+
 
 #[derive(Debug, PartialEq)]
 pub struct WhileExpr(pub Box<Expr>, pub Box<BlockExpr>);
