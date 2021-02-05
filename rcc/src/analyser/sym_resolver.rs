@@ -465,7 +465,7 @@ impl<'ast> SymbolResolver<'ast> {
             Stmt::ExprStmt(expr) => {
                 self.visit_expr(expr)?;
                 let type_info = expr.type_info();
-                if type_info != TypeInfo::Unit && !type_info.is_never() {
+                if expr.with_block() && type_info != TypeInfo::Unit && !type_info.is_never() {
                     return Err(format!(
                         "invalid type for expr stmt: expected `()`, found {:?}",
                         type_info
