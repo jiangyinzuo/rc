@@ -2,9 +2,6 @@ use std::fmt::Debug;
 use crate::ir::Opcode::Ret;
 use crate::ast::types::TypeAnnotation;
 
-pub mod ir_gen;
-mod tests;
-
 #[derive(Debug, PartialEq)]
 pub enum Opcode {
     Ret

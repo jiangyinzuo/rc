@@ -8,23 +8,31 @@ use crate::ast::{FromToken, TokenStart};
 use crate::from_token;
 use crate::lexer::token::Token;
 use crate::rcc::RccError;
+use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
+use std::ops::Deref;
+use std::rc::Rc;
 use std::str::FromStr;
 use strenum::StrEnum;
+use std::borrow::BorrowMut;
 
 pub trait ExprVisit {
-    fn type_info(&self) -> TypeInfo;
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>>;
+
     /// mutable place expr, immutable place expr or value expr
     fn kind(&self) -> ExprKind;
 
     fn is_callable(&self) -> bool {
-        matches!(self.type_info(), TypeInfo::Fn {..} | TypeInfo::FnPtr(_))
+        let type_info = self.type_info();
+        let t = type_info.deref().borrow();
+        matches!(t.deref(), &TypeInfo::Fn {..} | &TypeInfo::FnPtr(_))
     }
 }
 
 pub trait TypeInfoSetter {
     fn set_type_info(&mut self, type_info: TypeInfo);
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>);
 }
 
 #[derive(Debug, PartialEq, Copy, Clone)]
@@ -83,7 +91,6 @@ impl Expr {
                 | Token::Match
         )
     }
-
 }
 
 impl From<&str> for Expr {
@@ -93,13 +100,13 @@ impl From<&str> for Expr {
 }
 
 impl ExprVisit for Expr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         match self {
             Self::Path(e) => e.type_info(),
-            Self::LitStr(_) => TypeInfo::ref_str(),
-            Self::LitChar(_) => TypeInfo::Char,
-            Self::LitBool(_) => TypeInfo::Bool,
-            Self::LitNum(ln) => TypeInfo::LitNum(ln.ret_type),
+            Self::LitStr(_) => Rc::new(RefCell::new(TypeInfo::ref_str())),
+            Self::LitChar(_) => Rc::new(RefCell::new(TypeInfo::Char)),
+            Self::LitBool(_) => Rc::new(RefCell::new(TypeInfo::Bool)),
+            Self::LitNum(ln) => ln.type_info(),
             Self::Unary(e) => e.type_info(),
             Self::Block(e) => e.type_info(),
             Self::Assign(e) => e.type_info(),
@@ -147,12 +154,23 @@ impl ExprVisit for Expr {
 impl TypeInfoSetter for Expr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
         match self {
-            Self::Path(p) => p.type_info = type_info,
-            Self::LitNum(l) => match type_info {
-                TypeInfo::LitNum(new_type) => l.ret_type = new_type,
-                _ => unreachable!("can not change lit num to other type"),
-            },
+            Self::Path(p) => {
+                p.type_info.borrow_mut().replace( type_info);
+            }
+            Self::LitNum(l) => {
+                l.set_type_info(type_info);
+            }
             Self::Unary(u) => u.set_type_info(type_info),
+            e => unimplemented!("set type_info on {:?}", e),
+        }
+    }
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        match self {
+            Self::Path(p) => {}
+            Self::LitNum(l) => {
+                l.set_type_info_ref(type_info);
+            }
+            Self::Unary(u) => u.set_type_info_ref(type_info),
             e => unimplemented!("set type_info on {:?}", e),
         }
     }
@@ -188,17 +206,26 @@ impl LhsExpr {
 
     pub fn set_type_info(&mut self, type_info: TypeInfo) {
         match self {
-            Self::Path(p) => p.type_info = type_info,
+            Self::Path(p) => {
+                p.type_info.replace(type_info);
+            }
             Self::ArrayIndex(a) => unimplemented!("set array index type info"),
             Self::TupleIndex(t) => unimplemented!("set tuple index type info"),
             Self::FieldAccess(f) => unimplemented!("set tuple field type info"),
             Self::Deref(e) => unimplemented!("set tuple deref type info"),
         }
     }
+
+    pub fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        match self {
+            LhsExpr::Path(p) => p.set_type_info_ref(type_info),
+            _ => todo!(),
+        }
+    }
 }
 
 impl ExprVisit for LhsExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         match self {
             LhsExpr::Path(expr) => expr.type_info(),
             _ => todo!(),
@@ -251,11 +278,11 @@ pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
     pub expr_without_block: Option<Box<Expr>>,
     pub scope: Scope,
-    type_info: TypeInfo,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl ExprVisit for BlockExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
@@ -266,6 +293,10 @@ impl ExprVisit for BlockExpr {
 
 impl TypeInfoSetter for BlockExpr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info.replace(type_info);
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
         self.type_info = type_info;
     }
 }
@@ -291,7 +322,7 @@ impl BlockExpr {
             stmts: vec![],
             expr_without_block: None,
             scope: Scope::new(),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 
@@ -308,39 +339,62 @@ impl From<Vec<Stmt>> for BlockExpr {
             stmts,
             expr_without_block: None,
             scope: Scope::new(),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 }
 
 #[derive(PartialEq, Debug)]
 pub struct LitNumExpr {
-    pub ret_type: TypeLitNum,
     pub value: String,
+    pub type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl LitNumExpr {
     pub fn new(value: String, ret_type: TypeLitNum) -> LitNumExpr {
-        LitNumExpr { value, ret_type }
+        LitNumExpr {
+            value,
+            type_info: Rc::new(RefCell::new(TypeInfo::LitNum(ret_type))),
+        }
     }
 
     pub fn integer(value: String) -> LitNumExpr {
         LitNumExpr {
-            ret_type: TypeLitNum::I,
+            type_info: Rc::new(RefCell::new(TypeInfo::LitNum(TypeLitNum::I))),
             value,
         }
     }
 
     pub fn ret_type(mut self, ret_type: TypeLitNum) -> LitNumExpr {
-        self.ret_type = ret_type;
+        self.type_info = Rc::new(RefCell::new(TypeInfo::LitNum(ret_type)));
         self
+    }
+}
+
+impl ExprVisit for LitNumExpr {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        self.type_info.clone()
+    }
+
+    fn kind(&self) -> ExprKind {
+        unimplemented!()
+    }
+}
+
+impl TypeInfoSetter for LitNumExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info.replace(type_info);
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        self.type_info = type_info;
     }
 }
 
 impl From<i32> for LitNumExpr {
     fn from(num: i32) -> Self {
         LitNumExpr {
-            ret_type: TypeLitNum::I,
+            type_info: Rc::new(RefCell::new(TypeInfo::LitNum(TypeLitNum::I))),
             value: num.to_string(),
         }
     }
@@ -349,7 +403,7 @@ impl From<i32> for LitNumExpr {
 #[derive(PartialEq, Debug)]
 pub struct PathExpr {
     pub segments: Vec<String>,
-    pub type_info: TypeInfo,
+    pub type_info: Rc<RefCell<TypeInfo>>,
     pub expr_kind: ExprKind,
 }
 
@@ -357,14 +411,14 @@ impl PathExpr {
     pub fn new() -> Self {
         PathExpr {
             segments: vec![],
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
             expr_kind: ExprKind::Unknown,
         }
     }
 }
 
-impl ExprVisit for PathExpr {
-    fn type_info(&self) -> TypeInfo {
+impl PathExpr {
+    pub fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
@@ -373,11 +427,21 @@ impl ExprVisit for PathExpr {
     }
 }
 
+impl TypeInfoSetter for PathExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info.replace(type_info);
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        self.type_info = type_info;
+    }
+}
+
 impl From<Vec<String>> for PathExpr {
     fn from(segments: Vec<String>) -> Self {
         PathExpr {
             segments,
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
             expr_kind: ExprKind::Unknown,
         }
     }
@@ -387,7 +451,7 @@ impl From<Vec<&str>> for PathExpr {
     fn from(segments: Vec<&str>) -> Self {
         PathExpr {
             segments: segments.iter().map(|s| s.to_string()).collect(),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
             expr_kind: ExprKind::Unknown,
         }
     }
@@ -397,7 +461,7 @@ impl From<&str> for PathExpr {
     fn from(s: &str) -> Self {
         PathExpr {
             segments: s.split("::").map(|s| s.to_string()).collect(),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
             expr_kind: ExprKind::Unknown,
         }
     }
@@ -407,7 +471,7 @@ impl From<&str> for PathExpr {
 pub struct UnAryExpr {
     pub op: UnOp,
     pub expr: Box<Expr>,
-    pub type_info: TypeInfo,
+    type_info: Rc<RefCell<TypeInfo>>,
     pub expr_kind: ExprKind,
 }
 
@@ -416,14 +480,14 @@ impl UnAryExpr {
         UnAryExpr {
             op,
             expr: Box::new(expr),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
             expr_kind: ExprKind::Unknown,
         }
     }
 }
 
 impl ExprVisit for UnAryExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
@@ -443,6 +507,10 @@ impl TokenStart for UnAryExpr {
 
 impl TypeInfoSetter for UnAryExpr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info.replace(type_info);
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
         self.type_info = type_info;
     }
 }
@@ -507,8 +575,8 @@ impl AssignExpr {
 }
 
 impl ExprVisit for AssignExpr {
-    fn type_info(&self) -> TypeInfo {
-        TypeInfo::Unit
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        Rc::new(RefCell::new(TypeInfo::Unit))
     }
 
     fn kind(&self) -> ExprKind {
@@ -621,7 +689,7 @@ pub struct BinOpExpr {
     pub lhs: Box<Expr>,
     pub bin_op: BinOperator,
     pub rhs: Box<Expr>,
-    pub type_info: TypeInfo,
+    pub type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl BinOpExpr {
@@ -630,13 +698,13 @@ impl BinOpExpr {
             lhs: Box::new(lhs),
             bin_op,
             rhs: Box::new(rhs),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 }
 
 impl ExprVisit for BinOpExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
@@ -810,8 +878,8 @@ pub struct StructExpr;
 pub struct ReturnExpr(pub Option<Box<Expr>>);
 
 impl ExprVisit for ReturnExpr {
-    fn type_info(&self) -> TypeInfo {
-        TypeInfo::Never
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        Rc::new(RefCell::new(TypeInfo::Never))
     }
 
     fn kind(&self) -> ExprKind {
@@ -823,8 +891,8 @@ impl ExprVisit for ReturnExpr {
 pub struct BreakExpr(pub Option<Box<Expr>>);
 
 impl ExprVisit for BreakExpr {
-    fn type_info(&self) -> TypeInfo {
-        TypeInfo::Never
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        Rc::new(RefCell::new(TypeInfo::Never))
     }
 
     fn kind(&self) -> ExprKind {
@@ -836,7 +904,7 @@ impl ExprVisit for BreakExpr {
 pub struct CallExpr {
     pub expr: Box<Expr>,
     pub call_params: CallParams,
-    pub type_info: TypeInfo,
+    type_info: TypeInfo,
 }
 
 pub type CallParams = Vec<Expr>;
@@ -854,11 +922,15 @@ impl CallExpr {
         self.call_params = call_params;
         self
     }
+
+    pub fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info = type_info;
+    }
 }
 
 impl ExprVisit for CallExpr {
-    fn type_info(&self) -> TypeInfo {
-        self.type_info.clone()
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        Rc::new(RefCell::new(self.type_info.clone()))
     }
 
     fn kind(&self) -> ExprKind {
@@ -885,7 +957,7 @@ impl FieldAccessExpr {
 pub struct IfExpr {
     pub conditions: Vec<Expr>,
     pub blocks: Vec<BlockExpr>,
-    pub type_info: TypeInfo,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl IfExpr {
@@ -893,7 +965,7 @@ impl IfExpr {
         IfExpr {
             conditions: vec![],
             blocks: vec![],
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 
@@ -901,7 +973,7 @@ impl IfExpr {
         IfExpr {
             conditions,
             blocks,
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 
@@ -915,7 +987,7 @@ impl IfExpr {
 }
 
 impl ExprVisit for IfExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
@@ -926,17 +998,29 @@ impl ExprVisit for IfExpr {
 
 impl TypeInfoSetter for IfExpr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
-        self.type_info = type_info; 
+        self.type_info.replace(type_info.clone());
+        for t in self.blocks.iter_mut() {
+            let tp = t.type_info();
+            let tp1 = tp.borrow();
+            let tp2 = tp1.deref();
+            if tp2 != &TypeInfo::Never {
+                std::mem::drop(tp1);
+                t.set_type_info(type_info.clone());
+            }
+        }
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        self.type_info = type_info;
     }
 }
-
 
 #[derive(Debug, PartialEq)]
 pub struct WhileExpr(pub Box<Expr>, pub Box<BlockExpr>);
 
 impl ExprVisit for WhileExpr {
-    fn type_info(&self) -> TypeInfo {
-        TypeInfo::Unit
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
+        Rc::new(RefCell::new(TypeInfo::Unit))
     }
 
     fn kind(&self) -> ExprKind {
@@ -947,24 +1031,34 @@ impl ExprVisit for WhileExpr {
 #[derive(Debug, PartialEq)]
 pub struct LoopExpr {
     pub expr: Box<BlockExpr>,
-    pub type_info: TypeInfo,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl LoopExpr {
     pub fn new(expr: BlockExpr) -> LoopExpr {
         LoopExpr {
             expr: Box::new(expr),
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 }
 
 impl ExprVisit for LoopExpr {
-    fn type_info(&self) -> TypeInfo {
+    fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
     }
 
     fn kind(&self) -> ExprKind {
         ExprKind::Value
+    }
+}
+
+impl TypeInfoSetter for LoopExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info = Rc::new(RefCell::new(type_info));
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        self.type_info = type_info;
     }
 }

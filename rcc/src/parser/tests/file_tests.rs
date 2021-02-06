@@ -16,10 +16,7 @@ fn file_test() {
         "pi".into(),
         FnParams::new(),
         TypeAnnotation::Identifier("f64".into()),
-        BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
-            ret_type: TypeLitNum::F64,
-            value: "3.14".into(),
-        })),
+        BlockExpr::new().expr_without_block(LitNum(LitNumExpr::new("3.14".into(), TypeLitNum::F64))),
     ))]));
     assert_eq!(excepted, result);
 }

@@ -26,10 +26,7 @@ fn item_fn_test() {
                 "main".into(),
                 FnParams::new(),
                 "i32".into(),
-                BlockExpr::new().expr_without_block(LitNum(LitNumExpr {
-                    ret_type: TypeLitNum::I,
-                    value: "0".into(),
-                })),
+                BlockExpr::new().expr_without_block(LitNum(0.into())),
             ))),
             Ok(Item::Fn(ItemFn::new(
                 Priv,

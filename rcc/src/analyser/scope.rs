@@ -3,9 +3,11 @@ use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
 use lazy_static::lazy_static;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::ptr::NonNull;
+use std::rc::Rc;
 
 lazy_static! {
     pub static ref BULITIN_SCOPE: Scope = {
@@ -50,7 +52,7 @@ impl Scope {
         }
     }
 
-    pub fn add_variable(&mut self, ident: &str, kind: VarKind, type_info: TypeInfo) {
+    pub fn add_variable(&mut self, ident: &str, kind: VarKind, type_info: Rc<RefCell<TypeInfo>>) {
         let var_info = VarInfo::new(self.cur_stmt_id, kind, type_info);
         if let Some(v) = self.variables.get_mut(ident) {
             v.push(var_info);
@@ -67,7 +69,7 @@ impl Scope {
                 let mut left = 0;
                 let mut right = v.len();
                 if right == 1 {
-                    return Some(unsafe {v.get_unchecked(0)});
+                    return Some(unsafe { v.get_unchecked(0) });
                 }
                 while left < right {
                     let mid = (left + right + 1) / 2;
@@ -87,7 +89,6 @@ impl Scope {
                 return None;
             }
         }
-
     }
 
     pub fn find_def_except_fn(&self, ident: &str) -> TypeInfo {
@@ -95,9 +96,9 @@ impl Scope {
         loop {
             let s = unsafe { &*cur_scope };
             if let Some(ti) = s.types.get(ident) {
-                if let TypeInfo::Fn { .. } = ti {
-                } else {
-                    return ti.clone();
+                match ti {
+                    TypeInfo::Fn { .. } => {}
+                    _ => return ti.clone(),
                 }
             }
             if let Some(f) = s.father {

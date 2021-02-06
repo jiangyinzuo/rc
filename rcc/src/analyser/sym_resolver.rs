@@ -9,7 +9,6 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::Item::Type;
 use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
@@ -17,9 +16,11 @@ use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
-use std::any::Any;
+use std::cell::{Ref, RefCell};
 use std::collections::{HashMap, HashSet};
+use std::ops::Deref;
 use std::ptr::NonNull;
+use std::rc::Rc;
 
 #[derive(Debug, PartialEq)]
 pub enum VarKind {
@@ -33,11 +34,11 @@ pub enum VarKind {
 pub struct VarInfo {
     stmt_id: u64,
     kind: VarKind,
-    _type: TypeInfo,
+    _type: Rc<RefCell<TypeInfo>>,
 }
 
 impl VarInfo {
-    pub fn new(stmt_id: u64, kind: VarKind, _type: TypeInfo) -> VarInfo {
+    pub fn new(stmt_id: u64, kind: VarKind, _type: Rc<RefCell<TypeInfo>>) -> VarInfo {
         VarInfo {
             stmt_id,
             kind,
@@ -238,43 +239,47 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     /// return `TypeInfo::Unknown` if bin_op expr is invalid
-    fn primitive_bin_ops(lhs: &mut Expr, bin_op: BinOperator, rhs: &mut Expr) -> TypeInfo {
-        let l_type = lhs.type_info();
-        let r_type = rhs.type_info();
+    fn primitive_bin_ops(
+        lhs: &mut Expr,
+        bin_op: BinOperator,
+        rhs: &mut Expr,
+    ) -> Rc<RefCell<TypeInfo>> {
+        let l_type: Rc<RefCell<TypeInfo>> = lhs.type_info();
+        let r_type: Rc<RefCell<TypeInfo>> = rhs.type_info();
         match bin_op {
             // 3i64 << 2i32
             BinOperator::Shl | BinOperator::Shr => {
-                if l_type.is_integer() && r_type.is_integer() {
+                if l_type.borrow().deref().is_integer() && r_type.borrow().deref().is_integer() {
                     l_type
                 } else {
-                    Unknown
+                    Rc::new(RefCell::new(Unknown))
                 }
             }
             BinOperator::Plus | BinOperator::Minus | BinOperator::Star | BinOperator::Slash => {
-                if let TypeInfo::LitNum(l_lit) = l_type {
-                    if let TypeInfo::LitNum(r_lit) = r_type {
+                if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
+                    if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
                         return if l_lit == r_lit {
-                            l_type
-                        } else if l_lit == TypeLitNum::I && r_lit.is_integer()
-                            || l_lit == TypeLitNum::F && r_lit.is_float()
+                            l_type.clone()
+                        } else if l_lit == &TypeLitNum::I && r_lit.is_integer()
+                            || l_lit == &TypeLitNum::F && r_lit.is_float()
                         {
                             if let Expr::LitNum(expr) = lhs {
-                                expr.ret_type = r_lit;
+                                expr.set_type_info_ref(r_type.clone());
                             }
-                            r_type
-                        } else if r_lit == TypeLitNum::I && l_lit.is_integer()
-                            || r_lit == TypeLitNum::F && l_lit.is_float()
+                            r_type.clone()
+                        } else if r_lit == &TypeLitNum::I && l_lit.is_integer()
+                            || r_lit == &TypeLitNum::F && l_lit.is_float()
                         {
                             if let Expr::LitNum(expr) = rhs {
-                                expr.ret_type = l_lit;
+                                expr.set_type_info_ref(l_type.clone());
                             }
-                            l_type
+                            l_type.clone()
                         } else {
-                            Unknown
+                            Rc::new(RefCell::new(Unknown))
                         };
                     }
                 }
-                Unknown
+                Rc::new(RefCell::new(Unknown))
             }
             BinOperator::Percent => {
                 todo!()
@@ -285,61 +290,65 @@ impl<'ast> SymbolResolver<'ast> {
             | BinOperator::Ge
             | BinOperator::EqEq
             | BinOperator::Ne => {
-                if let TypeInfo::LitNum(l_lit) = l_type {
-                    if let TypeInfo::LitNum(r_lit) = r_type {
+                if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
+                    if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
                         return if l_lit == r_lit {
-                            TypeInfo::Bool
-                        } else if l_lit == TypeLitNum::I && r_lit.is_integer()
-                            || l_lit == TypeLitNum::F && r_lit.is_float()
+                            Rc::new(RefCell::new(TypeInfo::Bool))
+                        } else if l_lit == &TypeLitNum::I && r_lit.is_integer()
+                            || l_lit == &TypeLitNum::F && r_lit.is_float()
                         {
                             if let Expr::LitNum(expr) = lhs {
-                                expr.ret_type = r_lit;
+                                expr.set_type_info_ref(r_type.clone());
                             }
-                            TypeInfo::Bool
-                        } else if r_lit == TypeLitNum::I && l_lit.is_integer()
-                            || r_lit == TypeLitNum::F && l_lit.is_float()
+                            Rc::new(RefCell::new(TypeInfo::Bool))
+                        } else if r_lit == &TypeLitNum::I && l_lit.is_integer()
+                            || r_lit == &TypeLitNum::F && l_lit.is_float()
                         {
                             if let Expr::LitNum(expr) = rhs {
-                                expr.ret_type = l_lit;
+                                expr.set_type_info_ref(l_type.clone());
                             }
-                            TypeInfo::Bool
+                            Rc::new(RefCell::new(TypeInfo::Bool))
                         } else {
-                            Unknown
+                            Rc::new(RefCell::new(Unknown))
                         };
                     }
                 }
-                Unknown
+                Rc::new(RefCell::new(Unknown))
             }
             BinOperator::And | BinOperator::Or | BinOperator::Caret => {
-                if let TypeInfo::LitNum(l_lit) = l_type {
-                    if let TypeInfo::LitNum(r_lit) = r_type {
+                if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
+                    if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
                         return if l_lit == r_lit {
-                            l_type
-                        } else if l_lit == TypeLitNum::I && r_lit.is_integer() {
+                            l_type.clone()
+                        } else if l_lit == &TypeLitNum::I && r_lit.is_integer() {
                             if let Expr::LitNum(expr) = lhs {
-                                expr.ret_type = r_lit;
+                                expr.set_type_info_ref(l_type.clone());
                             }
-                            r_type
-                        } else if r_lit == TypeLitNum::I && l_lit.is_integer() {
+                            r_type.clone()
+                        } else if r_lit == &TypeLitNum::I && l_lit.is_integer() {
                             if let Expr::LitNum(expr) = rhs {
-                                expr.ret_type = l_lit;
+                                expr.set_type_info_ref(l_type.clone());
                             }
-                            l_type
+                            l_type.clone()
                         } else {
-                            Unknown
+                            Rc::new(RefCell::new(Unknown))
                         };
                     }
-                } else if l_type == TypeInfo::Bool && r_type == TypeInfo::Bool {
-                    return TypeInfo::Bool;
+                } else if l_type.borrow().deref() == &TypeInfo::Bool
+                    && r_type.borrow().deref() == &TypeInfo::Bool
+                {
+                    return Rc::new(RefCell::new(TypeInfo::Bool));
                 }
-                Unknown
+                Rc::new(RefCell::new(Unknown))
             }
             BinOperator::AndAnd | BinOperator::OrOr => {
                 // if loop {} && true {}
-                if l_type.is(&TypeInfo::Bool) && r_type.is(&TypeInfo::Bool) {
-                    return TypeInfo::Bool;
+                if l_type.borrow().deref().is(&TypeInfo::Bool)
+                    && r_type.borrow().deref().is(&TypeInfo::Bool)
+                {
+                    return Rc::new(RefCell::new(TypeInfo::Bool));
                 }
-                Unknown
+                Rc::new(RefCell::new(Unknown))
             }
             BinOperator::As => {
                 todo!()
@@ -379,14 +388,17 @@ impl<'ast> SymbolResolver<'ast> {
         expr: &mut (impl ExprVisit + TypeInfoSetter),
     ) {
         let type_info = expr.type_info();
+        let type_info = type_info.borrow();
+
         if expected_num_type.is_integer() && type_info.is_i()
             || expected_num_type.is_float() && type_info.is_f()
         {
+            std::mem::drop(type_info);
             expr.set_type_info(expected_num_type.clone());
         }
     }
 
-    fn validate_ret_type(&self, type_info: &mut TypeInfo) -> Result<(), RccError> {
+    fn validate_ret_type(&self, type_info: &TypeInfo) -> Result<(), RccError> {
         if type_info.is(&self.cur_fn_ret_type) {
             Ok(())
         } else {
@@ -435,14 +447,20 @@ impl<'ast> SymbolResolver<'ast> {
                     } else {
                         VarKind::Local
                     },
-                    TypeInfo::from_type_anno(&param._type, unsafe { &*self.cur_scope }),
+                    Rc::new(RefCell::new(TypeInfo::from_type_anno(
+                        &param._type,
+                        unsafe { &*self.cur_scope },
+                    ))),
                 ),
             }
         }
         self.visit_block_expr(&mut item_fn.fn_block)?;
         if item_fn.fn_block.expr_without_block.is_some() {
             Self::try_determine_number_type(&self.cur_fn_ret_type, &mut item_fn.fn_block);
-            self.validate_ret_type(&mut item_fn.fn_block.type_info())?;
+            let type_info = item_fn.fn_block.type_info();
+            let t = type_info.borrow();
+            let tp = t.deref();
+            self.validate_ret_type(tp)?;
         }
 
         // restore
@@ -464,8 +482,10 @@ impl<'ast> SymbolResolver<'ast> {
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
                 self.visit_expr(expr)?;
-                let type_info = expr.type_info();
-                if expr.with_block() && type_info != TypeInfo::Unit && !type_info.is_never() {
+                let t = expr.type_info();
+                let tp = t.borrow();
+                let type_info = tp.deref();
+                if expr.with_block() && type_info != &TypeInfo::Unit && !type_info.is_never() {
                     return Err(format!(
                         "invalid type for expr stmt: expected `()`, found {:?}",
                         type_info
@@ -484,7 +504,9 @@ impl<'ast> SymbolResolver<'ast> {
                 let anno_type_info =
                     TypeInfo::from_type_anno(type_anno, unsafe { &*self.cur_scope });
                 Self::try_determine_number_type(&anno_type_info, expr);
-                let expr_type_info = expr.type_info();
+                let t = expr.type_info();
+                let tp = t.borrow();
+                let expr_type_info = tp.deref();
                 if !expr_type_info.is(&anno_type_info) {
                     return Err(format!(
                         "invalid type in let stmt: expected `{:?}`, found `{:?}`",
@@ -495,7 +517,7 @@ impl<'ast> SymbolResolver<'ast> {
             }
             expr.type_info()
         } else {
-            Unknown
+            Rc::new(RefCell::new(Unknown))
         };
 
         match &let_stmt.pattern {
@@ -585,7 +607,7 @@ impl<'ast> SymbolResolver<'ast> {
             } else {
                 let type_info = cur_scope.find_fn(ident);
                 if !type_info.is_unknown() {
-                    path_expr.type_info = type_info;
+                    path_expr.set_type_info(type_info);
                     path_expr.expr_kind = ExprKind::Value;
                     Ok(())
                 } else {
@@ -602,36 +624,38 @@ impl<'ast> SymbolResolver<'ast> {
         let type_info = unary_expr.expr.type_info();
         match unary_expr.op {
             UnOp::Deref => {
-                if let TypeInfo::Ptr { kind: _, type_info } = type_info {
-                    unary_expr.type_info = *type_info;
+                if let TypeInfo::Ptr { kind: _, type_info } = type_info.borrow().deref() {
+                    unary_expr.set_type_info(*type_info.clone());
                     unary_expr.expr_kind = unary_expr.expr.kind();
                 } else {
                     return Err(format!("type `{:?}` can not be dereferenced", type_info).into());
                 }
             }
-            UnOp::Not => match type_info {
+            UnOp::Not => match type_info.borrow().deref() {
                 TypeInfo::Bool | TypeInfo::LitNum(_) => {
-                    unary_expr.type_info = type_info.clone();
+                    unary_expr.set_type_info_ref(type_info.clone());
                     unary_expr.expr_kind = ExprKind::Value;
                 }
                 t => {
                     return Err(format!("cannot apply unary operator `!` to type `{:?}`", t).into())
                 }
             },
-            UnOp::Neg => match type_info {
+            UnOp::Neg => match type_info.borrow().deref() {
                 TypeInfo::LitNum(_) => {
-                    unary_expr.type_info = type_info.clone();
+                    unary_expr.set_type_info_ref(type_info.clone());
                     unary_expr.expr_kind = ExprKind::Value;
                 }
-                t => {
-                    return Err(format!("cannot apply unary operator `-` to type `{:?}`", t).into())
+                tp => {
+                    return Err(
+                        format!("cannot apply unary operator `-` to type `{:?}`", tp).into(),
+                    )
                 }
             },
             UnOp::Borrow => {
-                unary_expr.type_info = TypeInfo::Ptr {
+                unary_expr.set_type_info(TypeInfo::Ptr {
                     kind: PtrKind::Ref,
-                    type_info: Box::new(type_info.clone()),
-                };
+                    type_info: Box::new(type_info.borrow().deref().clone()),
+                });
                 unary_expr.expr_kind = ExprKind::Value;
             }
             UnOp::BorrowMut => {
@@ -651,14 +675,17 @@ impl<'ast> SymbolResolver<'ast> {
             self.visit_expr(expr)?;
             unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
             let type_info = expr.type_info();
-            block_expr.set_type_info(type_info);
+            block_expr.set_type_info_ref(type_info);
         } else if block_expr.stmts.is_empty() {
             block_expr.set_type_info(TypeInfo::Unit);
         } else {
-            block_expr.set_type_info(match block_expr.stmts.last().unwrap() {
-                Stmt::Semi | Stmt::Let(_) | Stmt::Item(_) => TypeInfo::Unit,
-                Stmt::ExprStmt(e) => e.type_info(),
-            });
+            let last_stmt = block_expr.stmts.last().unwrap();
+            match last_stmt {
+                Stmt::Semi | Stmt::Let(_) | Stmt::Item(_) => {
+                    block_expr.set_type_info(TypeInfo::Unit);
+                }
+                Stmt::ExprStmt(e) => block_expr.set_type_info_ref(e.type_info()),
+            }
         }
 
         self.exit_block();
@@ -689,58 +716,66 @@ impl<'ast> SymbolResolver<'ast> {
                 let l_type = assign_expr.lhs.type_info();
                 let r_type = assign_expr.rhs.type_info();
 
-                debug_assert!(!r_type.is_unknown());
+                debug_assert!(!r_type.borrow().deref().is_unknown());
 
                 if matches!(assign_expr.assign_op, AssignOp::ShlEq | AssignOp::ShrEq) {
-                    return if l_type.is_integer() && r_type.is_integer() {
+                    return if l_type.borrow().deref().is_integer()
+                        && r_type.borrow().deref().is_integer()
+                    {
                         Ok(())
                     } else {
-                        invalid_type_error(&l_type, assign_expr)
+                        invalid_type_error(l_type.borrow().deref(), assign_expr)
                     };
                 }
 
                 // set type_info of lhs or rhs
 
                 // let mut a; a = 32;
-                if l_type.is_unknown() {
-                    assign_expr.lhs.set_type_info(r_type);
-                } else if !r_type.is(&l_type) {
-                    if l_type.is_integer() && r_type.is_integer() {
+                if l_type.borrow().deref().is_unknown() {
+                    assign_expr.lhs.set_type_info_ref(r_type);
+                } else if !r_type.borrow().deref().is(l_type.borrow().deref()) {
+                    if l_type.borrow().deref().is_integer() && r_type.borrow().deref().is_integer()
+                    {
                         // let mut a = 32; a = 64i128;
-                        if l_type.is_i() {
-                            assign_expr.lhs.set_type_info(r_type);
+                        if l_type.borrow().deref().is_i() {
+                            assign_expr.lhs.set_type_info_ref(r_type);
                         } else {
                             // let mut a: i64; a = 32;
-                            assign_expr.rhs.set_type_info(l_type);
+                            assign_expr.rhs.set_type_info_ref(l_type);
                         }
-                    } else if l_type.is_float() && r_type.is_float() {
+                    } else if l_type.borrow().deref().is_float()
+                        && r_type.borrow().deref().is_float()
+                    {
                         // let mut a = 32.3; a = 33f32;
-                        if l_type.is_f() {
-                            assign_expr.lhs.set_type_info(r_type);
+                        if l_type.borrow().deref().is_f() {
+                            assign_expr.lhs.set_type_info_ref(r_type);
                         } else {
                             // let mut a: f32; a = 33.2;
-                            assign_expr.rhs.set_type_info(l_type);
+                            assign_expr.rhs.set_type_info_ref(l_type);
                         }
                     } else {
-                        return invalid_type_error(&l_type, assign_expr);
+                        return invalid_type_error(l_type.borrow().deref(), assign_expr);
                     }
                 }
             }
         }
 
         debug_assert_eq!(assign_expr.lhs.type_info(), assign_expr.rhs.type_info());
-        let type_info = assign_expr.lhs.type_info();
+
+        let t = assign_expr.lhs.type_info();
+        let tp = t.borrow();
+        let type_info = tp.deref();
         // check compound assignment operators
         // TODO: operator override
         match assign_expr.assign_op {
             AssignOp::PlusEq | AssignOp::MinusEq | AssignOp::StarEq | AssignOp::SlashEq => {
                 if !type_info.is_number() {
-                    return invalid_type_error(&type_info, assign_expr);
+                    return invalid_type_error(type_info, assign_expr);
                 }
             }
             AssignOp::PercentEq | AssignOp::AndEq | AssignOp::OrEq | AssignOp::CaretEq => {
-                if !type_info.is_integer() && type_info != TypeInfo::Bool {
-                    return invalid_type_error(&type_info, assign_expr);
+                if !type_info.is_integer() && type_info != &TypeInfo::Bool {
+                    return invalid_type_error(type_info, assign_expr);
                 }
             }
             AssignOp::ShlEq | AssignOp::ShrEq => unreachable!(),
@@ -769,19 +804,21 @@ impl<'ast> SymbolResolver<'ast> {
             &mut bin_op_expr.rhs,
         );
         // primitive bin_op || override bin_op
-        if !bin_op_expr.type_info.is_unknown()
+        let tp = bin_op_expr.type_info.borrow();
+        let bin_type = tp.deref();
+        if !bin_type.is_unknown()
             || self.override_bin_ops.contains(&(
                 bin_op_expr.bin_op,
-                bin_op_expr.lhs.type_info(),
-                bin_op_expr.rhs.type_info(),
+                bin_op_expr.lhs.type_info().borrow().deref().clone(),
+                bin_op_expr.rhs.type_info().borrow().deref().clone(),
             ))
         {
             Ok(())
         } else {
             Err(format!(
                 "invalid operand type `{:?}` and `{:?}` for `{:?}`",
-                bin_op_expr.lhs.type_info(),
-                bin_op_expr.rhs.type_info(),
+                bin_op_expr.lhs.type_info().borrow().deref(),
+                bin_op_expr.rhs.type_info().borrow().deref(),
                 bin_op_expr.bin_op
             )
             .into())
@@ -829,8 +866,10 @@ impl<'ast> SymbolResolver<'ast> {
         if !call_expr.expr.is_callable() {
             return Err("expr is not callable".into());
         }
-
-        let type_fn_ptr = match call_expr.expr.type_info() {
+        let t = call_expr.expr.type_info();
+        let tp = t.borrow();
+        let type_info = tp.deref();
+        let type_fn_ptr = match type_info {
             TypeInfo::FnPtr(fn_ptr) => fn_ptr,
             TypeInfo::Fn { vis: _, inner } => inner,
             _ => unreachable!("callable type can only be fn_ptr or fn"),
@@ -853,7 +892,9 @@ impl<'ast> SymbolResolver<'ast> {
             let excepted_info = TypeInfo::from_type_anno(param, unsafe { &*self.cur_scope });
 
             Self::try_determine_number_type(&excepted_info, expr);
-            let actual_info = expr.type_info();
+            let t = expr.type_info();
+            let tp = t.borrow();
+            let actual_info = tp.deref();
             if !actual_info.is(&excepted_info) {
                 return Err(format!(
                     "invalid type for call expr: expected {:?}, found: {:?}",
@@ -862,8 +903,9 @@ impl<'ast> SymbolResolver<'ast> {
                 .into());
             }
         }
-        call_expr.type_info =
-            TypeInfo::from_type_anno(&type_fn_ptr.ret_type, unsafe { &*self.cur_scope });
+        call_expr.set_type_info(TypeInfo::from_type_anno(&type_fn_ptr.ret_type, unsafe {
+            &*self.cur_scope
+        }));
         Ok(())
     }
 
@@ -879,8 +921,9 @@ impl<'ast> SymbolResolver<'ast> {
         // store loop kind
         self.loop_kind_stack.push(self.loop_kind);
         self.loop_kind = LoopKind::While;
-
-        let cond_type = while_expr.0.type_info();
+        let type_info = while_expr.0.type_info();
+        let t = type_info.borrow();
+        let cond_type = t.deref();
         if !cond_type.is(&TypeInfo::Bool) {
             return Err(format!(
                 "invalid type in while condition: expected `bool`, found {:?}",
@@ -899,8 +942,11 @@ impl<'ast> SymbolResolver<'ast> {
         self.loop_kind = LoopKind::Loop(loop_expr);
         self.visit_block_expr(&mut loop_expr.expr)?;
         // never return, example: `let a = loop {};`
-        if loop_expr.type_info.is_unknown() {
-            loop_expr.type_info = TypeInfo::Never;
+        let t = loop_expr.type_info();
+        let tp = t.borrow();
+        let type_info = tp.deref();
+        if type_info.is_unknown() {
+            loop_expr.set_type_info(TypeInfo::Never);
         }
         self.exit_loop();
         Ok(())
@@ -919,7 +965,9 @@ impl<'ast> SymbolResolver<'ast> {
 
         for cond in if_expr.conditions.iter_mut() {
             self.visit_expr(cond)?;
-            let cond_type_info = cond.type_info();
+            let t = cond.type_info();
+            let tp = t.borrow();
+            let cond_type_info = tp.deref();
             if !cond_type_info.is(&TypeInfo::Bool) {
                 return Err(format!(
                     "invalid type of condition expr: expected `bool`, found: {:?}",
@@ -933,16 +981,20 @@ impl<'ast> SymbolResolver<'ast> {
         for block in if_expr.blocks.iter_mut() {
             self.visit_block_expr(block)?;
             let type_info = block.type_info();
-            debug_assert_ne!(TypeInfo::Unknown, type_info);
-            if block_type != TypeInfo::Unknown && !block_type.eq_or_never(&type_info) {
+            let t = type_info.borrow();
+            let tp = t.deref();
+            debug_assert_ne!(&TypeInfo::Unknown, type_info.borrow().deref());
+
+            if block_type != TypeInfo::Unknown && !block_type.eq_or_never(tp) {
                 return Err(format!(
                     "different type of if block: `{:?}`, `{:?}`",
                     block_type, type_info
                 )
                 .into());
             }
-            if type_info != TypeInfo::Never {
-                block_type = type_info;
+
+            if tp != &TypeInfo::Never {
+                block_type = tp.clone();
             }
         }
 
@@ -955,31 +1007,37 @@ impl<'ast> SymbolResolver<'ast> {
     }
 
     fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<(), RccError> {
-        let mut ret_type = match return_expr.0.as_mut() {
+        match return_expr.0.as_mut() {
             Some(expr) => {
                 self.visit_expr(expr)?;
                 Self::try_determine_number_type(&self.cur_fn_ret_type, expr.as_mut());
-                expr.type_info()
+                let type_info = expr.type_info();
+                let t = type_info.borrow();
+                let tp = t.deref();
+                self.validate_ret_type(tp)
             }
-            None => TypeInfo::Unit,
-        };
-        self.validate_ret_type(&mut ret_type)
+            None => self.validate_ret_type(&TypeInfo::Unit),
+        }
     }
 
     fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<(), RccError> {
         fn try_set_type_info(
             loop_expr: *mut LoopExpr,
-            type_info: TypeInfo,
+            type_info: Rc<RefCell<TypeInfo>>,
         ) -> Result<(), RccError> {
+            let tp = type_info.borrow();
+            let t = tp.deref();
             let loop_expr = unsafe { &mut *loop_expr };
-
-            if loop_expr.type_info.is_unknown() {
-                loop_expr.type_info = type_info;
+            let l = loop_expr.type_info();
+            let lt = l.borrow();
+            let loop_type_info = lt.deref();
+            if loop_type_info.is_unknown() {
+                loop_expr.set_type_info_ref(type_info.clone());
                 Ok(())
-            } else if !type_info.is(&loop_expr.type_info) {
+            } else if !t.is(loop_type_info) {
                 Err(format!(
                     "invalid type for break expr: expected `{:?}`, found {:?}",
-                    loop_expr.type_info, type_info
+                    loop_type_info, t
                 )
                 .into())
             } else {
@@ -996,7 +1054,7 @@ impl<'ast> SymbolResolver<'ast> {
                 LoopKind::Loop(loop_expr) => {
                     self.visit_expr(expr)?;
                     Self::try_determine_number_type(
-                        unsafe { &(*loop_expr).type_info() },
+                        unsafe { (*loop_expr).type_info().borrow().deref() },
                         expr.as_mut(),
                     );
                     try_set_type_info(loop_expr, expr.type_info())
@@ -1004,7 +1062,7 @@ impl<'ast> SymbolResolver<'ast> {
                 _ => Err("only loop can return values".into()),
             };
         } else if let LoopKind::Loop(loop_expr) = self.loop_kind {
-            return try_set_type_info(loop_expr, TypeInfo::Unit);
+            return try_set_type_info(loop_expr, Rc::new(RefCell::new(TypeInfo::Unit)));
         }
         Ok(())
     }

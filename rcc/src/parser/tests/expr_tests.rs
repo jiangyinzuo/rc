@@ -35,10 +35,7 @@ fn lit_expr_test() {
                 "2".to_string(),
                 TypeLitNum::F32,
             ))),
-            Ok(Expr::LitNum(LitNumExpr {
-                ret_type: TypeLitNum::I,
-                value: "123".to_string(),
-            })),
+            Ok(Expr::LitNum(LitNumExpr::new("123".to_string(), TypeLitNum::I))),
             Ok(Expr::LitChar('c')),
             Ok(Expr::LitStr("hello".to_string())),
         ],
@@ -64,10 +61,7 @@ fn return_expr_test() {
     parse_validate(
         vec!["{ return 0;}"],
         vec![Ok(Block(BlockExpr::from(vec![Stmt::ExprStmt(Return(
-            ReturnExpr(Some(Box::new(LitNum(LitNumExpr {
-                ret_type: TypeLitNum::I,
-                value: "0".into(),
-            })))),
+            ReturnExpr(Some(Box::new(LitNum(0.into())))),
         ))])))],
     );
 }
