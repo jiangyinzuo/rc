@@ -1,24 +1,19 @@
 use crate::ast::file::File;
-use crate::code_gen::{CodeGen, TargetPlatform};
-use crate::ir::{IRGen, IRGenContext};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io::{BufReader, BufWriter, Read, Write};
-use std::ops::Deref;
+use crate::code_gen::TargetPlatform;
 
 pub struct RcCompiler<R: Read, W: Write> {
-    code_gen: Box<dyn CodeGen>,
     input: BufReader<R>,
     output: BufWriter<W>,
 }
 
 impl<R: Read, W: Write> RcCompiler<R, W> {
     pub fn new(target_platform: TargetPlatform, input: R, output: W) -> Self {
-        let code_gen = target_platform.get_code_gen();
         RcCompiler {
-            code_gen: Box::new(code_gen),
             input: BufReader::new(input),
             output: BufWriter::new(output),
         }

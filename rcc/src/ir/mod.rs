@@ -1,79 +1,84 @@
+pub mod ir_build;
+
 use std::fmt::Debug;
-use crate::ir::Opcode::Ret;
-use crate::ast::types::TypeAnnotation;
 
 #[derive(Debug, PartialEq)]
-pub enum Opcode {
-    Ret
+pub enum BinOp {
+    /// Shifts
+    SLL,
+    SRL,
+    SRA,
+
+    /// Arithmetic
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Rem,
+
+    /// Logical
+    Xor,
+    Or,
+    And,
+
+    /// Compare
+    LT,
+    GT,
+    LE,
+    GE,
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Quad {
-    op: Opcode,
-    op_type: TypeAnnotation,
-    src1: String,
-    src2: String,
+pub enum Jump {
+    J,
+    JEq,
+    JNe,
+    JLt,
+    JGe,
 }
 
-impl Quad {
-    pub fn ret(data: Data) -> Self {
-        Quad {
-            op: Ret,
-            op_type: data._type,
-            src1: data.value,
-            src2: "".to_string()
-        }
-    }
+pub enum Operand {
+    Imm,
+    Place(Place),
 }
 
-pub struct BasicBlock {
-    name: String,
-    quads: Vec<Quad>,
+pub struct Place {}
+
+pub struct Func {
+    name: Label,
 }
 
-pub trait IRGen {
-    fn generate(&self, cxt: &mut IRGenContext) -> Result<(), String>;
-}
+pub type Label = String;
 
-pub struct Data {
-    _type: TypeAnnotation,
-    value: String,
-}
+pub enum IR {
+    BinOp {
+        op: BinOp,
+        dest: Place,
+        src1: Operand,
+        src2: Operand,
+    },
 
-pub struct IRGenContext {
-    pub basic_blocks: Vec<BasicBlock>,
-    data_stack: Vec<Data>,
-    quads: Vec<Quad>,
-}
+    Jump {
+        label: Label,
+    },
 
-impl IRGenContext {
-    pub fn new() -> Self {
-        IRGenContext {
-            basic_blocks: vec![],
-            data_stack: vec![],
-            quads: vec![],
-        }
-    }
+    JumpIf {
+        cond: Jump,
+        src1: Operand,
+        src2: Operand,
+        label: Label,
+    },
 
-    pub fn push_data(&mut self, data: Data) {
-        self.data_stack.push(data);
-    }
-
-    pub fn pop_data(&mut self) -> Option<Data> {
-        self.data_stack.pop()
-    }
-
-    pub fn push_quad(&mut self, quad: Quad) {
-        self.quads.push(quad);
-    }
-
-    pub fn add_basic_blocks(&mut self, basic_block: BasicBlock) {
-        self.basic_blocks.push(basic_block);
-    }
-
-    pub fn swap_and_get_quads(&mut self) -> Vec<Quad> {
-        let mut quads = vec![];
-        std::mem::swap(&mut quads, &mut self.quads);
-        quads
-    }
+    LoadData {
+        dest: Place,
+        src: Operand,
+    },
+    LoadAddr {
+        dest: Place,
+        symbol: Operand,
+    },
+    Call {
+        func: Func,
+        args: Vec<Operand>,
+    },
+    Ret(Operand),
 }

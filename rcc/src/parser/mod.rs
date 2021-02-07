@@ -28,7 +28,7 @@
 
 use std::fmt::Debug;
 
-use crate::ast::Visibility;
+use crate::ast::{Visibility, AST};
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
 use crate::ast::{FromToken};
@@ -164,5 +164,14 @@ impl Parse for Visibility {
             }
             _ => Ok(Visibility::Priv),
         }
+    }
+}
+
+impl Parse for AST {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
+        let file = crate::ast::file::File::parse(cursor)?;
+        Ok(AST {
+            file
+        })
     }
 }

@@ -598,7 +598,7 @@ impl<'ast> SymbolResolver<'ast> {
         if let Some(ident) = path_expr.segments.last() {
             let cur_scope = unsafe { &mut *self.cur_scope };
             if let Some(var_info) = cur_scope.find_variable(ident) {
-                path_expr.type_info = var_info._type.clone();
+                path_expr.set_type_info_ref(var_info._type.clone());
                 path_expr.expr_kind = match var_info.kind {
                     VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
                     VarKind::Const | VarKind::Local => ExprKind::Place,
@@ -798,13 +798,14 @@ impl<'ast> SymbolResolver<'ast> {
         self.visit_expr(&mut bin_op_expr.lhs)?;
         self.visit_expr(&mut bin_op_expr.rhs)?;
 
-        bin_op_expr.type_info = Self::primitive_bin_ops(
+        let t =Self::primitive_bin_ops(
             &mut bin_op_expr.lhs,
             bin_op_expr.bin_op,
             &mut bin_op_expr.rhs,
         );
+        bin_op_expr.set_type_info_ref(t.clone());
         // primitive bin_op || override bin_op
-        let tp = bin_op_expr.type_info.borrow();
+        let tp = t.borrow();
         let bin_type = tp.deref();
         if !bin_type.is_unknown()
             || self.override_bin_ops.contains(&(

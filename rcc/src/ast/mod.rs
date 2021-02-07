@@ -1,4 +1,5 @@
 use crate::lexer::token::Token;
+use crate::ast::file::File;
 
 pub mod file;
 pub mod item;
@@ -56,4 +57,10 @@ pub trait NamedASTNode {
 
 pub trait TokenStart {
     fn is_token_start(tk: &Token) -> bool;
+}
+
+/// Only single file is supported currently.
+#[derive(Debug, PartialEq)]
+pub struct AST {
+    pub file: File,
 }

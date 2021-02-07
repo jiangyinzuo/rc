@@ -1,7 +1,6 @@
 use crate::analyser::scope::Scope;
 use crate::analyser::sym_resolver::TypeInfo;
 use crate::ast::expr::Expr::Path;
-use crate::ast::item::Item::Type;
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
 use crate::ast::{FromToken, TokenStart};
@@ -347,7 +346,7 @@ impl From<Vec<Stmt>> for BlockExpr {
 #[derive(PartialEq, Debug)]
 pub struct LitNumExpr {
     pub value: String,
-    pub type_info: Rc<RefCell<TypeInfo>>,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl LitNumExpr {
@@ -403,7 +402,7 @@ impl From<i32> for LitNumExpr {
 #[derive(PartialEq, Debug)]
 pub struct PathExpr {
     pub segments: Vec<String>,
-    pub type_info: Rc<RefCell<TypeInfo>>,
+    type_info: Rc<RefCell<TypeInfo>>,
     pub expr_kind: ExprKind,
 }
 
@@ -689,7 +688,7 @@ pub struct BinOpExpr {
     pub lhs: Box<Expr>,
     pub bin_op: BinOperator,
     pub rhs: Box<Expr>,
-    pub type_info: Rc<RefCell<TypeInfo>>,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl BinOpExpr {
@@ -710,6 +709,18 @@ impl ExprVisit for BinOpExpr {
 
     fn kind(&self) -> ExprKind {
         ExprKind::Place
+    }
+}
+
+impl TypeInfoSetter for BinOpExpr {
+    fn set_type_info(&mut self, type_info: TypeInfo) {
+        self.type_info.replace(type_info.clone());
+        self.lhs.set_type_info(type_info.clone());
+        self.rhs.set_type_info(type_info);
+    }
+
+    fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
+        self.type_info = type_info;
     }
 }
 
@@ -904,7 +915,7 @@ impl ExprVisit for BreakExpr {
 pub struct CallExpr {
     pub expr: Box<Expr>,
     pub call_params: CallParams,
-    type_info: TypeInfo,
+    type_info: Rc<RefCell<TypeInfo>>,
 }
 
 pub type CallParams = Vec<Expr>;
@@ -914,7 +925,7 @@ impl CallExpr {
         CallExpr {
             expr: Box::new(expr),
             call_params: vec![],
-            type_info: TypeInfo::Unknown,
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
 
@@ -924,13 +935,13 @@ impl CallExpr {
     }
 
     pub fn set_type_info(&mut self, type_info: TypeInfo) {
-        self.type_info = type_info;
+        self.type_info.replace(type_info);
     }
 }
 
 impl ExprVisit for CallExpr {
     fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
-        Rc::new(RefCell::new(self.type_info.clone()))
+        self.type_info.clone()
     }
 
     fn kind(&self) -> ExprKind {

@@ -1,17 +1,16 @@
 use clap::Clap;
-
-use crate::code_gen::TargetPlatform;
 use crate::rcc::{RcCompiler, RccError};
 use std::error::Error;
 use std::str::FromStr;
+use code_gen::TargetPlatform;
 
 mod ast;
-mod code_gen;
 mod ir;
 mod lexer;
 mod parser;
 mod rcc;
 mod analyser;
+mod code_gen;
 
 #[derive(Clap)]
 struct Opts {
