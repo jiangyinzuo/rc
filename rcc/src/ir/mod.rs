@@ -58,13 +58,13 @@ pub enum IRType {
     I32(i32),
     I64(i64),
     I128(i128),
-    ISize(isize),
+    Isize(isize),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
     U128(u128),
-    USize(usize),
+    Usize(usize),
 }
 
 /// Immediate Presentation's Instructions
@@ -92,17 +92,17 @@ pub enum IRInst {
         dest: Place,
         src: Operand,
     },
-    
+
     LoadAddr {
         dest: Place,
         symbol: Operand,
     },
-    
+
     Call {
         func_name: String,
         args: Vec<Operand>,
     },
-    
+
     Ret(Operand),
 }
 

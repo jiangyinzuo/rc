@@ -42,7 +42,9 @@ pub enum RccError {
     #[error("{0}")]
     IO(#[from] std::io::Error),
     #[error("{0}")]
-    ParseNumber(#[from] std::num::ParseIntError),
+    ParseInt(#[from] std::num::ParseIntError),
+    #[error("{0}")]
+    ParseFloat(#[from] std::num::ParseFloatError),
     #[error("{0}")]
     Parse(String)
 }
@@ -74,8 +76,14 @@ impl PartialEq for RccError {
                 }
                 false
             }
-            RccError::ParseNumber(p) => {
-                if let RccError::ParseNumber(o) = other {
+            RccError::ParseInt(p) => {
+                if let RccError::ParseInt(o) = other {
+                    return p == o;
+                }
+                false
+            }
+            RccError::ParseFloat(p) => {
+                if let RccError::ParseFloat(o) = other {
                     return p == o;
                 }
                 false

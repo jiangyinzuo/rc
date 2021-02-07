@@ -411,8 +411,10 @@ impl<'ast> SymbolResolver<'ast> {
     }
 }
 
-impl<'ast> SymbolResolver<'ast> {
-    pub fn visit_file(&mut self, file: &'ast mut File) -> Result<(), RccError> {
+impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
+    type ReturnType = ();
+
+    fn visit_file(&mut self, file: &'ast mut File) -> Result<(), RccError> {
         self.cur_scope = &mut file.scope;
         self.file_scope = Some(&mut file.scope);
 
@@ -544,48 +546,6 @@ impl<'ast> SymbolResolver<'ast> {
         Ok(())
     }
 
-    fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
-        let res = match expr {
-            Expr::Path(path_expr) => self.visit_path_expr(path_expr),
-            Expr::LitNum(_) => Ok(()),
-            Expr::LitBool(_) => Ok(()),
-            Expr::LitChar(_) => Ok(()),
-            Expr::LitStr(s) => {
-                if !self.str_constants.contains_key(s) {
-                    self.str_constants
-                        .insert(s.clone(), self.str_constants.len() as u64);
-                }
-                Ok(())
-            }
-            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
-            Expr::Block(block_expr) => self.visit_block_expr(block_expr),
-            Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
-            // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
-            Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr),
-            Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr),
-            // Expr::Array(array_expr) => self.visit_array_expr(array_expr),
-            // Expr::ArrayIndex(array_index_expr) => self.visit_array_index_expr(array_index_expr),
-            // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
-            // Expr::TupleIndex(tuple_index_expr) => self.visit_tuple_index_expr(tuple_index_expr),
-            // Expr::Struct(struct_expr) => self.visit_struct_expr(struct_expr),
-            Expr::Call(call_expr) => self.visit_call_expr(call_expr),
-            // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
-            Expr::While(while_expr) => self.visit_while_expr(while_expr),
-            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
-            Expr::If(if_expr) => self.visit_if_expr(if_expr),
-            Expr::Return(return_expr) => self.visit_return_expr(return_expr),
-            Expr::Break(break_expr) => self.visit_break_expr(break_expr),
-            _ => Ok(()),
-        };
-        debug_assert_ne!(
-            ExprKind::Unknown,
-            expr.kind(),
-            "unknown expr kind: {:?}",
-            expr
-        );
-        res
-    }
-
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
         match lhs_expr {
             LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
@@ -617,6 +577,32 @@ impl<'ast> SymbolResolver<'ast> {
         } else {
             Err("invalid ident".into())
         }
+    }
+
+    fn visit_lit_num_expr(
+        &mut self,
+        _lit_num_expr: &mut LitNumExpr,
+    ) -> Result<Self::ReturnType, RccError> {
+        // do nothing
+        Ok(())
+    }
+
+    fn visit_lit_bool(&mut self, _lit_bool: &mut bool) -> Result<Self::ReturnType, RccError> {
+        // do nothing
+        Ok(())
+    }
+
+    fn visit_lit_char(&mut self, _lit_char: &mut char) -> Result<Self::ReturnType, RccError> {
+        // do nothing
+        Ok(())
+    }
+
+    fn visit_lit_str(&mut self, s: &String) -> Result<Self::ReturnType, RccError> {
+        if !self.str_constants.contains_key(s) {
+            self.str_constants
+                .insert(s.to_string(), self.str_constants.len() as u64);
+        }
+        Ok(())
     }
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError> {
@@ -798,7 +784,7 @@ impl<'ast> SymbolResolver<'ast> {
         self.visit_expr(&mut bin_op_expr.lhs)?;
         self.visit_expr(&mut bin_op_expr.rhs)?;
 
-        let t =Self::primitive_bin_ops(
+        let t = Self::primitive_bin_ops(
             &mut bin_op_expr.lhs,
             bin_op_expr.bin_op,
             &mut bin_op_expr.rhs,

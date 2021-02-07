@@ -46,6 +46,6 @@ fn compile(opts: Opts) -> Result<(), RccError> {
 fn main() {
     let opts = Opts::parse();
     if let Err(e) = compile(opts) {
-        eprintln!("{}", e);
+        eprintln!("{:?}", e);
     }
 }
