@@ -37,48 +37,81 @@ pub enum Jump {
 }
 
 pub enum Operand {
-    Imm,
+    Imm(IRType),
     Place(Place),
 }
 
 pub struct Place {}
 
 pub struct Func {
-    name: Label,
+    name: String,
+    insts: Vec<IRInst>,
 }
 
-pub type Label = String;
+pub enum IRType {
+    F32(f32),
+    F64(f64),
+    Bool(bool),
+    Char(char),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    ISize(isize),
+    U8(u8),
+    U16(u16),
+    U32(u32),
+    U64(u64),
+    U128(u128),
+    USize(usize),
+}
 
-pub enum IR {
+/// Immediate Presentation's Instructions
+pub enum IRInst {
     BinOp {
         op: BinOp,
+        _type: IRType,
         dest: Place,
         src1: Operand,
         src2: Operand,
     },
 
     Jump {
-        label: Label,
+        label: String,
     },
 
     JumpIf {
         cond: Jump,
         src1: Operand,
         src2: Operand,
-        label: Label,
+        label: String,
     },
 
     LoadData {
         dest: Place,
         src: Operand,
     },
+    
     LoadAddr {
         dest: Place,
         symbol: Operand,
     },
+    
     Call {
-        func: Func,
+        func_name: String,
         args: Vec<Operand>,
     },
+    
     Ret(Operand),
+}
+
+pub struct IR {
+    funcs: Vec<Func>
+}
+
+impl IR {
+    pub fn new () -> IR {
+        IR {funcs: vec![]}
+    }
 }

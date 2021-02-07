@@ -708,8 +708,8 @@ impl<'ast> SymbolResolver<'ast> {
 
         // check the mutability of place expr lhs
         match assign_expr.lhs.kind() {
-            ExprKind::Place => return Err(RccError("lhs is not mutable".into())),
-            ExprKind::Value => return Err(RccError("can not assign to lhs".into())),
+            ExprKind::Place => return Err("lhs is not mutable".into()),
+            ExprKind::Value => return Err("can not assign to lhs".into()),
             ExprKind::Unknown => unreachable!("lhs kind should not be unknown"),
             ExprKind::MutablePlace => {
                 self.visit_expr(&mut assign_expr.rhs)?;

@@ -17,10 +17,10 @@ fn path_expr_test() {
         vec!["a::b::c", "a::", "a", "::", "::a", "i8::I16"],
         vec![
             Ok(PathExpr::from(vec!["a", "b", "c"])),
-            Err("invalid path"),
+            Err("invalid path".into()),
             Ok(vec!["a"].into()),
-            Err("invalid path"),
-            Err("invalid path"),
+            Err("invalid path".into()),
+            Err("invalid path".into()),
             Ok(vec!["i8", "I16"].into()),
         ],
     );
@@ -150,7 +150,7 @@ fn bin_op_test() {
                 BinOperator::Plus,
                 LitNum(6.into()),
             ))),
-            Err("Chained comparison operator require parentheses"),
+            Err("Chained comparison operator require parentheses".into()),
         ],
     );
 }
@@ -184,8 +184,8 @@ fn call_expr_test() {
 
 #[test]
 fn place_expr_test() {
-    let expecteds: Vec<Result<Expr, &str>> = vec![
-        Err("invalid lhs expr"),
+    let expecteds: Vec<Result<Expr, RccError>> = vec![
+        Err("invalid lhs expr".into()),
         Ok(Expr::Assign(AssignExpr::new(
             LhsExpr::Deref(Box::new("a".into())),
             AssignOp::Eq,

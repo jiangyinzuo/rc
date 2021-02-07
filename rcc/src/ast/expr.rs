@@ -364,9 +364,16 @@ impl LitNumExpr {
         }
     }
 
-    pub fn ret_type(mut self, ret_type: TypeLitNum) -> LitNumExpr {
-        self.type_info = Rc::new(RefCell::new(TypeInfo::LitNum(ret_type)));
+    pub fn lit_type(mut self, lit_type: TypeLitNum) -> LitNumExpr {
+        self.type_info = Rc::new(RefCell::new(TypeInfo::LitNum(lit_type)));
         self
+    }
+    
+    pub fn get_lit_type(&mut self) -> TypeLitNum {
+        if let TypeInfo::LitNum(t) = self.type_info.borrow().deref() {
+            return t.clone();
+        }
+        panic!("TypeInfo must be lit num")
     }
 }
 
@@ -382,7 +389,10 @@ impl ExprVisit for LitNumExpr {
 
 impl TypeInfoSetter for LitNumExpr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
-        self.type_info.replace(type_info);
+        match &type_info {
+            TypeInfo::LitNum(_) => {self.type_info.replace(type_info);},
+            _ => panic!("must be lit num")
+        }
     }
 
     fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {

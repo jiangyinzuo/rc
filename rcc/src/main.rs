@@ -27,7 +27,7 @@ struct Opts {
     target: String,
 }
 
-fn compile(opts: Opts) -> Result<(), Box<dyn Error>> {
+fn compile(opts: Opts) -> Result<(), RccError> {
     match TargetPlatform::from_str(&opts.target) {
         Ok(target_platform) => {
             let input = std::fs::File::open(opts.input)?;
@@ -36,10 +36,10 @@ fn compile(opts: Opts) -> Result<(), Box<dyn Error>> {
             rc_compiler.compile()?;
             Ok(())
         }
-        Err(_) => Err(Box::new(RccError(format!(
+        Err(_) => Err(format!(
             "invalid target platform {}",
             opts.input
-        )))),
+        ).into()),
     }
 }
 

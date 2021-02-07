@@ -11,3 +11,4 @@ strenum = { path = "src/strenum" }
 cursor = { path = "../cursor" }
 clap = "3.0.0-beta.2"
 lazy_static = "1.4.0"
+thiserror = "1.0.23"

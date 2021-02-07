@@ -27,7 +27,7 @@ fn ident_not_found_test() {
     .unwrap();
     assert_eq!(1, ast_file.scope.types.len());
     assert_eq!(
-        Err(RccError("identifier `a` not found".into())),
+        Err("identifier `a` not found".into()),
         sym_resolver.visit_file(&mut ast_file)
     );
 }

@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io::{BufReader, BufWriter, Read, Write};
 use crate::code_gen::TargetPlatform;
+use thiserror;
 
 pub struct RcCompiler<R: Read, W: Write> {
     input: BufReader<R>,
@@ -19,7 +20,7 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
         }
     }
 
-    pub fn compile(&mut self) -> Result<(), Box<dyn Error>> {
+    pub fn compile(&mut self) -> Result<(), RccError> {
         let mut input = String::new();
         self.input.read_to_string(&mut input)?;
 
@@ -36,25 +37,49 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct RccError(pub String);
-
-impl Display for RccError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.write_str(&self.0)
-    }
+#[derive(thiserror::Error, Debug)]
+pub enum RccError {
+    #[error("{0}")]
+    IO(#[from] std::io::Error),
+    #[error("{0}")]
+    ParseNumber(#[from] std::num::ParseIntError),
+    #[error("{0}")]
+    Parse(String)
 }
-
-impl Error for RccError {}
 
 impl From<String> for RccError {
     fn from(s: String) -> Self {
-        RccError(s)
+        RccError::Parse(s)
     }
 }
 
 impl From<&str> for RccError {
     fn from(s: &str) -> Self {
-        RccError(s.to_string())
+        RccError::Parse(s.to_string())
+    }
+}
+
+impl PartialEq for RccError {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            RccError::IO(e) => {
+                if let RccError::IO(o) = other {
+                    return e.to_string() == o.to_string();
+                }
+                false
+            }
+            RccError::Parse(s)=> {
+                if let RccError::Parse(o) = other {
+                    return s == o;
+                }
+                false
+            }
+            RccError::ParseNumber(p) => {
+                if let RccError::ParseNumber(o) = other {
+                    return p == o;
+                }
+                false
+            }
+        }
     }
 }

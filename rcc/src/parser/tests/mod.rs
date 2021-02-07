@@ -21,7 +21,7 @@ fn parse_input<T: Parse>(input: &str) -> Result<T, RccError> {
 
 fn parse_validate<T: Parse>(
     inputs: std::vec::Vec<&str>,
-    excepteds: Vec<Result<T, &str>>,
+    excepteds: Vec<Result<T, RccError>>,
 ) {
     assert_eq!(inputs.len(), excepteds.len());
     for (input, excepted) in inputs.into_iter().zip(excepteds) {
@@ -29,7 +29,7 @@ fn parse_validate<T: Parse>(
         match excepted {
             Ok(segments) => assert_eq!(Ok(segments), result),
             Err(s) => {
-                assert_eq!(result.unwrap_err().0, s)
+                assert_eq!(result.unwrap_err(), s)
             },
         }
     }

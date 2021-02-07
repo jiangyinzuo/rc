@@ -31,7 +31,7 @@ pub trait Visit: Sized {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<&VarInfo, RccError>;
 
-    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<TypeInfo, RccError>;
+    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<(), RccError>;
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<(), RccError>;
 
