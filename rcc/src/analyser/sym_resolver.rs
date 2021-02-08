@@ -1,4 +1,4 @@
-use crate::analyser::scope::Scope;
+use crate::analyser::scope::{Scope, ScopeStack};
 use crate::analyser::sym_resolver::LoopKind::NotIn;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
 use crate::ast::expr::{
@@ -8,8 +8,7 @@ use crate::ast::expr::{
     WhileExpr,
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
-use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
+use crate::ast::item::{Fields, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
@@ -207,10 +206,8 @@ impl LoopKind {
 }
 
 /// Fill the `type information` and `expr kind` attributes of the expr nodes on AST
-pub struct SymbolResolver<'ast> {
-    cur_scope: *mut Scope,
-    file_scope: Option<&'ast mut Scope>,
-    scope_stack: Vec<*mut Scope>,
+pub struct SymbolResolver {
+    scope_stack: ScopeStack,
 
     loop_kind: LoopKind,
     loop_kind_stack: Vec<LoopKind>,
@@ -223,12 +220,10 @@ pub struct SymbolResolver<'ast> {
     pub str_constants: HashMap<String, u64>,
 }
 
-impl<'ast> SymbolResolver<'ast> {
-    pub fn new() -> SymbolResolver<'ast> {
+impl SymbolResolver {
+    pub fn new() -> SymbolResolver {
         SymbolResolver {
-            cur_scope: std::ptr::null_mut(),
-            file_scope: None,
-            scope_stack: vec![],
+            scope_stack: ScopeStack::new(),
             loop_kind: NotIn,
             loop_kind_stack: vec![],
             cur_fn_ret_type: TypeInfo::Unknown,
@@ -356,31 +351,8 @@ impl<'ast> SymbolResolver<'ast> {
         }
     }
 
-    fn enter_block(&mut self, block_expr: &mut BlockExpr) {
-        block_expr.scope.set_father(self.cur_scope);
-        self.scope_stack.push(self.cur_scope);
-        self.cur_scope = &mut block_expr.scope;
-    }
-
-    fn exit_block(&mut self) {
-        if let Some(s) = self.scope_stack.pop() {
-            self.cur_scope = s;
-            unsafe { &mut *self.cur_scope }.cur_stmt_id = 0;
-        } else {
-            debug_assert!(false, "scope_stack is empty!");
-        }
-    }
-
     fn exit_loop(&mut self) {
         self.loop_kind = self.loop_kind_stack.pop().expect("empty loop kind stack!");
-    }
-
-    fn cur_scope_is_global(&mut self) -> bool {
-        if let Some(f) = &mut self.file_scope {
-            self.cur_scope == *f
-        } else {
-            false
-        }
     }
 
     fn try_determine_number_type(
@@ -411,25 +383,11 @@ impl<'ast> SymbolResolver<'ast> {
     }
 }
 
-impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
+impl Visit for SymbolResolver {
     type ReturnType = ();
 
-    fn visit_file(&mut self, file: &'ast mut File) -> Result<(), RccError> {
-        self.cur_scope = &mut file.scope;
-        self.file_scope = Some(&mut file.scope);
-
-        for item in file.items.iter_mut() {
-            self.visit_item(item)?;
-        }
-        Ok(())
-    }
-
-    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError> {
-        match item {
-            Item::Fn(item_fn) => self.visit_item_fn(item_fn),
-            Item::Struct(item_struct) => self.visit_item_struct(item_struct),
-            _ => unimplemented!(),
-        }
+    fn scope_stack_mut(&mut self) -> &mut ScopeStack {
+        &mut self.scope_stack
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
@@ -438,7 +396,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
         std::mem::swap(&mut self.cur_fn_ret_type, &mut temp_ret_type);
         self.cur_fn_ret_type_stack.push(temp_ret_type);
         self.cur_fn_ret_type =
-            TypeInfo::from_type_anno(&item_fn.ret_type, unsafe { &*self.cur_scope });
+            TypeInfo::from_type_anno(&item_fn.ret_type, self.scope_stack.cur_scope());
 
         for param in item_fn.fn_params.params.iter() {
             match &param.pattern {
@@ -451,7 +409,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
                     },
                     Rc::new(RefCell::new(TypeInfo::from_type_anno(
                         &param._type,
-                        unsafe { &*self.cur_scope },
+                        self.scope_stack.cur_scope(),
                     ))),
                 ),
             }
@@ -504,7 +462,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
             self.visit_expr(expr)?;
             if let Some(type_anno) = &let_stmt._type {
                 let anno_type_info =
-                    TypeInfo::from_type_anno(type_anno, unsafe { &*self.cur_scope });
+                    TypeInfo::from_type_anno(type_anno, self.scope_stack.cur_scope());
                 Self::try_determine_number_type(&anno_type_info, expr);
                 let t = expr.type_info();
                 let tp = t.borrow();
@@ -524,7 +482,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
 
         match &let_stmt.pattern {
             Pattern::Identifier(ident_pattern) => unsafe {
-                (*self.cur_scope).add_variable(
+                self.scope_stack.cur_scope_mut().add_variable(
                     ident_pattern.ident(),
                     if ident_pattern.is_mut() {
                         VarKind::LocalMut
@@ -556,7 +514,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
         if let Some(ident) = path_expr.segments.last() {
-            let cur_scope = unsafe { &mut *self.cur_scope };
+            let cur_scope = self.scope_stack.cur_scope_mut();
             if let Some(var_info) = cur_scope.find_variable(ident) {
                 path_expr.set_type_info_ref(var_info._type.clone());
                 path_expr.expr_kind = match var_info.kind {
@@ -652,14 +610,14 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
     }
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
-        self.enter_block(block_expr);
+        self.scope_stack.enter_scope(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt)?;
-            unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
+            self.scope_stack.cur_scope_mut().cur_stmt_id += 1;
         }
         if let Some(expr) = block_expr.expr_without_block.as_mut() {
             self.visit_expr(expr)?;
-            unsafe { &mut *self.cur_scope }.cur_stmt_id += 1;
+            self.scope_stack.cur_scope_mut().cur_stmt_id += 1;
             let type_info = expr.type_info();
             block_expr.set_type_info_ref(type_info);
         } else if block_expr.stmts.is_empty() {
@@ -674,7 +632,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
             }
         }
 
-        self.exit_block();
+        self.scope_stack.exit_scope();
         Ok(())
     }
 
@@ -876,7 +834,7 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
             .zip(type_fn_ptr.params.iter())
         {
             self.visit_expr(expr)?;
-            let excepted_info = TypeInfo::from_type_anno(param, unsafe { &*self.cur_scope });
+            let excepted_info = TypeInfo::from_type_anno(param, self.scope_stack.cur_scope());
 
             Self::try_determine_number_type(&excepted_info, expr);
             let t = expr.type_info();
@@ -890,9 +848,10 @@ impl<'ast> Visit<'ast> for SymbolResolver<'ast> {
                 .into());
             }
         }
-        call_expr.set_type_info(TypeInfo::from_type_anno(&type_fn_ptr.ret_type, unsafe {
-            &*self.cur_scope
-        }));
+        call_expr.set_type_info(TypeInfo::from_type_anno(
+            &type_fn_ptr.ret_type,
+            self.scope_stack.cur_scope(),
+        ));
         Ok(())
     }
 

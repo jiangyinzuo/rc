@@ -1,5 +1,7 @@
 use crate::analyser::sym_resolver::TypeInfo::*;
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
+use crate::ast::expr::BlockExpr;
+use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
 use lazy_static::lazy_static;
@@ -109,7 +111,7 @@ impl Scope {
         }
     }
 
-    pub fn find_fn(&mut self, ident: &str) -> TypeInfo {
+    pub fn find_fn(&self, ident: &str) -> TypeInfo {
         let mut cur_scope: *const Scope = self;
         loop {
             let s = unsafe { &*cur_scope };
@@ -130,7 +132,7 @@ impl Scope {
         match item {
             Item::Fn(item_fn) => self.add_type_fn(item_fn),
             Item::Struct(item_struct) => self.add_type_struct(item_struct),
-            _ => { /* TODO */ }
+            _ => todo!(),
         }
     }
 
@@ -150,5 +152,57 @@ impl Scope {
 
     pub fn set_father_as_builtin_scope(&mut self) {
         self.father = Some(NonNull::from(BULITIN_SCOPE.deref()));
+    }
+}
+
+pub struct ScopeStack {
+    cur_scope: *mut Scope,
+    file_scope: Option<NonNull<Scope>>,
+    scope_stack: Vec<*mut Scope>,
+}
+
+impl ScopeStack {
+    pub fn new() -> ScopeStack {
+        ScopeStack {
+            cur_scope: std::ptr::null_mut(),
+            file_scope: None,
+            scope_stack: vec![],
+        }
+    }
+
+    pub fn enter_scope(&mut self, block_expr: &mut BlockExpr) {
+        block_expr.scope.set_father(self.cur_scope);
+        self.scope_stack.push(self.cur_scope);
+        self.cur_scope = &mut block_expr.scope;
+    }
+
+    pub fn exit_scope(&mut self) {
+        if let Some(s) = self.scope_stack.pop() {
+            self.cur_scope = s;
+            unsafe { &mut *self.cur_scope }.cur_stmt_id = 0;
+        } else {
+            debug_assert!(false, "scope_stack is empty!");
+        }
+    }
+
+    pub fn cur_scope_is_global(&mut self) -> bool {
+        if let Some(f) = &mut self.file_scope {
+            self.cur_scope == f.as_ptr()
+        } else {
+            false
+        }
+    }
+
+    pub fn cur_scope(&self) -> &Scope {
+        unsafe { &*self.cur_scope }
+    }
+
+    pub fn cur_scope_mut(&mut self) -> &mut Scope {
+        unsafe { &mut *self.cur_scope }
+    }
+
+    pub fn enter_file(&mut self, file: &mut File) {
+        self.cur_scope = &mut file.scope;
+        self.file_scope = Some(NonNull::new(&mut file.scope).unwrap());
     }
 }

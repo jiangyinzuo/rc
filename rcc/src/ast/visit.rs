@@ -5,13 +5,28 @@ use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::rcc::RccError;
+use crate::analyser::scope::ScopeStack;
 
-pub trait Visit<'ast>: Sized {
+pub trait Visit: Sized {
     type ReturnType;
 
-    fn visit_file(&mut self, file: &'ast mut File) -> Result<(), RccError>;
+    fn scope_stack_mut(&mut self) -> &mut ScopeStack;
 
-    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError>;
+    fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
+        self.scope_stack_mut().enter_file(file);
+        for item in file.items.iter_mut() {
+            self.visit_item(item)?;
+        }
+        Ok(())
+    }
+
+    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError> {
+        match item {
+            Item::Fn(item_fn) => self.visit_item_fn(item_fn),
+            Item::Struct(item_struct) => self.visit_item_struct(item_struct),
+            _ => unimplemented!(),
+        }
+    }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError>;
 

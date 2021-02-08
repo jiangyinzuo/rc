@@ -10,12 +10,17 @@ use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
 use crate::ast::visit::Visit;
 use crate::ast::AST;
-use crate::ir::{IRType, Operand, IR};
+use crate::ir::{IRType, Operand, IR, Func};
 use crate::rcc::RccError;
+use crate::analyser::scope::ScopeStack;
+use crate::analyser::sym_resolver::TypeInfo;
 
 pub struct IRBuilder {
     ast: AST,
     ir_output: IR,
+    cur_fn: Func,
+
+    scope_stack: ScopeStack,
 }
 
 impl IRBuilder {
@@ -23,6 +28,8 @@ impl IRBuilder {
         IRBuilder {
             ast,
             ir_output: IR::new(),
+            cur_fn: Func::new(),
+            scope_stack: ScopeStack::new(),
         }
     }
 
@@ -33,19 +40,22 @@ impl IRBuilder {
     }
 }
 
-impl<'ast> Visit<'ast> for IRBuilder {
+impl Visit for IRBuilder {
     type ReturnType = Operand;
 
-    fn visit_file(&mut self, file: &'ast mut File) -> Result<(), RccError> {
-        unimplemented!()
-    }
-
-    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError> {
-        unimplemented!()
+    fn scope_stack_mut(&mut self) -> &mut ScopeStack {
+        &mut self.scope_stack
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        unimplemented!()
+        let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
+        assert_eq!(info, TypeInfo::from_item_fn(item_fn));
+
+        // push current func to IR
+        let mut cur_fn = Func::new();
+        std::mem::swap(&mut cur_fn, &mut self.cur_fn);
+        self.ir_output.add_func(cur_fn);
+        Ok(())
     }
 
     fn visit_item_struct(&mut self, item_struct: &mut ItemStruct) -> Result<(), RccError> {
@@ -65,10 +75,6 @@ impl<'ast> Visit<'ast> for IRBuilder {
     }
 
     fn visit_ident_pattern(&mut self, ident_pattern: &mut IdentPattern) -> Result<(), RccError> {
-        unimplemented!()
-    }
-
-    fn visit_expr(&mut self, expr: &mut Expr) -> Result<Self::ReturnType, RccError> {
         unimplemented!()
     }
 
@@ -102,15 +108,15 @@ impl<'ast> Visit<'ast> for IRBuilder {
     }
 
     fn visit_lit_bool(&mut self, lit_bool: &mut bool) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
+        Ok(Operand::Imm(IRType::Bool(*lit_bool)))
     }
 
     fn visit_lit_char(&mut self, lit_char: &mut char) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
+        Ok(Operand::Imm(IRType::Char(*lit_char)))
     }
 
     fn visit_lit_str(&mut self, s: &String) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
+        Ok(self.ir_output.add_lit_str(s.to_string()))
     }
 
     fn visit_unary_expr(

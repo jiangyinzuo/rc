@@ -1,6 +1,8 @@
 pub mod ir_build;
 
+use std::collections::HashMap;
 use std::fmt::Debug;
+use crate::ir::Place::Label;
 
 #[derive(Debug, PartialEq)]
 pub enum BinOp {
@@ -41,11 +43,22 @@ pub enum Operand {
     Place(Place),
 }
 
-pub struct Place {}
+pub enum Place {
+    Label(String),
+}
 
 pub struct Func {
     name: String,
     insts: Vec<IRInst>,
+}
+
+impl Func {
+    pub fn new() -> Func {
+        Func {
+            name: "".to_string(),
+            insts: vec![]
+        }
+    }
 }
 
 pub enum IRType {
@@ -106,12 +119,31 @@ pub enum IRInst {
     Ret(Operand),
 }
 
+pub enum StrKind {
+    Lit,
+    Const,
+}
+
 pub struct IR {
-    funcs: Vec<Func>
+    funcs: Vec<Func>,
+    strs: HashMap<String, String>,
 }
 
 impl IR {
-    pub fn new () -> IR {
-        IR {funcs: vec![]}
+    pub fn new() -> IR {
+        IR {
+            funcs: vec![],
+            strs: HashMap::new(),
+        }
+    }
+
+    pub fn add_lit_str(&mut self, s: String) -> Operand {
+        let label = format!(".LC{}", self.strs.len());
+        self.strs.insert(label.clone(), s);
+        Operand::Place(Label(label))
+    }
+
+    pub fn add_func(&mut self, func: Func) {
+        self.funcs.push(func);
     }
 }
