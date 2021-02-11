@@ -1,19 +1,15 @@
-use crate::ast::expr::{
-    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr,
-    ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
-};
-use crate::ast::file::File;
+use crate::analyser::scope::ScopeStack;
+use crate::analyser::sym_resolver::TypeInfo;
+use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr, ExprVisit};
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
 use crate::ast::visit::Visit;
 use crate::ast::AST;
-use crate::ir::{IRType, Operand, IR, Func};
+use crate::ir::{Func, IRType, Operand, IR, IRInst, Place};
 use crate::rcc::RccError;
-use crate::analyser::scope::ScopeStack;
-use crate::analyser::sym_resolver::TypeInfo;
+use std::ops::Deref;
 
 pub struct IRBuilder {
     ast: AST,
@@ -21,6 +17,8 @@ pub struct IRBuilder {
     cur_fn: Func,
 
     scope_stack: ScopeStack,
+
+    last_operand: Operand,
 }
 
 impl IRBuilder {
@@ -30,6 +28,7 @@ impl IRBuilder {
             ir_output: IR::new(),
             cur_fn: Func::new(),
             scope_stack: ScopeStack::new(),
+            last_operand: Operand::Bool(false)
         }
     }
 
@@ -41,7 +40,7 @@ impl IRBuilder {
 }
 
 impl Visit for IRBuilder {
-    type ReturnType = Operand;
+    type ReturnType = ();
 
     fn scope_stack_mut(&mut self) -> &mut ScopeStack {
         &mut self.scope_stack
@@ -86,37 +85,44 @@ impl Visit for IRBuilder {
         unimplemented!()
     }
 
-    fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<Self::ReturnType, RccError> {
+    fn visit_lit_num_expr(
+        &mut self,
+        lit_num_expr: &mut LitNumExpr,
+    ) -> Result<Self::ReturnType, RccError> {
         let t = lit_num_expr.get_lit_type();
-        Ok(Operand::Imm(match t {
-            TypeLitNum::I8 => IRType::I8(lit_num_expr.value.parse()?),
-            TypeLitNum::I16 => IRType::I16(lit_num_expr.value.parse()?),
-            TypeLitNum::I32 => IRType::I32(lit_num_expr.value.parse()?),
-            TypeLitNum::I64 => IRType::I64(lit_num_expr.value.parse()?),
-            TypeLitNum::I128 => IRType::I128(lit_num_expr.value.parse()?),
-            TypeLitNum::Isize => IRType::Isize(lit_num_expr.value.parse()?),
-            TypeLitNum::U8 => IRType::U8(lit_num_expr.value.parse()?),
-            TypeLitNum::U16 => IRType::U16(lit_num_expr.value.parse()?),
-            TypeLitNum::U32 => IRType::U32(lit_num_expr.value.parse()?),
-            TypeLitNum::U64 => IRType::U64(lit_num_expr.value.parse()?),
-            TypeLitNum::U128 => IRType::U128(lit_num_expr.value.parse()?),
-            TypeLitNum::Usize => IRType::Usize(lit_num_expr.value.parse()?),
-            TypeLitNum::F32 => IRType::F32(lit_num_expr.value.parse()?),
-            TypeLitNum::F64 => IRType::F64(lit_num_expr.value.parse()?),
+        self.last_operand = match t {
+            TypeLitNum::I8 => Operand::I8(lit_num_expr.value.parse()?),
+            TypeLitNum::I16 => Operand::I16(lit_num_expr.value.parse()?),
+            TypeLitNum::I32 => Operand::I32(lit_num_expr.value.parse()?),
+            TypeLitNum::I64 => Operand::I64(lit_num_expr.value.parse()?),
+            TypeLitNum::I128 => Operand::I128(lit_num_expr.value.parse()?),
+            TypeLitNum::Isize => Operand::Isize(lit_num_expr.value.parse()?),
+            TypeLitNum::U8 => Operand::U8(lit_num_expr.value.parse()?),
+            TypeLitNum::U16 => Operand::U16(lit_num_expr.value.parse()?),
+            TypeLitNum::U32 => Operand::U32(lit_num_expr.value.parse()?),
+            TypeLitNum::U64 => Operand::U64(lit_num_expr.value.parse()?),
+            TypeLitNum::U128 => Operand::U128(lit_num_expr.value.parse()?),
+            TypeLitNum::Usize => Operand::Usize(lit_num_expr.value.parse()?),
+            TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
+            TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
             TypeLitNum::F | TypeLitNum::I => return Err("uncertain lit num type".into()),
-        }))
+        };
+        Ok(())
     }
 
     fn visit_lit_bool(&mut self, lit_bool: &mut bool) -> Result<Self::ReturnType, RccError> {
-        Ok(Operand::Imm(IRType::Bool(*lit_bool)))
+        self.last_operand = Operand::Bool(*lit_bool);
+        Ok(())
     }
 
     fn visit_lit_char(&mut self, lit_char: &mut char) -> Result<Self::ReturnType, RccError> {
-        Ok(Operand::Imm(IRType::Char(*lit_char)))
+        self.last_operand = Operand::Char(*lit_char);
+        Ok(())
     }
 
     fn visit_lit_str(&mut self, s: &String) -> Result<Self::ReturnType, RccError> {
-        Ok(self.ir_output.add_lit_str(s.to_string()))
+        self.last_operand = self.ir_output.add_lit_str(s.to_string());
+        Ok(())
     }
 
     fn visit_unary_expr(
@@ -137,6 +143,7 @@ impl Visit for IRBuilder {
         &mut self,
         assign_expr: &mut AssignExpr,
     ) -> Result<Self::ReturnType, RccError> {
+
         unimplemented!()
     }
 
@@ -151,14 +158,21 @@ impl Visit for IRBuilder {
         &mut self,
         bin_op_expr: &mut BinOpExpr,
     ) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
-    }
+        self.visit_expr(&mut bin_op_expr.lhs)?;
+        let lhs = self.last_operand.clone();
+        self.visit_expr(&mut bin_op_expr.rhs)?;
+        let rhs = self.last_operand.clone();
+        // TODO operator override
+        let _type = bin_op_expr.type_info();
+        let t = _type.borrow();
+        let tp = t.deref();
+        let ir_type = IRType::from_type_info(tp)?;
+        let scope = self.scope_stack.cur_scope_mut();
+        let ident = scope.gen_temp_variable(_type.clone());
 
-    fn visit_grouped_expr(
-        &mut self,
-        grouped_expr: &mut GroupedExpr,
-    ) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
+        self.ir_output.add_instructions(IRInst::bin_op(bin_op_expr.bin_op, ir_type, Place::Var(ident.clone()), lhs, rhs));
+        self.last_operand = Operand::Place(Place::Var(ident));
+        Ok(())
     }
 
     fn visit_array_expr(

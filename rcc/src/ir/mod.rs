@@ -1,34 +1,12 @@
 pub mod ir_build;
 
+use crate::analyser::sym_resolver::TypeInfo;
+use crate::ast::expr::BinOperator;
+use crate::ast::types::TypeLitNum;
+use crate::ir::Place::Label;
+use crate::rcc::RccError;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use crate::ir::Place::Label;
-
-#[derive(Debug, PartialEq)]
-pub enum BinOp {
-    /// Shifts
-    SLL,
-    SRL,
-    SRA,
-
-    /// Arithmetic
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-
-    /// Logical
-    Xor,
-    Or,
-    And,
-
-    /// Compare
-    LT,
-    GT,
-    LE,
-    GE,
-}
 
 pub enum Jump {
     J,
@@ -38,30 +16,8 @@ pub enum Jump {
     JGe,
 }
 
+#[derive(Clone)]
 pub enum Operand {
-    Imm(IRType),
-    Place(Place),
-}
-
-pub enum Place {
-    Label(String),
-}
-
-pub struct Func {
-    name: String,
-    insts: Vec<IRInst>,
-}
-
-impl Func {
-    pub fn new() -> Func {
-        Func {
-            name: "".to_string(),
-            insts: vec![]
-        }
-    }
-}
-
-pub enum IRType {
     F32(f32),
     F64(f64),
     Bool(bool),
@@ -78,12 +34,81 @@ pub enum IRType {
     U64(u64),
     U128(u128),
     Usize(usize),
+    Place(Place),
+}
+
+#[derive(Clone)]
+pub enum Place {
+    Label(String),
+    Var(String),
+}
+
+pub struct Func {
+    name: String,
+    insts: Vec<IRInst>,
+}
+
+impl Func {
+    pub fn new() -> Func {
+        Func {
+            name: "".to_string(),
+            insts: vec![],
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub enum IRType {
+    F32,
+    F64,
+    Bool,
+    Char,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    Isize,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    Usize,
+}
+
+impl IRType {
+    pub fn from_type_info(type_info: &TypeInfo) -> Result<IRType, RccError> {
+        let ir_type = match type_info {
+            TypeInfo::LitNum(num) => match num {
+                TypeLitNum::F32 => IRType::F32,
+                TypeLitNum::F64 => IRType::F64,
+                TypeLitNum::I8 => IRType::I8,
+                TypeLitNum::I16 => IRType::I16,
+                TypeLitNum::I32 => IRType::I32,
+                TypeLitNum::I64 => IRType::I64,
+                TypeLitNum::I128 => IRType::I128,
+                TypeLitNum::Isize => IRType::Isize,
+                TypeLitNum::U8 => IRType::U8,
+                TypeLitNum::U16 => IRType::U16,
+                TypeLitNum::U32 => IRType::U32,
+                TypeLitNum::U64 => IRType::U64,
+                TypeLitNum::U128 => IRType::U128,
+                TypeLitNum::Usize => IRType::Usize,
+                t => return Err(RccError::Parse(format!("invalid type {:?}", t).into())),
+            },
+            TypeInfo::Bool => IRType::Bool,
+            TypeInfo::Char => IRType::Char,
+            t => return Err(RccError::Parse(format!("invalid type {:?}", t).into())),
+        };
+        Ok(ir_type)
+    }
 }
 
 /// Immediate Presentation's Instructions
 pub enum IRInst {
     BinOp {
-        op: BinOp,
+        op: BinOperator,
         _type: IRType,
         dest: Place,
         src1: Operand,
@@ -119,6 +144,24 @@ pub enum IRInst {
     Ret(Operand),
 }
 
+impl IRInst {
+    pub fn bin_op(
+        op: BinOperator,
+        _type: IRType,
+        dest: Place,
+        src1: Operand,
+        src2: Operand,
+    ) -> IRInst {
+        IRInst::BinOp {
+            op,
+            _type,
+            dest,
+            src1,
+            src2,
+        }
+    }
+}
+
 pub enum StrKind {
     Lit,
     Const,
@@ -127,6 +170,7 @@ pub enum StrKind {
 pub struct IR {
     funcs: Vec<Func>,
     strs: HashMap<String, String>,
+    instructions: Vec<IRInst>,
 }
 
 impl IR {
@@ -134,6 +178,7 @@ impl IR {
         IR {
             funcs: vec![],
             strs: HashMap::new(),
+            instructions: vec![],
         }
     }
 
@@ -145,5 +190,9 @@ impl IR {
 
     pub fn add_func(&mut self, func: Func) {
         self.funcs.push(func);
+    }
+
+    pub fn add_instructions(&mut self, ir_inst: IRInst) {
+        self.instructions.push(ir_inst);
     }
 }

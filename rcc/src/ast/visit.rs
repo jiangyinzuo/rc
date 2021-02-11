@@ -1,11 +1,15 @@
+use crate::analyser::scope::ScopeStack;
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo};
-use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr, ExprKind, ExprVisit};
+use crate::ast::expr::{
+    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
+    ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
+    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
+};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::rcc::RccError;
-use crate::analyser::scope::ScopeStack;
 
 pub trait Visit: Sized {
     type ReturnType;
@@ -119,7 +123,9 @@ pub trait Visit: Sized {
     fn visit_grouped_expr(
         &mut self,
         grouped_expr: &mut GroupedExpr,
-    ) -> Result<Self::ReturnType, RccError>;
+    ) -> Result<Self::ReturnType, RccError> {
+        self.visit_expr(grouped_expr)
+    }
 
     fn visit_array_expr(
         &mut self,

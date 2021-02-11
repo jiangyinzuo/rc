@@ -770,10 +770,6 @@ impl Visit for SymbolResolver {
         }
     }
 
-    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<(), RccError> {
-        self.visit_expr(grouped_expr)
-    }
-
     fn visit_array_expr(&mut self, array_expr: &mut ArrayExpr) -> Result<(), RccError> {
         for e in array_expr.elems.iter_mut() {
             self.visit_expr(e)?;
