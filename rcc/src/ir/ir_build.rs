@@ -1,18 +1,21 @@
 use crate::analyser::scope::ScopeStack;
 use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr, ExprVisit};
-use crate::ast::item::{Item, ItemFn, ItemStruct};
+use crate::ast::expr::{
+    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, ExprVisit,
+    FieldAccessExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr,
+    ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
+};
+use crate::ast::item::{ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
 use crate::ast::visit::Visit;
 use crate::ast::AST;
-use crate::ir::{Func, IRType, Operand, IR, IRInst, Place};
+use crate::ir::{Func, IRInst, IRType, Operand, Place, IR};
 use crate::rcc::RccError;
 use std::ops::Deref;
 
 pub struct IRBuilder {
-    ast: AST,
     ir_output: IR,
     cur_fn: Func,
 
@@ -22,20 +25,20 @@ pub struct IRBuilder {
 }
 
 impl IRBuilder {
-    pub fn new(ast: AST) -> IRBuilder {
+    pub fn new() -> IRBuilder {
         IRBuilder {
-            ast,
             ir_output: IR::new(),
             cur_fn: Func::new(),
             scope_stack: ScopeStack::new(),
-            last_operand: Operand::Bool(false)
+            last_operand: Operand::Bool(false),
         }
     }
 
-    pub(super) fn generate_ir(&mut self) -> IR {
+    pub(super) fn generate_ir(&mut self, ast: &mut AST) -> Result<IR, RccError> {
+        self.visit_file(&mut ast.file)?;
         let mut output = IR::new();
         std::mem::swap(&mut self.ir_output, &mut output);
-        output
+        Ok(output)
     }
 }
 
@@ -62,11 +65,28 @@ impl Visit for IRBuilder {
     }
 
     fn visit_stmt(&mut self, stmt: &mut Stmt) -> Result<(), RccError> {
-        unimplemented!()
+        match stmt {
+            Stmt::Semi => Ok(()),
+            Stmt::Item(item) => self.visit_item(item),
+            Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
+            Stmt::ExprStmt(expr) => self.visit_expr(expr),
+        }
     }
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
-        unimplemented!()
+        if let Some(expr) = &mut let_stmt.expr {
+            self.visit_expr(expr)?;
+            let rhs = self.last_operand.clone();
+            match &let_stmt.pattern {
+                Pattern::Identifier(ident_pattern) => {
+                    let ident = ident_pattern.ident();
+                    let scope_id = self.scope_stack.cur_scope().scope_id();
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(Place::var(ident, scope_id), rhs));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn visit_pattern(&mut self, pattern: &mut Pattern) -> Result<(), RccError> {
@@ -77,12 +97,10 @@ impl Visit for IRBuilder {
         unimplemented!()
     }
 
-    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
-    }
-
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Self::ReturnType, RccError> {
-        unimplemented!()
+        // TODO path segmentation
+        self.last_operand = Operand::Place(Place::Var(path_expr.segments.last().unwrap().clone()));
+        Ok(())
     }
 
     fn visit_lit_num_expr(
@@ -143,8 +161,16 @@ impl Visit for IRBuilder {
         &mut self,
         assign_expr: &mut AssignExpr,
     ) -> Result<Self::ReturnType, RccError> {
-
-        unimplemented!()
+        self.visit_expr(&mut assign_expr.rhs)?;
+        let rhs = self.last_operand.clone();
+        self.visit_lhs_expr(&mut assign_expr.lhs)?;
+        let lhs = self.last_operand.clone();
+        let p = match lhs {
+            Operand::Place(p) => p,
+            _ => unreachable!(),
+        };
+        self.ir_output.add_instructions(IRInst::load_data(p, rhs));
+        Ok(())
     }
 
     fn visit_range_expr(
@@ -170,7 +196,13 @@ impl Visit for IRBuilder {
         let scope = self.scope_stack.cur_scope_mut();
         let ident = scope.gen_temp_variable(_type.clone());
 
-        self.ir_output.add_instructions(IRInst::bin_op(bin_op_expr.bin_op, ir_type, Place::Var(ident.clone()), lhs, rhs));
+        self.ir_output.add_instructions(IRInst::bin_op(
+            bin_op_expr.bin_op,
+            ir_type,
+            Place::Var(ident.clone()),
+            lhs,
+            rhs,
+        ));
         self.last_operand = Operand::Place(Place::Var(ident));
         Ok(())
     }

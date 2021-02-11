@@ -171,6 +171,10 @@ impl Scope {
     pub fn set_father_as_builtin_scope(&mut self) {
         self.father = Some(NonNull::from(BULITIN_SCOPE.deref()));
     }
+    
+    pub fn scope_id(&self) -> u64 {
+        self.scope_id
+    }
 }
 
 pub struct ScopeStack {

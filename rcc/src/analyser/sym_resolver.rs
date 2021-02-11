@@ -481,7 +481,7 @@ impl Visit for SymbolResolver {
         };
 
         match &let_stmt.pattern {
-            Pattern::Identifier(ident_pattern) => unsafe {
+            Pattern::Identifier(ident_pattern) => {
                 self.scope_stack.cur_scope_mut().add_variable(
                     ident_pattern.ident(),
                     if ident_pattern.is_mut() {
@@ -491,7 +491,7 @@ impl Visit for SymbolResolver {
                     },
                     expr_type_info,
                 );
-            },
+            }
         }
         Ok(())
     }
@@ -501,14 +501,6 @@ impl Visit for SymbolResolver {
     }
 
     fn visit_ident_pattern(&mut self, ident_pattern: &mut IdentPattern) -> Result<(), RccError> {
-        Ok(())
-    }
-
-    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
-        match lhs_expr {
-            LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
-            _ => todo!(),
-        }
         Ok(())
     }
 

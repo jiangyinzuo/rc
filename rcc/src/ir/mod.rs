@@ -43,6 +43,12 @@ pub enum Place {
     Var(String),
 }
 
+impl Place {
+    pub fn var(ident: &str, scope_id: u64) -> Place {
+        Place::Var(format!("{}_{}", ident, scope_id))
+    }
+}
+
 pub struct Func {
     name: String,
     insts: Vec<IRInst>,
@@ -159,6 +165,10 @@ impl IRInst {
             src1,
             src2,
         }
+    }
+
+    pub fn load_data(dest: Place, src: Operand) -> IRInst {
+        IRInst::LoadData { dest, src }
     }
 }
 

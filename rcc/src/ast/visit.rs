@@ -80,7 +80,13 @@ pub trait Visit: Sized {
         result
     }
 
-    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<Self::ReturnType, RccError>;
+    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<Self::ReturnType, RccError> {
+        let r = match lhs_expr {
+            LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
+            _ => todo!("visit lhs expr"),
+        };
+        Ok(r)
+    }
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Self::ReturnType, RccError>;
 
