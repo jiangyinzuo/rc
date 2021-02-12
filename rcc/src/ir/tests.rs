@@ -22,12 +22,7 @@ fn ir_build(input: &str) -> Result<IR, RccError> {
 
 #[test]
 fn test_ir_builder() {
-    let ir = match ir_build("fn main() {let a = 2 + 3;}") {
-        Ok(t) => t,
-        Err(e) => {
-            panic!("{:?}", e);
-        }
-    };
+    let ir = ir_build("fn main() {let a = 2 + 3;}").unwrap();
 
     let insts = vec![
         IRInst::bin_op(
@@ -41,4 +36,33 @@ fn test_ir_builder() {
     ];
 
     assert_eq!(insts, ir.instructions);
+}
+
+#[test]
+fn test_return() {
+    let ir = ir_build(
+        r#"fn main() -> i32{let b = 3 + 4;
+        b + 3
+    }"#,
+    )
+        .unwrap();
+    let insts = vec![
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::var("b_0".into()),
+            I32(3),
+            I32(4),
+        ),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::var("$0_0".into()),
+            Operand::Place(Place::var("b_0".into())),
+            I32(3),
+        ),
+        IRInst::Ret(Operand::Place(Place::var("$0_0".into()))),
+    ];
+    assert_eq!(insts, ir.instructions);
+
 }

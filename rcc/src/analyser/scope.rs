@@ -5,7 +5,6 @@ use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
 use lazy_static::lazy_static;
-use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -57,15 +56,14 @@ impl Scope {
             id
         });
 
-        let scope = Scope {
+        Scope {
             father: None,
             types: HashMap::new(),
             variables: HashMap::new(),
             cur_stmt_id: 0,
             temp_count: 0,
             scope_id,
-        };
-        scope
+        }
     }
 
     pub fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> String {

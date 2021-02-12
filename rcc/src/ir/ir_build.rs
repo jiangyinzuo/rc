@@ -1,11 +1,6 @@
 use crate::analyser::scope::ScopeStack;
 use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{
-    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr,
-    ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
-    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp,
-    WhileExpr,
-};
+use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr, BinOperator};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
@@ -185,9 +180,9 @@ impl IRBuilder {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Operand, RccError> {
         // TODO path segmentation
-        Ok(Operand::Place(Place::Var(
-            path_expr.segments.last().unwrap().clone(),
-        )))
+        Ok(Operand::Place(
+            self.gen_variable(path_expr.segments.last().unwrap()),
+        ))
     }
 
     fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<Operand, RccError> {
@@ -224,10 +219,7 @@ impl IRBuilder {
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<Operand, RccError> {
         let d = self.gen_temp_variable(unary_expr.expr.type_info());
-        let operand = self.visit_expr(
-            &mut unary_expr.expr,
-            d,
-        )?;
+        let operand = self.visit_expr(&mut unary_expr.expr, d)?;
         todo!()
     }
 
@@ -287,6 +279,38 @@ impl IRBuilder {
         Ok(Operand::Place(dest))
     }
 
+    /// ## Example1
+    ///
+    /// let a = foo() && bar();
+    ///
+    /// ...
+    /// a_0 = foo()
+    /// if not a_0 jump LABEL1
+    /// $0 = bar()
+    /// a_0 = $0
+    /// LABEL1:
+    /// ...
+    ///
+    /// ## Example2
+    ///
+    /// if foo() && bar() {
+    ///     ...
+    /// }
+    ///
+    /// ...
+    /// $0_0 = foo()
+    /// if not a_0 jump LABEL1
+    /// $1_0 = bar()
+    ///
+    fn visit_and_and_expr(
+        &mut self,
+        bin_op_expr: &mut BinOpExpr,
+        dest: Place,
+    ) -> Result<Operand, RccError> {
+        debug_assert_eq!(bin_op_expr.bin_op, BinOperator::AndAnd);
+        todo!()
+    }
+
     fn visit_array_expr(&mut self, array_expr: &mut ArrayExpr) -> Result<Operand, RccError> {
         unimplemented!()
     }
@@ -333,6 +357,7 @@ impl IRBuilder {
     }
 
     fn visit_if_expr(&mut self, if_expr: &mut IfExpr) -> Result<Operand, RccError> {
+        for cond in if_expr.conditions.iter_mut() {}
         unimplemented!()
     }
 
