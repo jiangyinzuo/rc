@@ -26,14 +26,14 @@ fn item_fn_test() {
                 "main".into(),
                 FnParams::new(),
                 "i32".into(),
-                BlockExpr::new().expr_without_block(LitNum(0.into())),
+                BlockExpr::new(0).expr_without_block(LitNum(0.into())),
             ))),
             Ok(Item::Fn(ItemFn::new(
                 Priv,
                 "oops".into(),
                 FnParams::new(),
                 TypeAnnotation::Unit,
-                BlockExpr::new(),
+                BlockExpr::new(0),
             ))),
             Ok(Item::Fn(ItemFn::new(
                 Priv,
@@ -49,7 +49,7 @@ fn item_fn_test() {
                     ),
                 ].into(),
                 "i32".into(),
-                BlockExpr::new().expr_without_block(BinOp(BinOpExpr::new(
+                BlockExpr::new(0).expr_without_block(BinOp(BinOpExpr::new(
                     "a".into(),
                     BinOperator::Plus,
                     "b".into(),

@@ -316,11 +316,11 @@ impl PartialEq for BlockExpr {
 }
 
 impl BlockExpr {
-    pub fn new() -> BlockExpr {
+    pub fn new(scope_id: u64) -> BlockExpr {
         BlockExpr {
             stmts: vec![],
             expr_without_block: None,
-            scope: Scope::new(),
+            scope: Scope::new(scope_id),
             type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }
@@ -337,7 +337,7 @@ impl From<Vec<Stmt>> for BlockExpr {
         BlockExpr {
             stmts,
             expr_without_block: None,
-            scope: Scope::new(),
+            scope: Scope::new(0),
             type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
     }

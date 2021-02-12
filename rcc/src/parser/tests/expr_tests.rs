@@ -162,11 +162,11 @@ fn if_expr_test() {
         vec![
             Ok(If(IfExpr::from_exprs(
                 vec![LitBool(true)],
-                vec![BlockExpr::new(), BlockExpr::new()],
+                vec![BlockExpr::new(0), BlockExpr::new(0)],
             ))),
             Ok(If(IfExpr::from_exprs(
                 vec![LitBool(false)],
-                vec![BlockExpr::new().expr_without_block(LitBool(true))],
+                vec![BlockExpr::new(0).expr_without_block(LitBool(true))],
             ))),
         ],
     );

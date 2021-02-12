@@ -21,10 +21,11 @@ use std::ops::Deref;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub enum VarKind {
     Static,
     Const,
+    LitConst,
     LocalMut,
     Local,
 }
@@ -47,6 +48,10 @@ impl VarInfo {
 
     pub fn stmt_id(&self) -> u64 {
         self.stmt_id
+    }
+
+    pub fn kind(&self) -> VarKind {
+        self.kind
     }
 }
 
@@ -570,6 +575,7 @@ impl SymbolResolver {
                 path_expr.expr_kind = match var_info.kind {
                     VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
                     VarKind::Const | VarKind::Local => ExprKind::Place,
+                    VarKind::LitConst => unreachable!()
                 };
                 Ok(())
             } else {

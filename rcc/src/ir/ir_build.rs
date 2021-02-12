@@ -1,11 +1,16 @@
 use crate::analyser::scope::ScopeStack;
-use crate::analyser::sym_resolver::TypeInfo;
-use crate::ast::expr::{ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BlockExpr, BreakExpr, CallExpr, Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr, BinOperator};
+use crate::analyser::sym_resolver::{TypeInfo, VarKind};
+use crate::ast::expr::{
+    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
+    Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
+    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp,
+    WhileExpr,
+};
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
-use crate::ast::types::{TypeAnnotation, TypeLitNum};
+use crate::ast::types::{TypeLitNum};
 use crate::ast::AST;
 use crate::ir::{Func, IRInst, IRType, Operand, Place, IR};
 use crate::rcc::RccError;
@@ -18,6 +23,7 @@ pub struct IRBuilder {
     cur_fn: Func,
 
     scope_stack: ScopeStack,
+    label_stack: Vec<String>,
 }
 
 impl IRBuilder {
@@ -26,6 +32,7 @@ impl IRBuilder {
             ir_output: IR::new(),
             cur_fn: Func::new(),
             scope_stack: ScopeStack::new(),
+            label_stack: vec![]
         }
     }
 
@@ -37,19 +44,18 @@ impl IRBuilder {
     }
 
     fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> Place {
-        Place::Var(
+        Place::local(
             self.scope_stack
                 .cur_scope_mut()
                 .gen_temp_variable(type_info),
         )
     }
 
-    fn gen_variable(&mut self, ident: &str) -> Place {
-        Place::Var(format!(
-            "{}_{}",
-            ident,
-            self.scope_stack.cur_scope().scope_id()
-        ))
+    fn gen_variable(&mut self, ident: &str, var_kind: VarKind) -> Place {
+        Place::new(
+            format!("{}_{}", ident, self.scope_stack.cur_scope().scope_id()),
+            var_kind,
+        )
     }
 
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
@@ -103,11 +109,19 @@ impl IRBuilder {
     }
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
+        let is_mut = let_stmt.is_mut();
         if let Some(expr) = &mut let_stmt.expr {
             match &let_stmt.pattern {
                 Pattern::Identifier(ident_pattern) => {
                     let ident = ident_pattern.ident();
-                    let dest = self.gen_variable(ident);
+                    let dest = self.gen_variable(
+                        ident,
+                        if is_mut {
+                            VarKind::LocalMut
+                        } else {
+                            VarKind::Local
+                        },
+                    );
                     self.visit_expr(expr, dest)?;
                 }
             }
@@ -180,9 +194,9 @@ impl IRBuilder {
 
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Operand, RccError> {
         // TODO path segmentation
-        Ok(Operand::Place(
-            self.gen_variable(path_expr.segments.last().unwrap()),
-        ))
+        let ident = path_expr.segments.last().unwrap();
+        let var_info = self.scope_stack.cur_scope().find_variable(ident).unwrap();
+        Ok(Operand::Place(self.gen_variable(ident, var_info.kind())))
     }
 
     fn visit_lit_num_expr(&mut self, lit_num_expr: &mut LitNumExpr) -> Result<Operand, RccError> {
@@ -228,15 +242,18 @@ impl IRBuilder {
         block_expr: &mut BlockExpr,
         dest: Place,
     ) -> Result<Operand, RccError> {
+        self.scope_stack.enter_scope(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt)?;
         }
 
-        Ok(if let Some(expr) = &mut block_expr.expr_without_block {
+        let result = Ok(if let Some(expr) = &mut block_expr.expr_without_block {
             self.visit_expr(&mut *expr, dest)?
         } else {
             Operand::Unit
-        })
+        });
+        self.scope_stack.exit_scope();
+        result
     }
 
     fn visit_assign_expr(&mut self, assign_expr: &mut AssignExpr) -> Result<Operand, RccError> {
@@ -281,33 +298,108 @@ impl IRBuilder {
 
     /// ## Example1
     ///
-    /// let a = foo() && bar();
+    /// let a = A() && B() || C() || D();
     ///
+    /// <=>
+    /// if A() {
+    ///     if B() {
+    ///         goto LABEL
+    ///     }
+    /// }
+    /// if C() {
+    ///     goto LABEL
+    /// }
+    /// if D() {
+    ///     goto LABEL (delete the last "goto LABEL")
+    /// }
+    /// LABEL:
     /// ...
-    /// a_0 = foo()
-    /// if not a_0 jump LABEL1
-    /// $0 = bar()
-    /// a_0 = $0
-    /// LABEL1:
+    ///
+    /// <=>
+    /// a_0 = A()
+    /// if not a_0 goto LABEL
+    /// a_0 = B()
+    /// if not a_0 goto LABEL
+    /// a_0 = C()
+    /// if a_0 goto LABEL
+    /// a_0 = D()
+    /// if a_0 goto LABEL
+    /// LABEL:
     /// ...
     ///
     /// ## Example2
     ///
-    /// if foo() && bar() {
+    /// if A() && B() || C() && (D() || E()) {
     ///     ...
     /// }
     ///
-    /// ...
-    /// $0_0 = foo()
-    /// if not a_0 jump LABEL1
-    /// $1_0 = bar()
+    /// <=>
     ///
-    fn visit_and_and_expr(
+    /// if A() {
+    ///     if B() {
+    ///         goto BLOCK
+    ///     } else {
+    ///         goto NEXT_STMT1
+    ///     }
+    /// } else {
+    ///     goto NEXT_STMT1
+    /// }
+    /// NEXT_STMT1:
+    /// if C() {
+    ///     if D() {
+    ///         goto BLOCK
+    ///     } else {
+    ///         goto NEXT_STMT3
+    ///     }
+    ///     NEXT_STMT3:
+    ///     if E() {
+    ///         goto BLOCK
+    ///     } else {
+    ///         goto NEXT_STMT2
+    ///     }
+    /// } else {
+    ///     goto NEXT_STMT2
+    /// }
+    /// goto NEXT_STMT2
+    /// BLOCK:
+    /// ...
+    /// NEXT_STMT2:
+    /// ...
+    ///
+    /// <=>
+    /// $0_0 = A()
+    /// if not $0_0 goto NEXT_STMT1
+    /// $0_0 = B()
+    /// if not $0_0 goto LABEL1
+    /// $0_0 = baz()
+    /// if $0_0
+    ///
+    /// LABEL1
+    ///
+    fn visit_logic_bin_expr(
         &mut self,
         bin_op_expr: &mut BinOpExpr,
         dest: Place,
     ) -> Result<Operand, RccError> {
-        debug_assert_eq!(bin_op_expr.bin_op, BinOperator::AndAnd);
+        debug_assert!(matches!(
+            bin_op_expr.bin_op,
+            BinOperator::AndAnd | BinOperator::OrOr
+        ));
+        let lhs = self.visit_expr(
+            &mut bin_op_expr.lhs,
+            dest,
+        )?;
+        let if_inst = if bin_op_expr.bin_op == BinOperator::AndAnd {
+            IRInst::jump_if_not(lhs)
+        } else {
+            IRInst::jump_if(lhs)
+        };
+        let if_idx = self.ir_output.instructions.len();
+        self.ir_output.add_instructions(if_inst);
+        // let rhs = self.visit_expr(
+        //     &mut bin_op_expr.rhs,
+        //     dest.clone(),
+        // );
         todo!()
     }
 

@@ -13,7 +13,7 @@ use std::rc::Rc;
 
 lazy_static! {
     pub static ref BULITIN_SCOPE: Scope = {
-        let mut s = Scope::new();
+        let mut s = Scope::new(0);
         s.types.insert("bool".into(), Bool);
         s.types.insert("char".into(), Char);
         s.types.insert("str".into(), Str);
@@ -35,8 +35,6 @@ lazy_static! {
     };
 }
 
-thread_local! { pub static SCOPE_ID: RefCell<u64> = RefCell::new(0); }
-
 pub struct Scope {
     father: Option<NonNull<Scope>>,
     pub(crate) types: HashMap<String, TypeInfo>,
@@ -49,13 +47,7 @@ pub struct Scope {
 unsafe impl std::marker::Sync for Scope {}
 
 impl Scope {
-    pub fn new() -> Scope {
-        let scope_id = SCOPE_ID.with(|f| {
-            let id = *f.borrow_mut();
-            *f.borrow_mut() += 1;
-            id
-        });
-
+    pub fn new(scope_id: u64) -> Scope {
         Scope {
             father: None,
             types: HashMap::new(),
@@ -83,7 +75,7 @@ impl Scope {
         }
     }
 
-    pub fn find_variable(&mut self, ident: &str) -> Option<&VarInfo> {
+    pub fn find_variable(& self, ident: &str) -> Option<&VarInfo> {
         let mut cur_scope: *const Scope = self;
         loop {
             let s = unsafe { &*cur_scope };

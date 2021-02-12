@@ -51,6 +51,7 @@ pub trait Parse: Sized + Debug + PartialEq {
 pub struct ParseCursor<'a> {
     token_stream: Vec<Token<'a>>,
     token_idx: usize,
+    scope_count: u64
 }
 
 impl<'a> ParseCursor<'a> {
@@ -58,6 +59,7 @@ impl<'a> ParseCursor<'a> {
         ParseCursor {
             token_stream,
             token_idx: 0,
+            scope_count: 1
         }
     }
 

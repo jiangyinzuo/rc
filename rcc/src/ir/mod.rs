@@ -1,17 +1,16 @@
 pub mod ir_build;
+#[cfg(test)]
 mod tests;
 
-use crate::analyser::sym_resolver::TypeInfo;
+use crate::analyser::sym_resolver::{TypeInfo, VarKind};
 use crate::ast::expr::BinOperator;
 use crate::ast::types::TypeLitNum;
-use crate::ir::Place::Label;
 use crate::rcc::RccError;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
 #[derive(Debug, PartialEq)]
 pub enum Jump {
-    J,
     JEq,
     JNe,
     JLt,
@@ -41,14 +40,35 @@ pub enum Operand {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Place {
-    Label(String),
-    Var(String),
+pub struct Place {
+    label: String,
+    kind: VarKind,
 }
 
 impl Place {
-    pub fn var(ident: String) -> Place {
-        Place::Var(ident)
+    pub fn new(label: String, kind: VarKind) -> Place {
+        Place { label, kind }
+    }
+
+    pub fn local(label: String) -> Place {
+        Place {
+            label,
+            kind: VarKind::Local,
+        }
+    }
+
+    pub fn local_mut(label: String) -> Place {
+        Place {
+            label,
+            kind: VarKind::LocalMut,
+        }
+    }
+
+    pub fn lit_const(label: String) -> Place {
+        Place {
+            label,
+            kind: VarKind::LitConst,
+        }
     }
 }
 
@@ -128,10 +148,20 @@ pub enum IRInst {
         label: String,
     },
 
-    JumpIf {
+    JumpIfCond {
         cond: Jump,
         src1: Operand,
         src2: Operand,
+        label: String,
+    },
+
+    JumpIf {
+        cond: Operand,
+        label: String,
+    },
+
+    JumpIfNot {
+        cond: Operand,
         label: String,
     },
 
@@ -173,6 +203,20 @@ impl IRInst {
     pub fn load_data(dest: Place, src: Operand) -> IRInst {
         IRInst::LoadData { dest, src }
     }
+
+    pub fn jump_if(cond: Operand) -> IRInst {
+        IRInst::JumpIf {
+            cond,
+            label: String::new(),
+        }
+    }
+    
+    pub fn jump_if_not(cond: Operand) -> IRInst {
+        IRInst::JumpIfNot {
+            cond,
+            label: String::new(),
+        }
+    }
 }
 
 pub enum StrKind {
@@ -198,7 +242,7 @@ impl IR {
     pub fn add_lit_str(&mut self, s: String) -> Operand {
         let label = format!(".LC{}", self.strs.len());
         self.strs.insert(label.clone(), s);
-        Operand::Place(Label(label))
+        Operand::Place(Place::lit_const(label))
     }
 
     pub fn add_func(&mut self, func: Func) {

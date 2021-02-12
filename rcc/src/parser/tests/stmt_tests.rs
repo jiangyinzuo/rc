@@ -64,7 +64,7 @@ fn expr_stmt_test() {
     assert_eq!(
         res,
         Ok(Expr::Block(
-            BlockExpr::from(vec![ExprStmt(Expr::Loop(LoopExpr::new(BlockExpr::new()))),])
+            BlockExpr::from(vec![ExprStmt(Expr::Loop(LoopExpr::new(BlockExpr::new(0)))),])
                 .expr_without_block(Expr::Unary(UnAryExpr::new(UnOp::Borrow, LitBool(true))))
         ))
     );

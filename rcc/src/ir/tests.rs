@@ -1,4 +1,3 @@
-use crate::analyser::scope::SCOPE_ID;
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::expr::BinOperator;
 use crate::ast::AST;
@@ -8,11 +7,14 @@ use crate::ir::{IRInst, IRType, Operand, Place, IR};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
+use std::sync::Mutex;
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref LOCK: Mutex<i32> = Mutex::default();
+}
 
 fn ir_build(input: &str) -> Result<IR, RccError> {
-    SCOPE_ID.with(|f| {
-        *f.borrow_mut() = 0;
-    });
     let mut ir_builder = IRBuilder::new();
     let mut lexer = Lexer::new(input);
     let mut cursor = ParseCursor::new(lexer.tokenize());
@@ -32,7 +34,7 @@ fn test_ir_builder() {
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
-            Place::var("a_0".into()),
+            Place::local("a_2".into()),
             I32(2),
             I32(3),
         ),
@@ -54,18 +56,19 @@ fn test_return() {
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
-            Place::var("b_0".into()),
+            Place::local("b_2".into()),
             I32(3),
             I32(4),
         ),
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
-            Place::var("$0_0".into()),
-            Operand::Place(Place::var("b_0".into())),
+            Place::local("$0_1".into()),
+            Operand::Place(Place::local("b_2".into())),
             I32(3),
         ),
-        IRInst::Ret(Operand::Place(Place::var("$0_0".into()))),
+        IRInst::Ret(Operand::Place(Place::local("$0_1".into()))),
     ];
     assert_eq!(insts, ir.instructions);
 }
+

@@ -371,7 +371,8 @@ pub mod primitive {
     impl Parse for BlockExpr {
         fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
             cursor.eat_token_eq(Token::LeftCurlyBraces)?;
-            let mut block_expr = BlockExpr::new();
+            let mut block_expr = BlockExpr::new(cursor.scope_count);
+            cursor.scope_count += 1;
             while cursor.next_token()? != &Token::RightCurlyBraces {
                 match parse_stmt_or_expr_without_block(cursor)? {
                     StmtOrExpr::Stmt(stmt) => {

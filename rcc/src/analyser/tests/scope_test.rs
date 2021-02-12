@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 #[test]
 fn scope_test() {
-    let mut scope = Scope::new();
+    let mut scope = Scope::new(0);
     let var_info = VarInfo::new(3, VarKind::Local, Rc::new(RefCell::new(TypeInfo::LitNum(TypeLitNum::U64))));
 
     scope.cur_stmt_id = 1;

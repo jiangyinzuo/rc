@@ -3,6 +3,7 @@ use crate::ast::expr::Expr;
 use crate::ast::types::TypeAnnotation;
 use crate::ast::stmt::Stmt::ExprStmt;
 use crate::ast::item::Item;
+use crate::analyser::sym_resolver::VarKind;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
@@ -42,5 +43,13 @@ impl LetStmt {
     pub fn expr(mut self, expr: Expr) -> Self {
         self.expr = Some(expr);
         self
+    }
+    
+    pub fn is_mut(&self) -> bool {
+        match &self.pattern {
+            Pattern::Identifier(i) => {
+                i.is_mut()
+            }
+        }
     }
 }

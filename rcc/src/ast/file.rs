@@ -9,8 +9,8 @@ pub struct File {
 }
 
 impl File {
-    pub fn new() -> File {
-        let mut file_scope = Scope::new();
+    pub fn new(scope_id: u64) -> File {
+        let mut file_scope = Scope::new(scope_id);
         file_scope.set_father_as_builtin_scope();
         File {
             items: vec![],

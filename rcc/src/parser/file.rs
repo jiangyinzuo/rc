@@ -7,7 +7,8 @@ use crate::rcc::RccError;
 
 impl Parse for File {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        let mut file = File::new();
+        let mut file = File::new(cursor.scope_count);
+        cursor.scope_count += 1;
         while !cursor.is_eof() {
             let item = Item::parse(cursor)?;
             file.scope.add_typedef(&item);
