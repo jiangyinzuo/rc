@@ -1,3 +1,4 @@
+use crate::analyser::scope::SCOPE_ID;
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::expr::BinOperator;
 use crate::ast::AST;
@@ -9,6 +10,9 @@ use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 
 fn ir_build(input: &str) -> Result<IR, RccError> {
+    SCOPE_ID.with(|f| {
+        *f.borrow_mut() = 0;
+    });
     let mut ir_builder = IRBuilder::new();
     let mut lexer = Lexer::new(input);
     let mut cursor = ParseCursor::new(lexer.tokenize());
@@ -45,7 +49,7 @@ fn test_return() {
         b + 3
     }"#,
     )
-        .unwrap();
+    .unwrap();
     let insts = vec![
         IRInst::bin_op(
             BinOperator::Plus,
@@ -64,5 +68,4 @@ fn test_return() {
         IRInst::Ret(Operand::Place(Place::var("$0_0".into()))),
     ];
     assert_eq!(insts, ir.instructions);
-
 }

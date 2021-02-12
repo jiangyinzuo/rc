@@ -35,7 +35,7 @@ lazy_static! {
     };
 }
 
-thread_local! { static SCOPE_ID: RefCell<u64> = RefCell::new(0); }
+thread_local! { pub static SCOPE_ID: RefCell<u64> = RefCell::new(0); }
 
 pub struct Scope {
     father: Option<NonNull<Scope>>,
