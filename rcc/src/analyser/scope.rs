@@ -5,6 +5,7 @@ use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
 use lazy_static::lazy_static;
+use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -35,7 +36,7 @@ lazy_static! {
     };
 }
 
-static mut SCOPE_ID: u64 = 0;
+thread_local! { static SCOPE_ID: RefCell<u64> = RefCell::new(0); }
 
 pub struct Scope {
     father: Option<NonNull<Scope>>,
@@ -50,18 +51,21 @@ unsafe impl std::marker::Sync for Scope {}
 
 impl Scope {
     pub fn new() -> Scope {
-        unsafe {
-            let scope = Scope {
-                father: None,
-                types: HashMap::new(),
-                variables: HashMap::new(),
-                cur_stmt_id: 0,
-                temp_count: 0,
-                scope_id: SCOPE_ID,
-            };
-            SCOPE_ID += 1;
-            scope
-        }
+        let scope_id = SCOPE_ID.with(|f| {
+            let id = *f.borrow_mut();
+            *f.borrow_mut() += 1;
+            id
+        });
+
+        let scope = Scope {
+            father: None,
+            types: HashMap::new(),
+            variables: HashMap::new(),
+            cur_stmt_id: 0,
+            temp_count: 0,
+            scope_id,
+        };
+        scope
     }
 
     pub fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> String {
