@@ -1,6 +1,5 @@
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::analyser::tests::get_ast_file;
-use crate::ast::visit::Visit;
 use crate::rcc::RccError;
 
 fn file_validate(inputs: &[&str], expecteds: &[Result<(), RccError>]) {

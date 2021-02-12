@@ -7,7 +7,6 @@ pub mod types;
 pub mod expr;
 pub mod stmt;
 pub mod pattern;
-pub mod visit;
 
 #[macro_export]
 macro_rules! from_token {

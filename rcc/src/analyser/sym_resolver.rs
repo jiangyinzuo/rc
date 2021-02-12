@@ -8,11 +8,11 @@ use crate::ast::expr::{
     WhileExpr,
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
-use crate::ast::item::{Fields, ItemFn, ItemStruct, TypeEnum};
+use crate::ast::file::File;
+use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
-use crate::ast::visit::Visit;
 use crate::ast::Visibility;
 use crate::rcc::RccError;
 use std::cell::{Ref, RefCell};
@@ -383,11 +383,69 @@ impl SymbolResolver {
     }
 }
 
-impl Visit for SymbolResolver {
-    type ReturnType = ();
+impl SymbolResolver {
+    pub(crate) fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
+        self.scope_stack.enter_file(file);
+        for item in file.items.iter_mut() {
+            self.visit_item(item)?;
+        }
+        Ok(())
+    }
 
-    fn scope_stack_mut(&mut self) -> &mut ScopeStack {
-        &mut self.scope_stack
+    fn visit_item(&mut self, item: &mut Item) -> Result<(), RccError> {
+        match item {
+            Item::Fn(item_fn) => self.visit_item_fn(item_fn),
+            Item::Struct(item_struct) => self.visit_item_struct(item_struct),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &mut Expr) -> Result<(), RccError> {
+        let result = match expr {
+            Expr::Path(path_expr) => self.visit_path_expr(path_expr),
+            Expr::LitNum(lit_num_expr) => Ok(()),
+            Expr::LitBool(lit_bool) => Ok(()),
+            Expr::LitChar(lig_char) => Ok(()),
+            Expr::LitStr(s) => self.visit_lit_str(s),
+            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
+            Expr::Block(block_expr) => self.visit_block_expr(block_expr),
+            Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
+            // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
+            Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr),
+            Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr),
+            // Expr::Array(array_expr) => self.visit_array_expr(array_expr),
+            // Expr::ArrayIndex(array_index_expr) => self.visit_array_index_expr(array_index_expr),
+            // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
+            // Expr::TupleIndex(tuple_index_expr) => self.visit_tuple_index_expr(tuple_index_expr),
+            // Expr::Struct(struct_expr) => self.visit_struct_expr(struct_expr),
+            Expr::Call(call_expr) => self.visit_call_expr(call_expr),
+            // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
+            Expr::While(while_expr) => self.visit_while_expr(while_expr),
+            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
+            Expr::If(if_expr) => self.visit_if_expr(if_expr),
+            Expr::Return(return_expr) => self.visit_return_expr(return_expr),
+            Expr::Break(break_expr) => self.visit_break_expr(break_expr),
+            _ => unimplemented!(),
+        };
+        debug_assert_ne!(
+            ExprKind::Unknown,
+            expr.kind(),
+            "unknown expr kind: {:?}",
+            expr
+        );
+        result
+    }
+
+    fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<(), RccError> {
+        let r = match lhs_expr {
+            LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
+            _ => todo!("visit lhs expr"),
+        };
+        Ok(r)
+    }
+
+    fn visit_grouped_expr(&mut self, grouped_expr: &mut GroupedExpr) -> Result<(), RccError> {
+        self.visit_expr(grouped_expr)
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
@@ -529,25 +587,7 @@ impl Visit for SymbolResolver {
         }
     }
 
-    fn visit_lit_num_expr(
-        &mut self,
-        _lit_num_expr: &mut LitNumExpr,
-    ) -> Result<Self::ReturnType, RccError> {
-        // do nothing
-        Ok(())
-    }
-
-    fn visit_lit_bool(&mut self, _lit_bool: &mut bool) -> Result<Self::ReturnType, RccError> {
-        // do nothing
-        Ok(())
-    }
-
-    fn visit_lit_char(&mut self, _lit_char: &mut char) -> Result<Self::ReturnType, RccError> {
-        // do nothing
-        Ok(())
-    }
-
-    fn visit_lit_str(&mut self, s: &String) -> Result<Self::ReturnType, RccError> {
+    fn visit_lit_str(&mut self, s: &String) -> Result<(), RccError> {
         if !self.str_constants.contains_key(s) {
             self.str_constants
                 .insert(s.to_string(), self.str_constants.len() as u64);

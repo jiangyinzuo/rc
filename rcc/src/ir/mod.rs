@@ -1,4 +1,5 @@
 pub mod ir_build;
+mod tests;
 
 use crate::analyser::sym_resolver::TypeInfo;
 use crate::ast::expr::BinOperator;
@@ -8,6 +9,7 @@ use crate::rcc::RccError;
 use std::collections::HashMap;
 use std::fmt::Debug;
 
+#[derive(Debug, PartialEq)]
 pub enum Jump {
     J,
     JEq,
@@ -16,7 +18,7 @@ pub enum Jump {
     JGe,
 }
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Operand {
     F32(f32),
     F64(f64),
@@ -35,17 +37,18 @@ pub enum Operand {
     U128(u128),
     Usize(usize),
     Place(Place),
+    Unit,
 }
 
-#[derive(Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Place {
     Label(String),
     Var(String),
 }
 
 impl Place {
-    pub fn var(ident: &str, scope_id: u64) -> Place {
-        Place::Var(format!("{}_{}", ident, scope_id))
+    pub fn var(ident: String) -> Place {
+        Place::Var(ident)
     }
 }
 
@@ -63,7 +66,7 @@ impl Func {
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 pub enum IRType {
     F32,
     F64,
@@ -88,10 +91,10 @@ impl IRType {
         let ir_type = match type_info {
             TypeInfo::LitNum(num) => match num {
                 TypeLitNum::F32 => IRType::F32,
-                TypeLitNum::F64 => IRType::F64,
+                TypeLitNum::F | TypeLitNum::F64 => IRType::F64,
                 TypeLitNum::I8 => IRType::I8,
                 TypeLitNum::I16 => IRType::I16,
-                TypeLitNum::I32 => IRType::I32,
+                TypeLitNum::I | TypeLitNum::I32 => IRType::I32,
                 TypeLitNum::I64 => IRType::I64,
                 TypeLitNum::I128 => IRType::I128,
                 TypeLitNum::Isize => IRType::Isize,
@@ -101,7 +104,6 @@ impl IRType {
                 TypeLitNum::U64 => IRType::U64,
                 TypeLitNum::U128 => IRType::U128,
                 TypeLitNum::Usize => IRType::Usize,
-                t => return Err(RccError::Parse(format!("invalid type {:?}", t).into())),
             },
             TypeInfo::Bool => IRType::Bool,
             TypeInfo::Char => IRType::Char,
@@ -112,6 +114,7 @@ impl IRType {
 }
 
 /// Immediate Presentation's Instructions
+#[derive(Debug, PartialEq)]
 pub enum IRInst {
     BinOp {
         op: BinOperator,
