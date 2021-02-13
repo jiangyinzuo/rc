@@ -280,6 +280,40 @@ pub struct BlockExpr {
     type_info: Rc<RefCell<TypeInfo>>,
 }
 
+impl BlockExpr {
+    pub fn new(scope_id: u64) -> BlockExpr {
+        BlockExpr {
+            stmts: vec![],
+            last_expr: None,
+            scope: Scope::new(scope_id),
+            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
+        }
+    }
+
+    pub fn expr_without_block(mut self, expr: Expr) -> Self {
+        debug_assert!(!expr.with_block());
+        self.last_expr = Some(Box::new(expr));
+        self
+    }
+
+    pub fn set_last_stmt_as_expr(&mut self) {
+        debug_assert!(self.last_expr.is_none());
+        debug_assert!(!self.stmts.is_empty());
+        let last_stmt = self.stmts.pop().unwrap();
+        match last_stmt {
+            Stmt::ExprStmt(e) => self.last_expr = Some(Box::new(e)),
+            e => panic!("{:?} can not be expr", e)
+        }
+    }
+
+    pub fn last_stmt_is_return(&self) -> bool {
+        self.last_expr.is_none() && match self.stmts.last() {
+            Some(s) => s.is_return(),
+            None => false
+        }
+    }
+}
+
 impl ExprVisit for BlockExpr {
     fn type_info(&self) -> Rc<RefCell<TypeInfo>> {
         self.type_info.clone()
@@ -313,34 +347,6 @@ impl PartialEq for BlockExpr {
     fn eq(&self, other: &Self) -> bool {
         self.stmts.eq(&other.stmts) && self.last_expr.eq(&other.last_expr)
     }
-}
-
-impl BlockExpr {
-    pub fn new(scope_id: u64) -> BlockExpr {
-        BlockExpr {
-            stmts: vec![],
-            last_expr: None,
-            scope: Scope::new(scope_id),
-            type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
-        }
-    }
-
-    pub fn expr_without_block(mut self, expr: Expr) -> Self {
-        debug_assert!(!expr.with_block());
-        self.last_expr = Some(Box::new(expr));
-        self
-    }
-
-    pub fn set_last_stmt_as_expr(&mut self) {
-        debug_assert!(self.last_expr.is_none());
-        debug_assert!(!self.stmts.is_empty());
-        let last_stmt = self.stmts.pop().unwrap();
-        match last_stmt {
-            Stmt::ExprStmt(e) => self.last_expr = Some(Box::new(e)),
-            e => panic!("{:?} can not be expr", e)
-        }
-    }
-
 }
 
 impl From<Vec<Stmt>> for BlockExpr {

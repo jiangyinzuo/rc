@@ -31,6 +31,13 @@ impl Stmt {
             }
         }
     }
+
+    pub fn is_return(&self) -> bool {
+        match self {
+            Self::Semi | Self::Item(_) | Self::Let(_) => false,
+            Self::ExprStmt(e) => matches!(e, Expr::Return(_)),
+        }
+    }
 }
 
 impl From<Expr> for Stmt {
