@@ -1,9 +1,10 @@
 use super::pattern::Pattern;
-use crate::ast::expr::Expr;
+use crate::ast::expr::{Expr, ExprVisit};
 use crate::ast::types::TypeAnnotation;
 use crate::ast::stmt::Stmt::ExprStmt;
 use crate::ast::item::Item;
-use crate::analyser::sym_resolver::VarKind;
+use crate::analyser::sym_resolver::TypeInfo;
+use std::ops::Deref;
 
 #[derive(Debug, PartialEq)]
 pub enum Stmt {
@@ -11,6 +12,19 @@ pub enum Stmt {
     Item(Item),
     Let(LetStmt),
     ExprStmt(Expr),
+}
+
+impl Stmt {
+    pub fn type_info(&self) -> TypeInfo {
+        match self {
+            Self::Semi  |Self::Item(_) | Self::Let(_) => TypeInfo::Unit,
+            Self::ExprStmt(e) => {
+                let tp = e.type_info();
+                let t = tp.borrow();
+                 t.deref().clone()
+            }
+        }
+    }
 }
 
 impl From<Expr> for Stmt {
@@ -23,7 +37,7 @@ impl From<Expr> for Stmt {
 pub struct LetStmt {
     pub pattern: Pattern,
     pub _type: Option<TypeAnnotation>,
-    pub expr: Option<Expr>,
+    pub rhs: Option<Expr>,
 }
 
 impl LetStmt {
@@ -31,7 +45,7 @@ impl LetStmt {
         LetStmt {
             pattern,
             _type: None,
-            expr: None,
+            rhs: None,
         }
     }
 
@@ -41,10 +55,10 @@ impl LetStmt {
     }
 
     pub fn expr(mut self, expr: Expr) -> Self {
-        self.expr = Some(expr);
+        self.rhs = Some(expr);
         self
     }
-    
+
     pub fn is_mut(&self) -> bool {
         match &self.pattern {
             Pattern::Identifier(i) => {

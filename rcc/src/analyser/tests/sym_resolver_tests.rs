@@ -235,6 +235,18 @@ fn return_test() {
             let a = loop{};
             a
            }"#,
+            r#"fn main() -> i32 { let mut a = 7;
+                 if a == 2 {a = 3;}
+                 else {
+                    a = 4;
+                 }
+            }"#,
+            r#"fn main() -> i32 { let mut a = 7;
+                 if a == 2 {3}
+                 else {
+                    a
+                 }
+            }"#,
         ],
         &[
             Ok(()),
@@ -243,6 +255,8 @@ fn return_test() {
             Ok(()),
             Ok(()),
             Ok(()),
+            Err("invalid return type: excepted `LitNum(i32)`, found `Unit`".into()),
+            Ok(())
         ],
     );
 }

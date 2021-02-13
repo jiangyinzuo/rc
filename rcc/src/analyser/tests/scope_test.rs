@@ -16,5 +16,5 @@ fn scope_test() {
     scope.cur_stmt_id = 8;
     scope.add_variable("a", VarKind::LocalMut, Rc::new(RefCell::new(TypeInfo::Bool)));
     scope.cur_stmt_id = 4;
-    assert_eq!(&var_info, scope.find_variable("a").unwrap());
+    assert_eq!(&var_info, scope.find_variable("a").unwrap().0);
 }

@@ -70,6 +70,10 @@ impl Place {
             kind: VarKind::LitConst,
         }
     }
+
+    pub fn is_temp(&self) -> bool {
+        self.label.starts_with("$")
+    }
 }
 
 pub struct Func {
@@ -145,24 +149,24 @@ pub enum IRInst {
     },
 
     Jump {
-        label: String,
+        label: usize,
     },
 
     JumpIfCond {
         cond: Jump,
         src1: Operand,
         src2: Operand,
-        label: String,
+        label: usize,
     },
 
     JumpIf {
         cond: Operand,
-        label: String,
+        label: usize,
     },
 
     JumpIfNot {
         cond: Operand,
-        label: String,
+        label: usize,
     },
 
     LoadData {
@@ -204,17 +208,54 @@ impl IRInst {
         IRInst::LoadData { dest, src }
     }
 
-    pub fn jump_if(cond: Operand) -> IRInst {
-        IRInst::JumpIf {
+    pub fn jump(label: usize) -> IRInst {
+        IRInst::Jump { label }
+    }
+
+    pub fn jump_if(cond: Operand, label: usize) -> IRInst {
+        IRInst::JumpIf { cond, label }
+    }
+
+    pub fn jump_if_not(cond: Operand, label: usize) -> IRInst {
+        IRInst::JumpIfNot { cond, label }
+    }
+
+    pub fn jump_if_cond(cond: Jump, src1: Operand, src2: Operand, label: usize) -> IRInst {
+        IRInst::JumpIfCond {
             cond,
-            label: String::new(),
+            src1,
+            src2,
+            label,
         }
     }
-    
-    pub fn jump_if_not(cond: Operand) -> IRInst {
-        IRInst::JumpIfNot {
-            cond,
-            label: String::new(),
+
+    pub fn set_jump_label(&mut self, new_label: usize) {
+        match self {
+            Self::Jump { label } => *label = new_label,
+            Self::JumpIfNot { cond, label } => *label = new_label,
+            Self::JumpIf { cond, label } => *label = new_label,
+            Self::JumpIfCond {
+                cond,
+                src1,
+                src2,
+                label,
+            } => *label = new_label,
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn jump_label(&self) -> usize {
+        *match self {
+            Self::Jump { label } => label,
+            Self::JumpIfNot { cond, label } => label,
+            Self::JumpIf { cond, label } => label,
+            Self::JumpIfCond {
+                cond,
+                src1,
+                src2,
+                label,
+            } => label,
+            ir => unreachable!("{:?}", ir),
         }
     }
 }
@@ -251,5 +292,14 @@ impl IR {
 
     pub fn add_instructions(&mut self, ir_inst: IRInst) {
         self.instructions.push(ir_inst);
+    }
+
+    /// Start from 1
+    pub fn next_inst_id(&mut self) -> usize {
+        self.instructions.len() + 1
+    }
+
+    pub fn get_inst_by_id(&mut self, id: usize) -> &mut IRInst {
+        self.instructions.get_mut(id - 1).unwrap()
     }
 }

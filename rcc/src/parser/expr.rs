@@ -382,8 +382,8 @@ pub mod primitive {
                         block_expr.stmts.push(stmt)
                     }
                     StmtOrExpr::Expr(expr) => {
-                        if block_expr.expr_without_block.is_none() {
-                            block_expr.expr_without_block = Some(Box::new(expr));
+                        if block_expr.last_expr.is_none() {
+                            block_expr.last_expr = Some(Box::new(expr));
                         } else {
                             return Err("expected `;`".into());
                         }

@@ -275,7 +275,7 @@ impl TokenStart for Expr {
 
 pub struct BlockExpr {
     pub stmts: Vec<Stmt>,
-    pub expr_without_block: Option<Box<Expr>>,
+    pub last_expr: Option<Box<Expr>>,
     pub scope: Scope,
     type_info: Rc<RefCell<TypeInfo>>,
 }
@@ -302,7 +302,7 @@ impl TypeInfoSetter for BlockExpr {
 
 impl Debug for BlockExpr {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match &self.expr_without_block {
+        match &self.last_expr {
             Some(expr) => write!(f, "{{ {:?} {:?} }}", self.stmts, expr),
             None => write!(f, "{{ {:?} }}", self.stmts),
         }
@@ -311,7 +311,7 @@ impl Debug for BlockExpr {
 
 impl PartialEq for BlockExpr {
     fn eq(&self, other: &Self) -> bool {
-        self.stmts.eq(&other.stmts) && self.expr_without_block.eq(&other.expr_without_block)
+        self.stmts.eq(&other.stmts) && self.last_expr.eq(&other.last_expr)
     }
 }
 
@@ -319,7 +319,7 @@ impl BlockExpr {
     pub fn new(scope_id: u64) -> BlockExpr {
         BlockExpr {
             stmts: vec![],
-            expr_without_block: None,
+            last_expr: None,
             scope: Scope::new(scope_id),
             type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }
@@ -327,16 +327,27 @@ impl BlockExpr {
 
     pub fn expr_without_block(mut self, expr: Expr) -> Self {
         debug_assert!(!expr.with_block());
-        self.expr_without_block = Some(Box::new(expr));
+        self.last_expr = Some(Box::new(expr));
         self
     }
+
+    pub fn set_last_stmt_as_expr(&mut self) {
+        debug_assert!(self.last_expr.is_none());
+        debug_assert!(!self.stmts.is_empty());
+        let last_stmt = self.stmts.pop().unwrap();
+        match last_stmt {
+            Stmt::ExprStmt(e) => self.last_expr = Some(Box::new(e)),
+            e => panic!("{:?} can not be expr", e)
+        }
+    }
+
 }
 
 impl From<Vec<Stmt>> for BlockExpr {
     fn from(stmts: Vec<Stmt>) -> Self {
         BlockExpr {
             stmts,
-            expr_without_block: None,
+            last_expr: None,
             scope: Scope::new(0),
             type_info: Rc::new(RefCell::new(TypeInfo::Unknown)),
         }

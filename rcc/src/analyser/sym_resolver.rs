@@ -478,12 +478,24 @@ impl SymbolResolver {
             }
         }
         self.visit_block_expr(&mut item_fn.fn_block)?;
-        if item_fn.fn_block.expr_without_block.is_some() {
+        if item_fn.fn_block.last_expr.is_some() {
             Self::try_determine_number_type(&self.cur_fn_ret_type, &mut item_fn.fn_block);
             let type_info = item_fn.fn_block.type_info();
             let t = type_info.borrow();
             let tp = t.deref();
             self.validate_ret_type(tp)?;
+        } else if item_fn.fn_block.stmts.is_empty() {
+            if item_fn.ret_type != TypeAnnotation::Unit {
+                return Err(format!(
+                    "invalid return type: expected `{:?}`, found `()`",
+                    item_fn.ret_type
+                )
+                .into());
+            }
+        } else {
+            let last_stmt = item_fn.fn_block.stmts.last().unwrap();
+            let type_info = last_stmt.type_info();
+            self.validate_ret_type(&type_info)?;
         }
 
         // restore
@@ -521,7 +533,7 @@ impl SymbolResolver {
     }
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
-        let expr_type_info = if let Some(expr) = &mut let_stmt.expr {
+        let expr_type_info = if let Some(expr) = &mut let_stmt.rhs {
             self.visit_expr(expr)?;
             if let Some(type_anno) = &let_stmt._type {
                 let anno_type_info =
@@ -570,12 +582,12 @@ impl SymbolResolver {
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<(), RccError> {
         if let Some(ident) = path_expr.segments.last() {
             let cur_scope = self.scope_stack.cur_scope_mut();
-            if let Some(var_info) = cur_scope.find_variable(ident) {
+            if let Some((var_info, _scope_id)) = cur_scope.find_variable(ident) {
                 path_expr.set_type_info_ref(var_info._type.clone());
                 path_expr.expr_kind = match var_info.kind {
                     VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
                     VarKind::Const | VarKind::Local => ExprKind::Place,
-                    VarKind::LitConst => unreachable!()
+                    VarKind::LitConst => unreachable!(),
                 };
                 Ok(())
             } else {
@@ -649,11 +661,19 @@ impl SymbolResolver {
 
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
         self.scope_stack.enter_scope(block_expr);
+
+        if block_expr.last_expr.is_none() && !block_expr.stmts.is_empty() {
+            if let Stmt::ExprStmt(_) = block_expr.stmts.last().unwrap() {
+                block_expr.set_last_stmt_as_expr();
+            }
+        }
+
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt)?;
             self.scope_stack.cur_scope_mut().cur_stmt_id += 1;
         }
-        if let Some(expr) = block_expr.expr_without_block.as_mut() {
+
+        if let Some(expr) = block_expr.last_expr.as_mut() {
             self.visit_expr(expr)?;
             self.scope_stack.cur_scope_mut().cur_stmt_id += 1;
             let type_info = expr.type_info();

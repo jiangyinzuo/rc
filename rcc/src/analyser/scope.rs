@@ -75,7 +75,8 @@ impl Scope {
         }
     }
 
-    pub fn find_variable(& self, ident: &str) -> Option<&VarInfo> {
+    /// Return var info and scope id
+    pub fn find_variable(& self, ident: &str) -> Option<(&VarInfo, u64)> {
         let mut cur_scope: *const Scope = self;
         loop {
             let s = unsafe { &*cur_scope };
@@ -83,7 +84,7 @@ impl Scope {
                 let mut left = 0;
                 let mut right = v.len();
                 if right == 1 {
-                    return Some(unsafe { v.get_unchecked(0) });
+                    return Some((unsafe { v.get_unchecked(0) }, s.scope_id));
                 }
                 while left < right {
                     let mid = (left + right + 1) / 2;
@@ -96,7 +97,7 @@ impl Scope {
                         left = mid;
                     }
                 }
-                return Some(unsafe { v.get_unchecked(left) });
+                return Some((unsafe { v.get_unchecked(left) }, s.scope_id));
             } else if let Some(f) = s.father {
                 cur_scope = f.as_ptr();
             } else {
@@ -164,10 +165,6 @@ impl Scope {
 
     pub fn set_father_as_builtin_scope(&mut self) {
         self.father = Some(NonNull::from(BULITIN_SCOPE.deref()));
-    }
-
-    pub fn scope_id(&self) -> u64 {
-        self.scope_id
     }
 }
 
