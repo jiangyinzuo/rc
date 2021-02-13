@@ -265,6 +265,7 @@ fn return_test() {
 fn never_type_test() {
     file_validate(
         &[
+            r#"fn f() -> i32 {loop {}}"#,
             r#"
         fn foo() -> i32 {
             let b: char = loop {
@@ -297,6 +298,7 @@ fn never_type_test() {
     "#,
         ],
         &[
+            Ok(()),
             Ok(()),
             Ok(()),
             Err("invalid operand type `Never` and `Bool` for `&`".into()),

@@ -245,6 +245,7 @@ pub mod primitive {
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
+    use crate::ast::stmt::Stmt;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | LitChar | LitStr | LitBool | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr
@@ -390,6 +391,15 @@ pub mod primitive {
                     }
                 }
             }
+
+            if block_expr.last_expr.is_none() && !block_expr.stmts.is_empty() {
+                if let Stmt::ExprStmt(e) = block_expr.stmts.last().unwrap() {
+                    if e.with_block() {
+                        block_expr.set_last_stmt_as_expr();
+                    }
+                }
+            }
+
             cursor.eat_token_eq(Token::RightCurlyBraces)?;
             Ok(block_expr)
         }

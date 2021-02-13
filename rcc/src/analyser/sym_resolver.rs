@@ -662,12 +662,6 @@ impl SymbolResolver {
     fn visit_block_expr(&mut self, block_expr: &mut BlockExpr) -> Result<(), RccError> {
         self.scope_stack.enter_scope(block_expr);
 
-        if block_expr.last_expr.is_none() && !block_expr.stmts.is_empty() {
-            if let Stmt::ExprStmt(_) = block_expr.stmts.last().unwrap() {
-                block_expr.set_last_stmt_as_expr();
-            }
-        }
-
         for stmt in block_expr.stmts.iter_mut() {
             self.visit_stmt(stmt)?;
             self.scope_stack.cur_scope_mut().cur_stmt_id += 1;

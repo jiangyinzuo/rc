@@ -1,9 +1,9 @@
 use super::pattern::Pattern;
-use crate::ast::expr::{Expr, ExprVisit};
-use crate::ast::types::TypeAnnotation;
-use crate::ast::stmt::Stmt::ExprStmt;
-use crate::ast::item::Item;
 use crate::analyser::sym_resolver::TypeInfo;
+use crate::ast::expr::{Expr, ExprVisit};
+use crate::ast::item::Item;
+use crate::ast::stmt::Stmt::ExprStmt;
+use crate::ast::types::TypeAnnotation;
 use std::ops::Deref;
 
 #[derive(Debug, PartialEq)]
@@ -17,11 +17,17 @@ pub enum Stmt {
 impl Stmt {
     pub fn type_info(&self) -> TypeInfo {
         match self {
-            Self::Semi  |Self::Item(_) | Self::Let(_) => TypeInfo::Unit,
+            Self::Semi | Self::Item(_) | Self::Let(_) => TypeInfo::Unit,
             Self::ExprStmt(e) => {
-                let tp = e.type_info();
-                let t = tp.borrow();
-                 t.deref().clone()
+                if e.with_block() {
+                    let tp = e.type_info();
+                    let t = tp.borrow();
+                    t.deref().clone()
+                } else if let Expr::Return(_) = e {
+                    TypeInfo::Never
+                } else {
+                    TypeInfo::Unit
+                }
             }
         }
     }
@@ -61,9 +67,7 @@ impl LetStmt {
 
     pub fn is_mut(&self) -> bool {
         match &self.pattern {
-            Pattern::Identifier(i) => {
-                i.is_mut()
-            }
+            Pattern::Identifier(i) => i.is_mut(),
         }
     }
 }
