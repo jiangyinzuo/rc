@@ -25,6 +25,7 @@ pub struct IRBuilder {
 
     scope_stack: ScopeStack,
     label_stack: Vec<String>,
+    loop_var_stack: Vec<Option<Place>>,
 }
 
 impl IRBuilder {
@@ -35,6 +36,7 @@ impl IRBuilder {
             fn_ret_temp_var: vec![],
             scope_stack: ScopeStack::new(),
             label_stack: vec![],
+            loop_var_stack: vec![]
         }
     }
 
@@ -107,7 +109,7 @@ impl IRBuilder {
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
                 let operand = self.visit_expr(expr, None)?;
-                debug_assert_eq!(operand, Operand::Unit, "{:?}", expr);
+                debug_assert!(operand == Operand::Unit || operand == Operand::Never, "{:?}", expr);
                 Ok(())
             }
         }
@@ -154,10 +156,10 @@ impl IRBuilder {
             // Expr::Struct(struct_expr) => self.visit_struct_expr(struct_expr),
             Expr::Call(call_expr) => self.visit_call_expr(call_expr),
             // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
-            Expr::While(while_expr) => self.visit_while_expr(while_expr),
-            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr),
+            Expr::While(while_expr) => self.visit_while_expr(while_expr, dest),
+            Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr, dest),
             Expr::If(if_expr) => self.visit_if_expr(if_expr, dest),
-            Expr::Return(return_expr) => self.visit_return_expr(return_expr),
+            Expr::Return(return_expr) => self.visit_return_expr(return_expr, dest),
             Expr::Break(break_expr) => self.visit_break_expr(break_expr),
             _ => unimplemented!(),
         };
@@ -296,7 +298,12 @@ impl IRBuilder {
         }
 
         let result = Ok(if let Some(expr) = &mut block_expr.last_expr {
-            self.visit_expr(&mut *expr, dest)?
+            let is_none = dest.is_none();
+            let res = self.visit_expr(&mut *expr, dest)?;
+            if is_none && res != Operand::Unit && res != Operand::Never {
+                return Err(format!("error in visiting block expr: expected `()`, found {:?}", res).into());
+            }
+            res
         } else {
             Operand::Unit
         });
@@ -447,12 +454,15 @@ impl IRBuilder {
         unimplemented!()
     }
 
-    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr) -> Result<Operand, RccError> {
+    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr, dest: Option<Place>) -> Result<Operand, RccError> {
         unimplemented!()
     }
 
-    fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr) -> Result<Operand, RccError> {
+    fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr, dest: Option<Place>) -> Result<Operand, RccError> {
         let loop_start_id = self.ir_output.next_inst_id();
+        self.loop_var_stack.push(dest);
+        self.visit_block_expr(&mut loop_expr.expr, None)?;
+        
         todo!()
     }
 
@@ -651,13 +661,24 @@ impl IRBuilder {
         }
     }
 
-    fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<Operand, RccError> {
-        let place = self.fn_ret_temp_var.last().unwrap();
-        // match return_expr.0 {
-        //     Some(e) => {self.visit_expr(&mut e)?}
-        //     None =>
-        // }
-        todo!()
+    fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr, dest: Option<Place>) -> Result<Operand, RccError> {
+        match &mut return_expr.0 {
+            Some( e) => {
+                let ret_place = self.fn_ret_temp_var.last().unwrap();
+                let operand = self.visit_expr(e.as_mut(), Some(ret_place.clone()))?;
+                self.ir_output.add_instructions(IRInst::Ret(operand));
+            }
+            None => {
+                self.ir_output.add_instructions(IRInst::Ret(Operand::Unit));
+            }
+        };
+        match dest {
+            Some(d) => {
+                self.ir_output.add_instructions(IRInst::load_data(d.clone(), Operand::Never));
+                Ok(Operand::Place(d))
+            }
+            None => Ok(Operand::Never)
+        }
     }
 
     fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<Operand, RccError> {

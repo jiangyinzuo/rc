@@ -37,6 +37,7 @@ pub enum Operand {
     Usize(usize),
     Place(Place),
     Unit,
+    Never,
 }
 
 #[derive(Debug, PartialEq, Clone)]

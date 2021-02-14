@@ -159,6 +159,21 @@ fn assign_expr_test() {
 }
 
 #[test]
+fn block_test() {
+    file_validate(&[r##"
+        fn main() {
+            let a = 3;
+            if true {
+                2
+            } else {
+                3
+            }
+            let b = 3;
+        }
+    "##], &[Err("invalid type for expr stmt: expected `()`, found LitNum(#i)".into())]);
+}
+
+#[test]
 fn loop_test() {
     file_validate(
         &[

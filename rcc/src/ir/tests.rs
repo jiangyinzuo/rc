@@ -69,6 +69,7 @@ fn test_return() {
 
 #[test]
 fn test_if() {
+    let last_ir_id = 22;
     macro_rules! triple {
         ($cond:ident, $src2:literal, $load_a:literal) => {
             &mut vec![
@@ -76,10 +77,10 @@ fn test_if() {
                     $cond,
                     Operand::Place(Place::local("b_2".into())),
                     Operand::I32($src2),
-                    22,
+                    last_ir_id,
                 ),
                 IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
-                IRInst::jump(22),
+                IRInst::jump(last_ir_id),
             ]
         };
     }
@@ -91,10 +92,10 @@ fn test_if() {
                     $cond,
                     Operand::I32($src1),
                     Operand::Place(Place::local("b_2".into())),
-                    22,
+                    last_ir_id,
                 ),
                 IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
-                IRInst::jump(22),
+                IRInst::jump(last_ir_id),
             ]
         };
     }
@@ -117,6 +118,9 @@ fn test_if() {
         } else {
             a = 333;
         }
+        if b == 2 {
+            return b;
+        }
         a
     }"#,
     )
@@ -138,10 +142,12 @@ fn test_if() {
     expected.append(triple!(JGe, 2, 3));
     expected.append(triple_reverse!(JLt, 33, 2));
     expected.append(triple!(JLt, 50, 22));
-    expected.append(&mut vec![IRInst::load_data(
-        Place::local_mut("a_2".into()),
-        I32(333),
-    ), IRInst::Ret(Operand::Place(Place::local_mut("a_2".into())))]);
+    expected.append(&mut vec![
+        IRInst::load_data(Place::local_mut("a_2".into()), I32(333)),
+        IRInst::jump_if_cond(JNe, Operand::Place(Place::local("b_2".into())), I32(2), 24),
+        IRInst::Ret(Operand::Place(Place::local("b_2".into()))),
+        IRInst::Ret(Operand::Place(Place::local_mut("a_2".into()))),
+    ]);
     println!("{:#?}", ir.instructions);
     assert_eq!(expected, ir.instructions);
 }
