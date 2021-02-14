@@ -80,7 +80,7 @@ impl IRBuilder {
 
         let dest = self.gen_temp_variable(item_fn.fn_block.type_info());
         self.fn_ret_temp_var.push(dest.clone());
-        let operand = self.visit_block_expr(&mut item_fn.fn_block, dest)?;
+        let operand = self.visit_block_expr(&mut item_fn.fn_block, Some(dest))?;
 
         if item_fn.fn_block.last_expr.is_none() && item_fn.fn_block.stmts.is_empty() {
             self.ir_output.add_instructions(IRInst::Ret(Operand::Unit));
@@ -106,8 +106,8 @@ impl IRBuilder {
             Stmt::Item(item) => self.visit_item(item),
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
-                let dest = self.gen_temp_variable(expr.type_info());
-                self.visit_expr(expr, dest)?;
+                let operand = self.visit_expr(expr, None)?;
+                debug_assert_eq!(operand, Operand::Unit, "{:?}", expr);
                 Ok(())
             }
         }
@@ -127,14 +127,14 @@ impl IRBuilder {
                             VarKind::Local
                         },
                     );
-                    let rhs = self.visit_expr(expr, dest)?;
+                    let rhs = self.visit_expr(expr, Some(dest))?;
                 }
             }
         }
         Ok(())
     }
 
-    fn visit_expr(&mut self, expr: &mut Expr, dest: Place) -> Result<Operand, RccError> {
+    fn visit_expr(&mut self, expr: &mut Expr, dest: Option<Place>) -> Result<Operand, RccError> {
         let result = match expr {
             Expr::Path(path_expr) => self.visit_path_expr(path_expr),
             Expr::LitNum(lit_num_expr) => self.visit_lit_num_expr(lit_num_expr, dest),
@@ -181,7 +181,7 @@ impl IRBuilder {
     fn visit_grouped_expr(
         &mut self,
         grouped_expr: &mut GroupedExpr,
-        dest: Place,
+        dest: Option<Place>,
     ) -> Result<Operand, RccError> {
         self.visit_expr(grouped_expr, dest)
     }
@@ -207,48 +207,72 @@ impl IRBuilder {
     fn visit_lit_num_expr(
         &mut self,
         lit_num_expr: &mut LitNumExpr,
-        dest: Place,
+        dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        let t = lit_num_expr.get_lit_type();
-        let operand = match t {
-            TypeLitNum::I8 => Operand::I8(lit_num_expr.value.parse()?),
-            TypeLitNum::I16 => Operand::I16(lit_num_expr.value.parse()?),
-            TypeLitNum::I | TypeLitNum::I32 => Operand::I32(lit_num_expr.value.parse()?),
-            TypeLitNum::I64 => Operand::I64(lit_num_expr.value.parse()?),
-            TypeLitNum::I128 => Operand::I128(lit_num_expr.value.parse()?),
-            TypeLitNum::Isize => Operand::Isize(lit_num_expr.value.parse()?),
-            TypeLitNum::U8 => Operand::U8(lit_num_expr.value.parse()?),
-            TypeLitNum::U16 => Operand::U16(lit_num_expr.value.parse()?),
-            TypeLitNum::U32 => Operand::U32(lit_num_expr.value.parse()?),
-            TypeLitNum::U64 => Operand::U64(lit_num_expr.value.parse()?),
-            TypeLitNum::U128 => Operand::U128(lit_num_expr.value.parse()?),
-            TypeLitNum::Usize => Operand::Usize(lit_num_expr.value.parse()?),
-            TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
-            TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
-        };
-        if !dest.is_temp() {
-            self.ir_output
-                .add_instructions(IRInst::load_data(dest, operand.clone()));
+        match dest {
+            Some(d) => {
+                let t = lit_num_expr.get_lit_type();
+                let operand = match t {
+                    TypeLitNum::I8 => Operand::I8(lit_num_expr.value.parse()?),
+                    TypeLitNum::I16 => Operand::I16(lit_num_expr.value.parse()?),
+                    TypeLitNum::I | TypeLitNum::I32 => Operand::I32(lit_num_expr.value.parse()?),
+                    TypeLitNum::I64 => Operand::I64(lit_num_expr.value.parse()?),
+                    TypeLitNum::I128 => Operand::I128(lit_num_expr.value.parse()?),
+                    TypeLitNum::Isize => Operand::Isize(lit_num_expr.value.parse()?),
+                    TypeLitNum::U8 => Operand::U8(lit_num_expr.value.parse()?),
+                    TypeLitNum::U16 => Operand::U16(lit_num_expr.value.parse()?),
+                    TypeLitNum::U32 => Operand::U32(lit_num_expr.value.parse()?),
+                    TypeLitNum::U64 => Operand::U64(lit_num_expr.value.parse()?),
+                    TypeLitNum::U128 => Operand::U128(lit_num_expr.value.parse()?),
+                    TypeLitNum::Usize => Operand::Usize(lit_num_expr.value.parse()?),
+                    TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
+                    TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
+                };
+
+                if !d.is_temp() {
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(d, operand.clone()));
+                }
+                Ok(operand)
+            }
+            None => Ok(Operand::Unit),
         }
-        Ok(operand)
     }
 
-    fn visit_lit_bool(&mut self, lit_bool: &mut bool, dest: Place) -> Result<Operand, RccError> {
-        let operand = Operand::Bool(*lit_bool);
-        if !dest.is_temp() {
-            self.ir_output
-                .add_instructions(IRInst::load_data(dest, operand.clone()));
+    fn visit_lit_bool(
+        &mut self,
+        lit_bool: &mut bool,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
+        match dest {
+            Some(d) => {
+                let operand = Operand::Bool(*lit_bool);
+                if !d.is_temp() {
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(d, operand.clone()));
+                }
+                Ok(operand)
+            }
+            None => Ok(Operand::Unit),
         }
-        Ok(operand)
     }
 
-    fn visit_lit_char(&mut self, lit_char: &mut char, dest: Place) -> Result<Operand, RccError> {
-        let operand = Operand::Char(*lit_char);
-        if !dest.is_temp() {
-            self.ir_output
-                .add_instructions(IRInst::load_data(dest, operand.clone()));
+    fn visit_lit_char(
+        &mut self,
+        lit_char: &mut char,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
+        match dest {
+            Some(d) => {
+                let operand = Operand::Char(*lit_char);
+                if !d.is_temp() {
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(d, operand.clone()));
+                }
+                Ok(operand)
+            }
+            None => Ok(Operand::Unit),
         }
-        Ok(operand)
     }
 
     fn visit_lit_str(&mut self, s: &String) -> Result<Operand, RccError> {
@@ -256,15 +280,15 @@ impl IRBuilder {
     }
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<Operand, RccError> {
-        let d = self.gen_temp_variable(unary_expr.expr.type_info());
-        let operand = self.visit_expr(&mut unary_expr.expr, d)?;
+        // let d = self.gen_temp_variable(unary_expr.expr.type_info());
+        // let operand = self.visit_expr(&mut unary_expr.expr, d)?;
         todo!()
     }
 
     fn visit_block_expr(
         &mut self,
         block_expr: &mut BlockExpr,
-        dest: Place,
+        dest: Option<Place>,
     ) -> Result<Operand, RccError> {
         self.scope_stack.enter_scope(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
@@ -286,7 +310,7 @@ impl IRBuilder {
             Operand::Place(p) => p,
             _ => unimplemented!(),
         };
-        self.visit_expr(&mut assign_expr.rhs, p)?;
+        self.visit_expr(&mut assign_expr.rhs, Some(p))?;
         Ok(Operand::Unit)
     }
 
@@ -297,12 +321,12 @@ impl IRBuilder {
     fn visit_bin_op_expr(
         &mut self,
         bin_op_expr: &mut BinOpExpr,
-        dest: Place,
+        dest: Option<Place>,
     ) -> Result<Operand, RccError> {
         let d = self.gen_temp_variable(bin_op_expr.lhs.type_info());
-        let lhs = self.visit_expr(&mut bin_op_expr.lhs, d)?;
+        let lhs = self.visit_expr(&mut bin_op_expr.lhs, Some(d))?;
         let d = self.gen_temp_variable(bin_op_expr.rhs.type_info());
-        let rhs = self.visit_expr(&mut bin_op_expr.rhs, d)?;
+        let rhs = self.visit_expr(&mut bin_op_expr.rhs, Some(d))?;
 
         // TODO operator override
         let _type = bin_op_expr.type_info();
@@ -310,14 +334,19 @@ impl IRBuilder {
         let tp = t.deref();
         let ir_type = IRType::from_type_info(tp)?;
 
-        self.ir_output.add_instructions(IRInst::bin_op(
-            bin_op_expr.bin_op,
-            ir_type,
-            dest.clone(),
-            lhs,
-            rhs,
-        ));
-        Ok(Operand::Place(dest))
+        match dest {
+            Some(d) => {
+                self.ir_output.add_instructions(IRInst::bin_op(
+                    bin_op_expr.bin_op,
+                    ir_type,
+                    d.clone(),
+                    lhs,
+                    rhs,
+                ));
+                Ok(Operand::Place(d))
+            }
+            None => Ok(Operand::Unit)
+        }
     }
 
     /// ## Example1
@@ -423,7 +452,8 @@ impl IRBuilder {
     }
 
     fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr) -> Result<Operand, RccError> {
-        unimplemented!()
+        let loop_start_id = self.ir_output.next_inst_id();
+        todo!()
     }
 
     /// ## Examples for translating `if` and logical condition expressions
@@ -525,7 +555,7 @@ impl IRBuilder {
     /// &&n &&n+1:
     ///     &&n left miss := &&n+1 right next
     ///     &&n right hit := &&n+1 next
-    fn visit_if_expr(&mut self, if_expr: &mut IfExpr, dest: Place) -> Result<Operand, RccError> {
+    fn visit_if_expr(&mut self, if_expr: &mut IfExpr, dest: Option<Place>) -> Result<Operand, RccError> {
         let mut next_back_patch_link = 0usize;
 
         macro_rules! visit_block {
@@ -544,9 +574,9 @@ impl IRBuilder {
         macro_rules! gen_jump_cond {
             ($e:ident, $i:ident, $jump:ident) => {
                 let d = self.gen_temp_variable($e.type_info());
-                let lhs = self.visit_expr(&mut $e.lhs, d)?;
+                let lhs = self.visit_expr(&mut $e.lhs, Some(d))?;
                 let d = self.gen_temp_variable($e.type_info());
-                let rhs = self.visit_expr(&mut $e.rhs, d)?;
+                let rhs = self.visit_expr(&mut $e.rhs, Some(d))?;
                 let ir_inst = IRInst::jump_if_cond($jump, lhs, rhs, next_back_patch_link);
                 visit_block!($i, ir_inst);
             };
@@ -555,9 +585,9 @@ impl IRBuilder {
         macro_rules! gen_jump_cond_reverse {
             ($e:ident, $i:ident, $jump:ident) => {
                 let d = self.gen_temp_variable($e.type_info());
-                let lhs = self.visit_expr(&mut $e.lhs, d)?;
+                let lhs = self.visit_expr(&mut $e.lhs, Some(d))?;
                 let d = self.gen_temp_variable($e.type_info());
-                let rhs = self.visit_expr(&mut $e.rhs, d)?;
+                let rhs = self.visit_expr(&mut $e.rhs, Some(d))?;
                 let ir_inst = IRInst::jump_if_cond($jump, rhs, lhs, next_back_patch_link);
                 visit_block!($i, ir_inst);
             };
@@ -592,7 +622,7 @@ impl IRBuilder {
                     }
                     _ => {
                         let d = self.gen_temp_variable(e.type_info());
-                        let operand = self.visit_bin_op_expr(e, d)?;
+                        let operand = self.visit_bin_op_expr(e, Some(d))?;
                         let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
                         visit_block!(i, ir_inst);
                     }
@@ -600,7 +630,7 @@ impl IRBuilder {
                 // todo: unary expr
                 e => {
                     let d = self.gen_temp_variable(e.type_info());
-                    let operand = self.visit_expr(e, d)?;
+                    let operand = self.visit_expr(e, Some(d))?;
                     let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
                     visit_block!(i, ir_inst);
                 }
@@ -615,7 +645,10 @@ impl IRBuilder {
             next_back_patch_link = inst.jump_label();
             inst.set_jump_label(next_idx);
         }
-        Ok(Operand::Place(dest))
+        match dest {
+            Some(d) => Ok(Operand::Place(d)),
+            None => Ok(Operand::Unit)
+        }
     }
 
     fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr) -> Result<Operand, RccError> {
