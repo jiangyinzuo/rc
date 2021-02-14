@@ -160,7 +160,8 @@ fn assign_expr_test() {
 
 #[test]
 fn block_test() {
-    file_validate(&[r##"
+    file_validate(
+        &[r##"
         fn main() {
             let a = 3;
             if true {
@@ -170,7 +171,11 @@ fn block_test() {
             }
             let b = 3;
         }
-    "##], &[Err("invalid type for expr stmt: expected `()`, found LitNum(#i)".into())]);
+    "##],
+        &[Err(
+            "invalid type for expr stmt: expected `()`, found LitNum(#i)".into(),
+        )],
+    );
 }
 
 #[test]
@@ -271,7 +276,7 @@ fn return_test() {
             Ok(()),
             Ok(()),
             Err("invalid return type: excepted `LitNum(i32)`, found `Unit`".into()),
-            Ok(())
+            Ok(()),
         ],
     );
 }
@@ -325,7 +330,8 @@ fn never_type_test() {
 #[test]
 fn control_flow_test() {
     file_validate(
-        &[r#"
+        &[
+            r#"
         fn guess(mid: i32) -> i32 {
             mid
         }
@@ -345,8 +351,15 @@ fn control_flow_test() {
             }
             return -1;
         }
-    "#],
-        &[Ok(())],
+    "#,
+            r#"fn fff() { if 2 {let a = 3;}}"#,
+            r#"fn bbb() { while true {2}}"#
+        ],
+        &[
+            Ok(()),
+            Err("invalid type of condition expr: expected `bool`, found: LitNum(#i)".into()),
+            Err("invalid type in while block: expected Unit, found LitNum(#i)".into()),
+        ],
     );
 }
 
@@ -380,13 +393,24 @@ fn call_test() {
                     let a = 1;
                     a();
                 }
-            "#
+            "#,
         ],
         &[
             Ok(()),
-            Err("invalid type for call expr: expected LitNum(i32), found: LitNum(i64)".into()),
+            Err("invalid type for call expr: expected LitNum(i32), found LitNum(i64)".into()),
             Err("This function takes 0 parameters but 1 parameters was supplied".into()),
             Err("expr is not callable".into()),
         ],
+    );
+}
+
+#[test]
+fn local_mut_test() {
+    file_validate(
+        &[r#"fn add() {
+        let a = 2;
+        a = 3;
+    }"#],
+        &[Err("lhs is not mutable".into())],
     );
 }

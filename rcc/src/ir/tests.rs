@@ -151,3 +151,49 @@ fn test_if() {
     println!("{:#?}", ir.instructions);
     assert_eq!(expected, ir.instructions);
 }
+
+#[test]
+fn test_loop() {
+    let ir = ir_build(
+        r#"
+        fn main() {
+            let mut a = 3;
+            loop {
+                a += 1;
+            }
+            let b = loop {
+                let a = 5 + 2;
+                break a;
+            };
+        }
+    "#,
+    )
+    .unwrap();
+    let expected = vec![
+        IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local_mut("a_2".into()),
+            Operand::Place(Place::local_mut("a_2".into())),
+            I32(1),
+        ),
+        IRInst::jump(2),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local("a_4".into()),
+            I32(5),
+            I32(2),
+        ),
+        IRInst::load_data(
+            Place::local("b_2".into()),
+            Operand::Place(Place::local("a_4".into())),
+        ),
+        IRInst::jump(8),
+        IRInst::jump(4),
+        IRInst::Ret(Operand::Unit),
+    ];
+
+    assert_eq!(expected, ir.instructions);
+}

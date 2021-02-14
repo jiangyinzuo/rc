@@ -885,16 +885,7 @@ impl SymbolResolver {
             let excepted_info = TypeInfo::from_type_anno(param, self.scope_stack.cur_scope());
 
             Self::try_determine_number_type(&excepted_info, expr);
-            let t = expr.type_info();
-            let tp = t.borrow();
-            let actual_info = tp.deref();
-            if !actual_info.is(&excepted_info) {
-                return Err(format!(
-                    "invalid type for call expr: expected {:?}, found: {:?}",
-                    excepted_info, actual_info
-                )
-                .into());
-            }
+            assert_type_is(expr, &excepted_info, "invalid type for call expr")?;
         }
         call_expr.set_type_info(TypeInfo::from_type_anno(
             &type_fn_ptr.ret_type,
@@ -915,17 +906,19 @@ impl SymbolResolver {
         // store loop kind
         self.loop_kind_stack.push(self.loop_kind);
         self.loop_kind = LoopKind::While;
-        let type_info = while_expr.0.type_info();
-        let t = type_info.borrow();
-        let cond_type = t.deref();
-        if !cond_type.is(&TypeInfo::Bool) {
-            return Err(format!(
-                "invalid type in while condition: expected `bool`, found {:?}",
-                cond_type
-            )
-            .into());
-        }
+        assert_type_is(
+            &*while_expr.0,
+            &TypeInfo::Bool,
+            "invalid type in while condition",
+        )?;
+
         self.visit_block_expr(&mut while_expr.1)?;
+        assert_type_is(
+            &*while_expr.1,
+            &TypeInfo::Unit,
+            "invalid type in while block",
+        )?;
+
         // restore loop kind
         self.exit_loop();
         Ok(())
@@ -1060,4 +1053,22 @@ impl SymbolResolver {
         }
         Ok(())
     }
+}
+
+pub(super) fn assert_type_is<T: ExprVisit>(
+    expr: &T,
+    expected_type: &TypeInfo,
+    err_msg: &str,
+) -> Result<(), RccError> {
+    let type_info = expr.type_info();
+    let t = type_info.borrow();
+    let cond_type = t.deref();
+    if !cond_type.is(expected_type) {
+        return Err(format!(
+            "{}: expected {:?}, found {:?}",
+            err_msg, expected_type, cond_type
+        )
+        .into());
+    }
+    Ok(())
 }

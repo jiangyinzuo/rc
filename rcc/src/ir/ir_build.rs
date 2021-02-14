@@ -1,9 +1,10 @@
 use crate::analyser::scope::ScopeStack;
 use crate::analyser::sym_resolver::{TypeInfo, VarKind};
 use crate::ast::expr::{
-    ArrayExpr, ArrayIndexExpr, AssignExpr, BinOpExpr, BinOperator, BlockExpr, BreakExpr, CallExpr,
-    Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
-    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, WhileExpr,
+    ArrayExpr, ArrayIndexExpr, AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, BreakExpr,
+    CallExpr, Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr,
+    LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr,
+    WhileExpr,
 };
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
@@ -25,7 +26,9 @@ pub struct IRBuilder {
 
     scope_stack: ScopeStack,
     label_stack: Vec<String>,
-    loop_var_stack: Vec<Option<Place>>,
+
+    // (place = loop expr, break link)
+    loop_var_stack: Vec<(Option<Place>, usize)>,
 }
 
 impl IRBuilder {
@@ -36,7 +39,7 @@ impl IRBuilder {
             fn_ret_temp_var: vec![],
             scope_stack: ScopeStack::new(),
             label_stack: vec![],
-            loop_var_stack: vec![]
+            loop_var_stack: vec![],
         }
     }
 
@@ -109,7 +112,7 @@ impl IRBuilder {
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
                 let operand = self.visit_expr(expr, None)?;
-                debug_assert!(operand == Operand::Unit || operand == Operand::Never, "{:?}", expr);
+                debug_assert!(operand.is_unit_or_never(), "{:?}", expr);
                 Ok(())
             }
         }
@@ -160,7 +163,7 @@ impl IRBuilder {
             Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr, dest),
             Expr::If(if_expr) => self.visit_if_expr(if_expr, dest),
             Expr::Return(return_expr) => self.visit_return_expr(return_expr, dest),
-            Expr::Break(break_expr) => self.visit_break_expr(break_expr),
+            Expr::Break(break_expr) => self.visit_break_expr(break_expr, dest),
             _ => unimplemented!(),
         };
         debug_assert_ne!(
@@ -300,8 +303,12 @@ impl IRBuilder {
         let result = Ok(if let Some(expr) = &mut block_expr.last_expr {
             let is_none = dest.is_none();
             let res = self.visit_expr(&mut *expr, dest)?;
-            if is_none && res != Operand::Unit && res != Operand::Never {
-                return Err(format!("error in visiting block expr: expected `()`, found {:?}", res).into());
+            if is_none && !res.is_unit_or_never() {
+                return Err(format!(
+                    "error in visiting block expr: expected `()`, found {:?}",
+                    res
+                )
+                .into());
             }
             res
         } else {
@@ -317,7 +324,39 @@ impl IRBuilder {
             Operand::Place(p) => p,
             _ => unimplemented!(),
         };
-        self.visit_expr(&mut assign_expr.rhs, Some(p))?;
+        let type_info = assign_expr.lhs.type_info();
+        let tp = type_info.borrow();
+        let tp = tp.deref();
+        let t = IRType::from_type_info(tp)?;
+
+        macro_rules! add_inst {
+            ($bin_op:path) => {{
+                let rhs_dest = self.gen_temp_variable(assign_expr.lhs.type_info());
+                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(rhs_dest))?;
+                self.ir_output.add_instructions(IRInst::bin_op(
+                    $bin_op,
+                    t,
+                    p.clone(),
+                    Operand::Place(p),
+                    rhs.clone(),
+                ))
+            }};
+        }
+        match assign_expr.assign_op {
+            AssignOp::Eq => {
+                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(p.clone()))?;
+            }
+            AssignOp::ShrEq => add_inst!(BinOperator::Shr),
+            AssignOp::ShlEq => add_inst!(BinOperator::Shl),
+            AssignOp::PlusEq => add_inst!(BinOperator::Plus),
+            AssignOp::MinusEq => add_inst!(BinOperator::Minus),
+            AssignOp::StarEq => add_inst!(BinOperator::Star),
+            AssignOp::SlashEq => add_inst!(BinOperator::Slash),
+            AssignOp::PercentEq => add_inst!(BinOperator::Percent),
+            AssignOp::AndEq => add_inst!(BinOperator::And),
+            AssignOp::OrEq => add_inst!(BinOperator::Or),
+            AssignOp::CaretEq => add_inst!(BinOperator::Caret),
+        }
         Ok(Operand::Unit)
     }
 
@@ -352,7 +391,7 @@ impl IRBuilder {
                 ));
                 Ok(Operand::Place(d))
             }
-            None => Ok(Operand::Unit)
+            None => Ok(Operand::Unit),
         }
     }
 
@@ -454,16 +493,84 @@ impl IRBuilder {
         unimplemented!()
     }
 
-    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr, dest: Option<Place>) -> Result<Operand, RccError> {
-        unimplemented!()
+    fn visit_while_expr(
+        &mut self,
+        while_expr: &mut WhileExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
+        let loop_start_id = self.ir_output.next_inst_id();
+        self.loop_var_stack.push((None, 0));
+
+        // while condition
+        // match while_expr.0.as_ref() {
+        //     Expr::BinOp(e) => match e.bin_op {
+        //         BinOperator::AndAnd => {
+        //             todo!()
+        //         }
+        //         BinOperator::OrOr => {
+        //             todo!()
+        //         }
+        //         BinOperator::Ne => {
+        //             gen_jump_cond!(e, i, JEq);
+        //         }
+        //         BinOperator::EqEq => {
+        //             gen_jump_cond!(e, i, JNe);
+        //         }
+        //         BinOperator::Le => {
+        //             gen_jump_cond_reverse!(e, i, JLt);
+        //         }
+        //         BinOperator::Lt => {
+        //             gen_jump_cond!(e, i, JGe);
+        //         }
+        //         BinOperator::Gt => {
+        //             gen_jump_cond_reverse!(e, i, JGe);
+        //         }
+        //         BinOperator::Ge => {
+        //             gen_jump_cond!(e, i, JLt);
+        //         }
+        //         _ => {
+        //             let d = self.gen_temp_variable(e.type_info());
+        //             let operand = self.visit_bin_op_expr(e, Some(d))?;
+        //             let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
+        //             visit_block!(i, ir_inst);
+        //         }
+        //     },
+        //     // todo: unary expr, lit bool
+        //     e => {
+        //         let d = self.gen_temp_variable(e.type_info());
+        //         let operand = self.visit_expr(e, Some(d))?;
+        //         let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
+        //         visit_block!(i, ir_inst);
+        //     }
+        // }
+
+        todo!()
     }
 
-    fn visit_loop_expr(&mut self, loop_expr: &mut LoopExpr, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn visit_loop_expr(
+        &mut self,
+        loop_expr: &mut LoopExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
         let loop_start_id = self.ir_output.next_inst_id();
-        self.loop_var_stack.push(dest);
-        self.visit_block_expr(&mut loop_expr.expr, None)?;
-        
-        todo!()
+        self.loop_var_stack.push((dest, 0));
+
+        let operand = self.visit_block_expr(&mut loop_expr.expr, None)?;
+        debug_assert!(operand.is_unit_or_never());
+
+        self.ir_output.add_instructions(IRInst::jump(loop_start_id));
+
+        let (d, mut link) = self.loop_var_stack.pop().unwrap();
+        let next_id = self.ir_output.next_inst_id();
+        while link != 0 {
+            let inst = self.ir_output.get_inst_by_id(link);
+            link = inst.jump_label();
+            inst.set_jump_label(next_id);
+        }
+        match d {
+            Some(p) => Ok(Operand::Place(p)),
+            None => Ok(Operand::Unit),
+        }
     }
 
     /// ## Examples for translating `if` and logical condition expressions
@@ -565,7 +672,11 @@ impl IRBuilder {
     /// &&n &&n+1:
     ///     &&n left miss := &&n+1 right next
     ///     &&n right hit := &&n+1 next
-    fn visit_if_expr(&mut self, if_expr: &mut IfExpr, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn visit_if_expr(
+        &mut self,
+        if_expr: &mut IfExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
         let mut next_back_patch_link = 0usize;
 
         macro_rules! visit_block {
@@ -637,7 +748,7 @@ impl IRBuilder {
                         visit_block!(i, ir_inst);
                     }
                 },
-                // todo: unary expr
+                // todo: unary expr, lit bool
                 e => {
                     let d = self.gen_temp_variable(e.type_info());
                     let operand = self.visit_expr(e, Some(d))?;
@@ -657,13 +768,17 @@ impl IRBuilder {
         }
         match dest {
             Some(d) => Ok(Operand::Place(d)),
-            None => Ok(Operand::Unit)
+            None => Ok(Operand::Unit),
         }
     }
 
-    fn visit_return_expr(&mut self, return_expr: &mut ReturnExpr, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn visit_return_expr(
+        &mut self,
+        return_expr: &mut ReturnExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
         match &mut return_expr.0 {
-            Some( e) => {
+            Some(e) => {
                 let ret_place = self.fn_ret_temp_var.last().unwrap();
                 let operand = self.visit_expr(e.as_mut(), Some(ret_place.clone()))?;
                 self.ir_output.add_instructions(IRInst::Ret(operand));
@@ -674,14 +789,52 @@ impl IRBuilder {
         };
         match dest {
             Some(d) => {
-                self.ir_output.add_instructions(IRInst::load_data(d.clone(), Operand::Never));
+                self.ir_output
+                    .add_instructions(IRInst::load_data(d.clone(), Operand::Never));
                 Ok(Operand::Place(d))
             }
-            None => Ok(Operand::Never)
+            None => Ok(Operand::Never),
         }
     }
 
-    fn visit_break_expr(&mut self, break_expr: &mut BreakExpr) -> Result<Operand, RccError> {
-        unimplemented!()
+    fn visit_break_expr(
+        &mut self,
+        break_expr: &mut BreakExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
+        let (break_place, _) = self.loop_var_stack.last_mut().unwrap();
+        match &mut break_expr.0 {
+            Some(e) => {
+                if let Some(p) = break_place {
+                    let p = p.clone();
+                    let d = Some(p.clone());
+                    let rhs = self.visit_expr(e, d)?;
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(p, rhs));
+                } else {
+                    unreachable!("error in ir_builder: break expr has ret value");
+                }
+            }
+            None => {
+                if break_place.is_some() {
+                    unreachable!("error in ir_builder: break expr shouldn't follow expr")
+                }
+            }
+        }
+        let jump_id = self.ir_output.next_inst_id();
+
+        let (_, loop_start_id) = self.loop_var_stack.last_mut().unwrap();
+        self.ir_output
+            .add_instructions(IRInst::jump(*loop_start_id));
+        *loop_start_id = jump_id;
+
+        match dest {
+            Some(d) => {
+                self.ir_output
+                    .add_instructions(IRInst::load_data(d.clone(), Operand::Never));
+                Ok(Operand::Place(d))
+            }
+            None => Ok(Operand::Never),
+        }
     }
 }

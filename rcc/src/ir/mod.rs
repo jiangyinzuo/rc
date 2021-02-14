@@ -40,6 +40,16 @@ pub enum Operand {
     Never,
 }
 
+impl Operand {
+    pub fn is_unit_or_never(&self) -> bool {
+        matches!(self, Self::Unit | Self::Never)
+    }
+
+    pub fn eq_or_is_never(&self, other: Operand) -> bool {
+        self == &other || self == &Self::Never
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Place {
     label: String,
