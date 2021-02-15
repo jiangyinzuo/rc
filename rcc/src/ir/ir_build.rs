@@ -21,11 +21,9 @@ use std::rc::Rc;
 
 pub struct IRBuilder {
     ir_output: IR,
-    cur_fn: Func,
     fn_ret_temp_var: Vec<Place>,
 
     scope_stack: ScopeStack,
-    label_stack: Vec<String>,
 
     // (place = loop expr, break link)
     loop_var_stack: Vec<(Option<Place>, usize)>,
@@ -35,10 +33,8 @@ impl IRBuilder {
     pub fn new() -> IRBuilder {
         IRBuilder {
             ir_output: IR::new(),
-            cur_fn: Func::new(),
             fn_ret_temp_var: vec![],
             scope_stack: ScopeStack::new(),
-            label_stack: vec![],
             loop_var_stack: vec![],
         }
     }
@@ -60,7 +56,7 @@ impl IRBuilder {
 
     fn gen_variable(&mut self, ident: &str, var_kind: VarKind) -> Place {
         let res = self.scope_stack.cur_scope().find_variable(ident).unwrap();
-        Place::new(format!("{}_{}", ident, res.1), var_kind)
+        Place::variable(ident, res.1, var_kind)
     }
 
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
@@ -80,6 +76,8 @@ impl IRBuilder {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
+        self.ir_output.add_func();
+
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
         assert_eq!(info, TypeInfo::from_item_fn(item_fn));
 
@@ -93,10 +91,6 @@ impl IRBuilder {
             self.ir_output.add_instructions(IRInst::Ret(operand));
         }
 
-        // push current func to IR
-        let mut cur_fn = Func::new();
-        std::mem::swap(&mut cur_fn, &mut self.cur_fn);
-        self.ir_output.add_func(cur_fn);
         self.fn_ret_temp_var.pop();
         Ok(())
     }
@@ -157,7 +151,7 @@ impl IRBuilder {
             // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
             // Expr::TupleIndex(tuple_index_expr) => self.visit_tuple_index_expr(tuple_index_expr),
             // Expr::Struct(struct_expr) => self.visit_struct_expr(struct_expr),
-            Expr::Call(call_expr) => self.visit_call_expr(call_expr),
+            Expr::Call(call_expr) => self.visit_call_expr(call_expr, dest),
             // Expr::FieldAccess(field_access_expr) => self.visit_field_access_expr(field_access_expr),
             Expr::While(while_expr) => self.visit_while_expr(while_expr),
             Expr::Loop(loop_expr) => self.visit_loop_expr(loop_expr, dest),
@@ -205,8 +199,15 @@ impl IRBuilder {
     fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Operand, RccError> {
         // TODO path segmentation
         let ident = path_expr.segments.last().unwrap();
-        let var_info = self.scope_stack.cur_scope().find_variable(ident).unwrap().0;
-        Ok(Operand::Place(self.gen_variable(ident, var_info.kind())))
+
+        let cur_scope = self.scope_stack.cur_scope();
+        if let Some((var, scope_id)) = cur_scope.find_variable(ident) {
+            Ok(Operand::Place(Place::variable(ident, scope_id, var.kind())))
+        } else if !cur_scope.find_fn(ident).is_unknown() {
+            Ok(Operand::FnLabel(ident.clone()))
+        } else {
+            Err("error in visit path expr: ident not found".into())
+        }
     }
 
     fn visit_lit_num_expr(
@@ -482,8 +483,29 @@ impl IRBuilder {
         unimplemented!()
     }
 
-    fn visit_call_expr(&mut self, call_expr: &mut CallExpr) -> Result<Operand, RccError> {
-        unimplemented!()
+    fn visit_call_expr(
+        &mut self,
+        call_expr: &mut CallExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
+        let callee_place = self.gen_temp_variable(call_expr.type_info());
+        let callee = self.visit_expr(&mut call_expr.expr, Some(callee_place))?;
+
+        let mut params = vec![];
+        for e in call_expr.call_params.iter_mut() {
+            let param_place = self.gen_temp_variable(e.type_info());
+            params.push(self.visit_expr(e, Some(param_place))?);
+        }
+        self.ir_output
+            .add_instructions(IRInst::call(callee, params));
+        match dest {
+            Some(d) => {
+                self.ir_output
+                    .add_instructions(IRInst::load_data(d.clone(), Operand::FnRetPlace));
+                Ok(Operand::Place(d))
+            }
+            None => Ok(Operand::Unit),
+        }
     }
 
     fn visit_field_access_expr(
@@ -512,10 +534,7 @@ impl IRBuilder {
     }
 
     /// While Expr always values ()
-    fn visit_while_expr(
-        &mut self,
-        while_expr: &mut WhileExpr,
-    ) -> Result<Operand, RccError> {
+    fn visit_while_expr(&mut self, while_expr: &mut WhileExpr) -> Result<Operand, RccError> {
         let loop_start_id = self.ir_output.next_inst_id();
 
         let mut next_back_patch_link = 0;

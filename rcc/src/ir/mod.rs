@@ -36,8 +36,10 @@ pub enum Operand {
     U128(u128),
     Usize(usize),
     Place(Place),
+    FnLabel(String),
     Unit,
     Never,
+    FnRetPlace,
 }
 
 impl Operand {
@@ -59,6 +61,10 @@ pub struct Place {
 impl Place {
     pub fn new(label: String, kind: VarKind) -> Place {
         Place { label, kind }
+    }
+
+    pub fn variable(ident: &str, scope_id: u64, var_kind: VarKind) -> Place {
+        Place::new(format!("{}_{}", ident, scope_id), var_kind)
     }
 
     pub fn local(label: String) -> Place {
@@ -191,7 +197,7 @@ pub enum IRInst {
     },
 
     Call {
-        func_name: String,
+        callee: Operand,
         args: Vec<Operand>,
     },
 
@@ -240,6 +246,10 @@ impl IRInst {
         }
     }
 
+    pub fn call(callee: Operand, args: Vec<Operand>) -> IRInst {
+        IRInst::Call { callee, args }
+    }
+
     pub fn set_jump_label(&mut self, new_label: usize) {
         match self {
             Self::Jump { label } => *label = new_label,
@@ -279,7 +289,6 @@ pub enum StrKind {
 pub struct IR {
     funcs: Vec<Func>,
     strs: HashMap<String, String>,
-    instructions: Vec<IRInst>,
 }
 
 impl IR {
@@ -287,7 +296,6 @@ impl IR {
         IR {
             funcs: vec![],
             strs: HashMap::new(),
-            instructions: vec![],
         }
     }
 
@@ -297,20 +305,24 @@ impl IR {
         Operand::Place(Place::lit_const(label))
     }
 
-    pub fn add_func(&mut self, func: Func) {
-        self.funcs.push(func);
+    pub fn add_func(&mut self) {
+        self.funcs.push(Func::new());
+    }
+
+    pub fn cur_func_mut(&mut self) -> &mut Func {
+        self.funcs.last_mut().unwrap()
     }
 
     pub fn add_instructions(&mut self, ir_inst: IRInst) {
-        self.instructions.push(ir_inst);
+        self.cur_func_mut().insts.push(ir_inst);
     }
 
     /// Start from 1
     pub fn next_inst_id(&mut self) -> usize {
-        self.instructions.len() + 1
+        self.cur_func_mut().insts.len() + 1
     }
 
     pub fn get_inst_by_id(&mut self, id: usize) -> &mut IRInst {
-        self.instructions.get_mut(id - 1).unwrap()
+        self.cur_func_mut().insts.get_mut(id - 1).unwrap()
     }
 }

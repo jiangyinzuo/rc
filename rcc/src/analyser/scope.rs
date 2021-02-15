@@ -75,7 +75,7 @@ impl Scope {
         }
     }
 
-    /// Return var info and scope id
+    /// Return (var info, scope id)
     pub fn find_variable(& self, ident: &str) -> Option<(&VarInfo, u64)> {
         let mut cur_scope: *const Scope = self;
         loop {

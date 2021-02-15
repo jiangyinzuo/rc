@@ -3,7 +3,7 @@ use crate::ast::expr::BinOperator;
 use crate::ast::AST;
 use crate::ir::ir_build::IRBuilder;
 use crate::ir::Jump::*;
-use crate::ir::Operand::I32;
+use crate::ir::Operand::{I32, FnLabel};
 use crate::ir::{IRInst, IRType, Operand, Place, IR};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
@@ -36,7 +36,7 @@ fn test_ir_builder() {
         IRInst::Ret(Operand::Unit),
     ];
 
-    assert_eq!(insts, ir.instructions);
+    assert_eq!(insts, ir.funcs.last().unwrap().insts);
 }
 
 #[test]
@@ -64,7 +64,7 @@ fn test_return() {
         ),
         IRInst::Ret(Operand::Place(Place::local("$0_1".into()))),
     ];
-    assert_eq!(insts, ir.instructions);
+    assert_eq!(insts, ir.funcs.last().unwrap().insts);
 }
 
 #[test]
@@ -148,8 +148,7 @@ fn test_if() {
         IRInst::Ret(Operand::Place(Place::local("b_2".into()))),
         IRInst::Ret(Operand::Place(Place::local_mut("a_2".into()))),
     ]);
-    println!("{:#?}", ir.instructions);
-    assert_eq!(expected, ir.instructions);
+    assert_eq!(expected, ir.funcs.last().unwrap().insts);
 }
 
 #[test]
@@ -195,7 +194,7 @@ fn test_loop() {
         IRInst::Ret(Operand::Unit),
     ];
 
-    assert_eq!(expected, ir.instructions);
+    assert_eq!(expected, ir.funcs.last().unwrap().insts);
 }
 
 #[test]
@@ -215,10 +214,15 @@ fn test_while() {
         }
     "#,
     )
-        .unwrap();
+    .unwrap();
     let expected = vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
-        IRInst::jump_if_cond(JGe, Operand::Place(Place::local_mut("a_2".into())), I32(10), 7),
+        IRInst::jump_if_cond(
+            JGe,
+            Operand::Place(Place::local_mut("a_2".into())),
+            I32(10),
+            7,
+        ),
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
@@ -226,7 +230,12 @@ fn test_while() {
             Operand::Place(Place::local_mut("a_2".into())),
             I32(1),
         ),
-        IRInst::jump_if_cond(JNe, Operand::Place(Place::local_mut("a_2".into())), I32(5), 6),
+        IRInst::jump_if_cond(
+            JNe,
+            Operand::Place(Place::local_mut("a_2".into())),
+            I32(5),
+            6,
+        ),
         IRInst::jump(7),
         IRInst::jump(2),
         IRInst::bin_op(
@@ -243,10 +252,74 @@ fn test_while() {
             Operand::Place(Place::local("$4_2".into())),
             I32(3),
         ),
-        IRInst::jump_if_cond(JGe, Operand::Place(Place::local("$3_2".into())),
-                             Operand::Place(Place::local_mut("a_2".into())), 11),
+        IRInst::jump_if_cond(
+            JGe,
+            Operand::Place(Place::local("$3_2".into())),
+            Operand::Place(Place::local_mut("a_2".into())),
+            11,
+        ),
         IRInst::jump(7),
         IRInst::Ret(Operand::Unit),
     ];
-    assert_eq!(expected, ir.instructions);
+    assert_eq!(expected, ir.funcs.last().unwrap().insts);
+}
+
+#[test]
+fn fn_call_test() {
+    let ir = ir_build(
+        r#"
+        fn foo() -> i32 {
+            let a = 3 + 4;
+            a
+        }
+        fn bar(c: i32) {
+            let b = foo();
+            let a = b * 2 + c;
+        }
+        fn baz() {
+            let cc = bar(3);
+            baz();
+        }
+    "#,
+    )
+    .unwrap();
+    assert_eq!(3, ir.funcs.len());
+
+    let expected_ir = vec![
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local("a_2".into()),
+            I32(3),
+            I32(4),
+        ),
+        IRInst::Ret(Operand::Place(Place::local("a_2".into()))),
+    ];
+    assert_eq!(expected_ir, ir.funcs.get(0).unwrap().insts);
+    let expected_ir = vec![
+        IRInst::call(Operand::FnLabel("foo".to_string()), vec![]),
+        IRInst::load_data(Place::local("b_3".into()), Operand::FnRetPlace),
+        IRInst::bin_op(
+            BinOperator::Star,
+            IRType::I32,
+            Place::local("$1_3".into()),
+            Operand::Place(Place::local("b_3".into())),
+            I32(2),
+        ),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local("a_3".into()),
+            Operand::Place(Place::local("$1_3".into())),
+            Operand::Place(Place::local("c_3".into())),
+        ),
+        IRInst::Ret(Operand::Unit),
+    ];
+    assert_eq!(expected_ir, ir.funcs.get(1).unwrap().insts);
+    let expected_ir = vec![
+        IRInst::call(Operand::FnLabel("bar".to_string()), vec![I32(3)]),
+        IRInst::load_data(Place::local("cc_4".into()), Operand::FnRetPlace),
+        IRInst::call(FnLabel("baz".into()), vec![]),
+        IRInst::Ret(Operand::Unit),];
+    assert_eq!(expected_ir, ir.funcs.last().unwrap().insts);
 }
