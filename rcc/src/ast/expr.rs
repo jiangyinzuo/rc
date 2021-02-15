@@ -7,6 +7,7 @@ use crate::ast::{FromToken, TokenStart};
 use crate::from_token;
 use crate::lexer::token::Token;
 use crate::rcc::RccError;
+use std::borrow::BorrowMut;
 use std::cell::RefCell;
 use std::fmt;
 use std::fmt::{Debug, Formatter};
@@ -14,7 +15,6 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::str::FromStr;
 use strenum::StrEnum;
-use std::borrow::BorrowMut;
 
 pub trait ExprVisit {
     fn type_info(&self) -> Rc<RefCell<TypeInfo>>;
@@ -154,7 +154,7 @@ impl TypeInfoSetter for Expr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
         match self {
             Self::Path(p) => {
-                p.type_info.borrow_mut().replace( type_info);
+                p.type_info.borrow_mut().replace(type_info);
             }
             Self::LitNum(l) => {
                 l.set_type_info(type_info);
@@ -302,15 +302,16 @@ impl BlockExpr {
         let last_stmt = self.stmts.pop().unwrap();
         match last_stmt {
             Stmt::ExprStmt(e) => self.last_expr = Some(Box::new(e)),
-            e => panic!("{:?} can not be expr", e)
+            e => panic!("{:?} can not be expr", e),
         }
     }
 
     pub fn last_stmt_is_return(&self) -> bool {
-        self.last_expr.is_none() && match self.stmts.last() {
-            Some(s) => s.is_return(),
-            None => false
-        }
+        self.last_expr.is_none()
+            && match self.stmts.last() {
+                Some(s) => s.is_return(),
+                None => false,
+            }
     }
 }
 
@@ -385,7 +386,7 @@ impl LitNumExpr {
         self.type_info = Rc::new(RefCell::new(TypeInfo::LitNum(lit_type)));
         self
     }
-    
+
     pub fn get_lit_type(&mut self) -> TypeLitNum {
         if let TypeInfo::LitNum(t) = self.type_info.borrow().deref() {
             return t.clone();
@@ -407,8 +408,10 @@ impl ExprVisit for LitNumExpr {
 impl TypeInfoSetter for LitNumExpr {
     fn set_type_info(&mut self, type_info: TypeInfo) {
         match &type_info {
-            TypeInfo::LitNum(_) => {self.type_info.replace(type_info);},
-            _ => panic!("must be lit num")
+            TypeInfo::LitNum(_) => {
+                self.type_info.replace(type_info);
+            }
+            _ => panic!("must be lit num"),
         }
     }
 
@@ -816,6 +819,27 @@ from_token! {
     }
 }
 
+impl BinOperator {
+    pub fn prec_lt(&self, other: &BinOperator) -> Result<bool, RccError> {
+        let l_prec = Precedence::from_bin_op(self);
+        let r_prec = Precedence::from_bin_op(&other);
+        if l_prec == r_prec && l_prec == Precedence::Cmp {
+            Err("Chained comparison operator require parentheses".into())
+        } else {
+            Ok(l_prec < r_prec)
+        }
+    }
+
+    pub fn prec_gt(&self, p: &Precedence) -> Result<bool, RccError> {
+        let l_prec = Precedence::from_bin_op(self);
+        if &l_prec == p && l_prec == Precedence::Cmp {
+            Err("Chained comparison operator require parentheses".into())
+        } else {
+            Ok(&l_prec >= p)
+        }
+    }
+}
+
 impl Debug for BinOperator {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <Self as std::fmt::Display>::fmt(self, f)
@@ -825,20 +849,21 @@ impl Debug for BinOperator {
 /// # Examples
 ///
 /// ```
-/// assert!(Precedence::As < Precedence::Multi);
+/// assert!(Precedence::Add < Precedence::Multi);
 /// ```
 #[derive(Debug, PartialOrd, PartialEq)]
 pub enum Precedence {
-    As,
-    Multi,
-    Add,
-    Shift,
-    And,
-    Xor,
-    Or,
-    Cmp,
-    AndAnd,
+    Min,
     OrOr,
+    AndAnd,
+    Cmp,
+    Or,
+    Xor,
+    And,
+    Shift,
+    Add,
+    Multi,
+    As,
 }
 
 impl Precedence {

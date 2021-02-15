@@ -197,3 +197,56 @@ fn test_loop() {
 
     assert_eq!(expected, ir.instructions);
 }
+
+#[test]
+fn test_while() {
+    let ir = ir_build(
+        r#"
+        fn main() {
+            let mut a = 3;
+            while a < 10 {
+                a += 1;
+                if a == 5 {
+                    break;
+                }
+            }
+            while a > 1 + 2 + 3 {
+            }
+        }
+    "#,
+    )
+        .unwrap();
+    let expected = vec![
+        IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
+        IRInst::jump_if_cond(JGe, Operand::Place(Place::local_mut("a_2".into())), I32(10), 7),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local_mut("a_2".into()),
+            Operand::Place(Place::local_mut("a_2".into())),
+            I32(1),
+        ),
+        IRInst::jump_if_cond(JNe, Operand::Place(Place::local_mut("a_2".into())), I32(5), 6),
+        IRInst::jump(7),
+        IRInst::jump(2),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local("$4_2".into()),
+            I32(1),
+            I32(2),
+        ),
+        IRInst::bin_op(
+            BinOperator::Plus,
+            IRType::I32,
+            Place::local("$3_2".into()),
+            Operand::Place(Place::local("$4_2".into())),
+            I32(3),
+        ),
+        IRInst::jump_if_cond(JGe, Operand::Place(Place::local("$3_2".into())),
+                             Operand::Place(Place::local_mut("a_2".into())), 11),
+        IRInst::jump(7),
+        IRInst::Ret(Operand::Unit),
+    ];
+    assert_eq!(expected, ir.instructions);
+}

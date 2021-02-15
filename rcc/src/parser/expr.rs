@@ -98,14 +98,15 @@ pub mod prec {
     /// &&               left to right
     /// ||               left to right
     fn bin_op_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
-        fn reduce(bin_ops: &mut Vec<BinOperator>, exprs: &mut Vec<Expr>) {
-            while let Some(last_op) = bin_ops.pop() {
+        // 1|2|3&4+4+4+5*6*7+7&8
+        fn reduce(bin_ops: &mut Vec<BinOperator>, exprs: &mut Vec<Expr>, next_prec: Precedence) -> Result<(), RccError> {
+            while !bin_ops.is_empty() && bin_ops.last().unwrap().prec_gt(&next_prec)? {
                 let rhs = exprs.pop().unwrap();
                 let lhs = exprs.pop().unwrap();
+                let last_op = bin_ops.pop().unwrap();
                 exprs.push(Expr::BinOp(BinOpExpr::new(lhs, last_op, rhs)));
             }
-            debug_assert_eq!(exprs.len(), 1);
-            debug_assert!(bin_ops.is_empty());
+            Ok(())
         };
 
         let mut exprs = vec![unary_expr(cursor)?];
@@ -114,24 +115,23 @@ pub mod prec {
 
         loop {
             if next_is_op {
-                if let Some(next_op) = cursor.eat_token_if_from::<BinOperator>() {
-                    if let Some(last_op) = bin_ops.last() {
-                        // 1 + 2 * 3   <- -
-                        let prec_last = Precedence::from_bin_op(last_op);
-                        let prec_next = Precedence::from_bin_op(&next_op);
-                        if prec_last <= prec_next {
-                            if prec_last == Precedence::Cmp && prec_last == prec_next {
-                                return Err(
-                                    "Chained comparison operator require parentheses".into()
-                                );
+                match cursor.eat_token_if_from::<BinOperator>() {
+                    Some(next_op) => {
+                        if let Some(last_op) = bin_ops.last() {
+                            // 1 + 2 * 3   <- -
+                            if !last_op.prec_lt(&next_op)? {
+                                reduce(&mut bin_ops, &mut exprs, Precedence::from_bin_op(&next_op))?;
                             }
-                            reduce(&mut bin_ops, &mut exprs);
                         }
+                        // shift
+                        bin_ops.push(next_op);
                     }
-                    bin_ops.push(next_op);
-                } else {
-                    reduce(&mut bin_ops, &mut exprs);
-                    return Ok(exprs.pop().unwrap());
+                    None => {
+                        reduce(&mut bin_ops, &mut exprs, Precedence::Min)?;
+                        debug_assert!(bin_ops.is_empty());
+                        debug_assert_eq!(exprs.len(), 1);
+                        return Ok(exprs.pop().unwrap());
+                    }
                 }
                 next_is_op = false;
             } else {
@@ -237,6 +237,7 @@ pub mod primitive {
 
     use crate::ast::expr::Expr::{Array, Block, If, LitBool, LitNum, Loop, Path, While};
     use crate::ast::expr::*;
+    use crate::ast::stmt::Stmt;
     use crate::ast::types::TypeLitNum;
     use crate::ast::TokenStart;
     use crate::lexer::token::LiteralKind::*;
@@ -245,7 +246,6 @@ pub mod primitive {
     use crate::parser::stmt::{parse_stmt_or_expr_without_block, StmtOrExpr};
     use crate::parser::{Parse, ParseCursor};
     use crate::rcc::RccError;
-    use crate::ast::stmt::Stmt;
 
     /// PrimitiveExpr -> PathExpr | LitExpr | LitChar | LitStr | LitBool | BlockExpr
     ///                | GroupedExpr | TupleExpr | ArrayExpr

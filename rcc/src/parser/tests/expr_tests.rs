@@ -135,8 +135,9 @@ fn left_paren_test() {
 #[test]
 fn bin_op_test() {
     parse_validate(
-        vec!["1+2*4+6", "1>=2<=3"],
+        vec!["2 3", "1+2*4+6", "1>=2<=3", "2>3+4+5", "2+32*4/5"],
         vec![
+            Ok(LitNum(2.into())),
             Ok(BinOp(BinOpExpr::new(
                 BinOp(BinOpExpr::new(
                     LitNum(1.into()),
@@ -151,6 +152,20 @@ fn bin_op_test() {
                 LitNum(6.into()),
             ))),
             Err("Chained comparison operator require parentheses".into()),
+            Ok(BinOp(BinOpExpr::new(LitNum(2.into()), BinOperator::Gt,
+                BinOp(BinOpExpr::new(
+                    BinOp(BinOpExpr::new(LitNum(3.into()), BinOperator::Plus, LitNum(4.into()))),
+                    BinOperator::Plus,
+                    LitNum(5.into())
+                ))
+            ))),
+            Ok(BinOp(BinOpExpr::new(LitNum(2.into()), BinOperator::Plus,
+                                    BinOp(BinOpExpr::new(
+                                        BinOp(BinOpExpr::new(LitNum(32.into()), BinOperator::Star, LitNum(4.into()))),
+                                        BinOperator::Slash,
+                                        LitNum(5.into())
+                                    ))
+            ))),
         ],
     );
 }
