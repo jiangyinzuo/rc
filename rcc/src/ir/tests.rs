@@ -1,13 +1,16 @@
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::expr::BinOperator;
 use crate::ast::AST;
+use crate::ir::cfg::CFG;
 use crate::ir::ir_build::IRBuilder;
 use crate::ir::Jump::*;
-use crate::ir::Operand::{I32, FnLabel};
+use crate::ir::Operand::{FnLabel, I32};
 use crate::ir::{IRInst, IRType, Operand, Place, IR};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
+use std::collections::VecDeque;
+use std::iter::FromIterator;
 
 fn ir_build(input: &str) -> Result<IR, RccError> {
     let mut ir_builder = IRBuilder::new();
@@ -23,9 +26,9 @@ fn ir_build(input: &str) -> Result<IR, RccError> {
 
 #[test]
 fn test_ir_builder() {
-    let ir = ir_build("fn main() {let a = 2 + 3;}").unwrap();
+    let mut ir = ir_build("fn main() {let a = 2 + 3;}").unwrap();
 
-    let insts = vec![
+    let insts = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
@@ -34,9 +37,18 @@ fn test_ir_builder() {
             I32(3),
         ),
         IRInst::Ret(Operand::Unit),
-    ];
+    ]);
 
-    assert_eq!(insts, ir.funcs.last().unwrap().insts);
+    let func = ir.funcs.pop().unwrap();
+    assert_eq!(insts, func.insts);
+
+    let cfg = CFG::new(func);
+    assert_eq!(1, cfg.basic_blocks.len());
+    let bb = cfg.basic_blocks.last().unwrap();
+    assert_eq!(0 ,bb.id);
+    assert!(bb.predecessors.is_empty());
+    assert_eq!(2, bb.instructions.len());
+    assert!(cfg.succ_of(0).is_empty());
 }
 
 #[test]
@@ -47,7 +59,7 @@ fn test_return() {
     }"#,
     )
     .unwrap();
-    let insts = vec![
+    let insts = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
@@ -63,7 +75,7 @@ fn test_return() {
             I32(3),
         ),
         IRInst::Ret(Operand::Place(Place::local("$0_1".into()))),
-    ];
+    ]);
     assert_eq!(insts, ir.funcs.last().unwrap().insts);
 }
 
@@ -72,7 +84,7 @@ fn test_if() {
     let last_ir_id = 22;
     macro_rules! triple {
         ($cond:ident, $src2:literal, $load_a:literal) => {
-            &mut vec![
+            &mut VecDeque::from(vec![
                 IRInst::jump_if_cond(
                     $cond,
                     Operand::Place(Place::local("b_2".into())),
@@ -81,13 +93,13 @@ fn test_if() {
                 ),
                 IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
                 IRInst::jump(last_ir_id),
-            ]
+            ])
         };
     }
 
     macro_rules! triple_reverse {
         ($cond:ident, $src1:literal, $load_a:literal) => {
-            &mut vec![
+            &mut VecDeque::from(vec![
                 IRInst::jump_if_cond(
                     $cond,
                     Operand::I32($src1),
@@ -96,7 +108,7 @@ fn test_if() {
                 ),
                 IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
                 IRInst::jump(last_ir_id),
-            ]
+            ])
         };
     }
 
@@ -126,7 +138,7 @@ fn test_if() {
     )
     .unwrap();
 
-    let mut expected = vec![
+    let mut expected = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
@@ -135,19 +147,19 @@ fn test_if() {
             I32(4),
         ),
         IRInst::load_data(Place::local_mut("a_2".into()), I32(0)),
-    ];
+    ]);
     expected.append(triple!(JNe, 7, 5));
     expected.append(triple!(JEq, 9, 8));
     expected.append(triple_reverse!(JGe, 100, 1));
     expected.append(triple!(JGe, 2, 3));
     expected.append(triple_reverse!(JLt, 33, 2));
     expected.append(triple!(JLt, 50, 22));
-    expected.append(&mut vec![
+    expected.append(&mut VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(333)),
         IRInst::jump_if_cond(JNe, Operand::Place(Place::local("b_2".into())), I32(2), 24),
         IRInst::Ret(Operand::Place(Place::local("b_2".into()))),
         IRInst::Ret(Operand::Place(Place::local_mut("a_2".into()))),
-    ]);
+    ]));
     assert_eq!(expected, ir.funcs.last().unwrap().insts);
 }
 
@@ -168,7 +180,7 @@ fn test_loop() {
     "#,
     )
     .unwrap();
-    let expected = vec![
+    let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::bin_op(
             BinOperator::Plus,
@@ -192,7 +204,7 @@ fn test_loop() {
         IRInst::jump(8),
         IRInst::jump(4),
         IRInst::Ret(Operand::Unit),
-    ];
+    ]);
 
     assert_eq!(expected, ir.funcs.last().unwrap().insts);
 }
@@ -215,7 +227,7 @@ fn test_while() {
     "#,
     )
     .unwrap();
-    let expected = vec![
+    let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::jump_if_cond(
             JGe,
@@ -260,7 +272,7 @@ fn test_while() {
         ),
         IRInst::jump(7),
         IRInst::Ret(Operand::Unit),
-    ];
+    ]);
     assert_eq!(expected, ir.funcs.last().unwrap().insts);
 }
 
@@ -285,7 +297,7 @@ fn fn_call_test() {
     .unwrap();
     assert_eq!(3, ir.funcs.len());
 
-    let expected_ir = vec![
+    let expected_ir = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
             IRType::I32,
@@ -294,9 +306,9 @@ fn fn_call_test() {
             I32(4),
         ),
         IRInst::Ret(Operand::Place(Place::local("a_2".into()))),
-    ];
+    ]);
     assert_eq!(expected_ir, ir.funcs.get(0).unwrap().insts);
-    let expected_ir = vec![
+    let expected_ir = VecDeque::from(vec![
         IRInst::call(Operand::FnLabel("foo".to_string()), vec![]),
         IRInst::load_data(Place::local("b_3".into()), Operand::FnRetPlace),
         IRInst::bin_op(
@@ -314,12 +326,13 @@ fn fn_call_test() {
             Operand::Place(Place::local("c_3".into())),
         ),
         IRInst::Ret(Operand::Unit),
-    ];
+    ]);
     assert_eq!(expected_ir, ir.funcs.get(1).unwrap().insts);
-    let expected_ir = vec![
+    let expected_ir = VecDeque::from(vec![
         IRInst::call(Operand::FnLabel("bar".to_string()), vec![I32(3)]),
         IRInst::load_data(Place::local("cc_4".into()), Operand::FnRetPlace),
         IRInst::call(FnLabel("baz".into()), vec![]),
-        IRInst::Ret(Operand::Unit),];
+        IRInst::Ret(Operand::Unit),
+    ]);
     assert_eq!(expected_ir, ir.funcs.last().unwrap().insts);
 }

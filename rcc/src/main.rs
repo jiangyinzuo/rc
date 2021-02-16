@@ -1,6 +1,7 @@
+#![feature(map_first_last)]
+
 use clap::Clap;
 use crate::rcc::{RcCompiler, RccError};
-use std::error::Error;
 use std::str::FromStr;
 use code_gen::TargetPlatform;
 

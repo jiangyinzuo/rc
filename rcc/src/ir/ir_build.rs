@@ -817,7 +817,6 @@ impl IRBuilder {
         let ir_inst = IRInst::jump_if_cond(jump, rhs, lhs, *next_back_patch_link);
         *next_back_patch_link = self.ir_output.next_inst_id();
         self.ir_output.add_instructions(ir_inst);
-
         Ok(())
     }
 

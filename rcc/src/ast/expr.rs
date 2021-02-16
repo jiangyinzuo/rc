@@ -13,7 +13,6 @@ use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::ops::Deref;
 use std::rc::Rc;
-use std::str::FromStr;
 use strenum::StrEnum;
 
 pub trait ExprVisit {

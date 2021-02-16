@@ -1,3 +1,4 @@
+mod cfg;
 pub mod ir_build;
 #[cfg(test)]
 mod tests;
@@ -6,7 +7,7 @@ use crate::analyser::sym_resolver::{TypeInfo, VarKind};
 use crate::ast::expr::BinOperator;
 use crate::ast::types::TypeLitNum;
 use crate::rcc::RccError;
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fmt::Debug;
 
 #[derive(Debug, PartialEq)]
@@ -95,14 +96,14 @@ impl Place {
 
 pub struct Func {
     name: String,
-    insts: Vec<IRInst>,
+    insts: VecDeque<IRInst>,
 }
 
 impl Func {
     pub fn new() -> Func {
         Func {
             name: "".to_string(),
-            insts: vec![],
+            insts: VecDeque::new(),
         }
     }
 }
@@ -314,7 +315,7 @@ impl IR {
     }
 
     pub fn add_instructions(&mut self, ir_inst: IRInst) {
-        self.cur_func_mut().insts.push(ir_inst);
+        self.cur_func_mut().insts.push_back(ir_inst);
     }
 
     /// Start from 1
