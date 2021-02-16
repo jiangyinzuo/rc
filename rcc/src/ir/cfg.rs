@@ -1,4 +1,4 @@
-use crate::ir::{Func, IRInst, IR};
+use crate::ir::{Func, IRInst};
 use std::collections::{BTreeSet, HashMap, LinkedList};
 
 /// Control Flow Graph
@@ -57,15 +57,18 @@ impl CFG {
                 leader = *next_leader;
                 let mut bb = LinkedList::new();
                 while inst_count > 0 {
-                    match func.insts.pop_front().unwrap() {
+                    let inst = func.insts.pop_front().unwrap();
+                    match inst {
                         // delete instructions like `(n) if cond goto n+1`
                         IRInst::Jump { label }
                         | IRInst::JumpIf { label, .. }
                         | IRInst::JumpIfNot { label, .. }
                         | IRInst::JumpIfCond { label, .. } => {
-                            debug_assert_eq!(i + 2, label);
+                            if i + 2 != label {
+                                bb.push_back(inst);
+                            }
                         }
-                        inst => {
+                        _ => {
                             bb.push_back(inst);
                         }
                     }
@@ -99,10 +102,7 @@ impl CFG {
                         Some(vec![*label])
                     }
                 }
-                _ => {
-                    debug_assert_eq!(i, last_bb_id);
-                    None
-                }
+                _ => None,
             } {
                 for b in bs {
                     basic_blocks.get_mut(b).unwrap().predecessors.push(i);
@@ -123,10 +123,10 @@ impl CFG {
             .unwrap()
             .instructions
             .back()
-            .unwrap() {
-            IRInst::Jump { label } => {
-                vec![*label]
-            }
+            .unwrap()
+        {
+            IRInst::Jump { label } => vec![*label],
+
             IRInst::JumpIf { label, .. }
             | IRInst::JumpIfNot { label, .. }
             | IRInst::JumpIfCond { label, .. } => {
@@ -136,10 +136,7 @@ impl CFG {
                 }
                 succ
             }
-            _ => {
-                debug_assert_eq!(bb_id, self.basic_blocks.len() - 1);
-                vec![]
-            }
+            _ => vec![],
         }
     }
 }

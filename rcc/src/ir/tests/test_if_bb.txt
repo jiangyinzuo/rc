@@ -1,0 +1,338 @@
+[
+    BasicBlock {
+        id: 0,
+        predecessors: [],
+        instructions: [
+            BinOp {
+                op: +,
+                _type: I32,
+                dest: Place {
+                    label: "b_2",
+                    kind: Local,
+                },
+                src1: I32(
+                    3,
+                ),
+                src2: I32(
+                    4,
+                ),
+            },
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    0,
+                ),
+            },
+            JumpIfCond {
+                cond: JNe,
+                src1: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                src2: I32(
+                    7,
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 1,
+        predecessors: [
+            0,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    5,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 2,
+        predecessors: [],
+        instructions: [
+            JumpIfCond {
+                cond: JEq,
+                src1: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                src2: I32(
+                    9,
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 3,
+        predecessors: [
+            2,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    8,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 4,
+        predecessors: [],
+        instructions: [
+            JumpIfCond {
+                cond: JGe,
+                src1: I32(
+                    100,
+                ),
+                src2: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 5,
+        predecessors: [
+            4,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    1,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 6,
+        predecessors: [],
+        instructions: [
+            JumpIfCond {
+                cond: JGe,
+                src1: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                src2: I32(
+                    2,
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 7,
+        predecessors: [
+            6,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    3,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 8,
+        predecessors: [],
+        instructions: [
+            JumpIfCond {
+                cond: JLt,
+                src1: I32(
+                    33,
+                ),
+                src2: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 9,
+        predecessors: [
+            8,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    2,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 10,
+        predecessors: [],
+        instructions: [
+            JumpIfCond {
+                cond: JLt,
+                src1: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                src2: I32(
+                    50,
+                ),
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 11,
+        predecessors: [
+            10,
+        ],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    22,
+                ),
+            },
+            Jump {
+                label: 13,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 12,
+        predecessors: [],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    333,
+                ),
+            },
+        ],
+    },
+    BasicBlock {
+        id: 13,
+        predecessors: [
+            0,
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+        ],
+        instructions: [
+            JumpIfCond {
+                cond: JNe,
+                src1: Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+                src2: I32(
+                    2,
+                ),
+                label: 15,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 14,
+        predecessors: [
+            13,
+        ],
+        instructions: [
+            Ret(
+                Place(
+                    Place {
+                        label: "b_2",
+                        kind: Local,
+                    },
+                ),
+            ),
+        ],
+    },
+    BasicBlock {
+        id: 15,
+        predecessors: [
+            13,
+        ],
+        instructions: [
+            Ret(
+                Place(
+                    Place {
+                        label: "a_2",
+                        kind: LocalMut,
+                    },
+                ),
+            ),
+        ],
+    },
+]

@@ -10,7 +10,12 @@ use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 use std::collections::VecDeque;
-use std::iter::FromIterator;
+use std::fs::File;
+use std::io::Read;
+
+fn file_pathname(file_name: &str) -> String{
+    format!("./src/ir/tests/{}", file_name)
+}
 
 fn ir_build(input: &str) -> Result<IR, RccError> {
     let mut ir_builder = IRBuilder::new();
@@ -45,7 +50,7 @@ fn test_ir_builder() {
     let cfg = CFG::new(func);
     assert_eq!(1, cfg.basic_blocks.len());
     let bb = cfg.basic_blocks.last().unwrap();
-    assert_eq!(0 ,bb.id);
+    assert_eq!(0, bb.id);
     assert!(bb.predecessors.is_empty());
     assert_eq!(2, bb.instructions.len());
     assert!(cfg.succ_of(0).is_empty());
@@ -58,7 +63,7 @@ fn test_return() {
         b + 3
     }"#,
     )
-    .unwrap();
+        .unwrap();
     let insts = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
@@ -112,7 +117,7 @@ fn test_if() {
         };
     }
 
-    let ir = ir_build(
+    let mut ir = ir_build(
         r#"fn main() -> i32{let b = 3 + 4;
         let mut a = 0;
         if b == 7 {
@@ -136,7 +141,7 @@ fn test_if() {
         a
     }"#,
     )
-    .unwrap();
+        .unwrap();
 
     let mut expected = VecDeque::from(vec![
         IRInst::bin_op(
@@ -160,7 +165,17 @@ fn test_if() {
         IRInst::Ret(Operand::Place(Place::local("b_2".into()))),
         IRInst::Ret(Operand::Place(Place::local_mut("a_2".into()))),
     ]));
-    assert_eq!(expected, ir.funcs.last().unwrap().insts);
+
+    let func = ir.funcs.pop().unwrap();
+    assert_eq!(expected, func.insts);
+
+    let cfg = CFG::new(func);
+    assert_eq!(16, cfg.basic_blocks.len());
+
+    let mut file = File::open(file_pathname("test_if_bb.txt")).unwrap();
+    let mut expected = String::new();
+    file.read_to_string(&mut expected).unwrap();
+    assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
 }
 
 #[test]
@@ -179,7 +194,7 @@ fn test_loop() {
         }
     "#,
     )
-    .unwrap();
+        .unwrap();
     let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::bin_op(
@@ -226,7 +241,7 @@ fn test_while() {
         }
     "#,
     )
-    .unwrap();
+        .unwrap();
     let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::jump_if_cond(
@@ -294,7 +309,7 @@ fn fn_call_test() {
         }
     "#,
     )
-    .unwrap();
+        .unwrap();
     assert_eq!(3, ir.funcs.len());
 
     let expected_ir = VecDeque::from(vec![
