@@ -13,8 +13,11 @@ use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
 
-fn file_pathname(file_name: &str) -> String{
-    format!("./src/ir/tests/{}", file_name)
+fn expected_from_file(file_name: &str) -> String {
+    let mut file = File::open(format!("./src/ir/tests/{}", file_name)).unwrap();
+    let mut expected = String::new();
+    file.read_to_string(&mut expected).unwrap();
+    expected
 }
 
 fn ir_build(input: &str) -> Result<IR, RccError> {
@@ -172,9 +175,7 @@ fn test_if() {
     let cfg = CFG::new(func);
     assert_eq!(16, cfg.basic_blocks.len());
 
-    let mut file = File::open(file_pathname("test_if_bb.txt")).unwrap();
-    let mut expected = String::new();
-    file.read_to_string(&mut expected).unwrap();
+    let expected = expected_from_file("test_if_bb.txt");
     assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
 }
 
@@ -225,7 +226,8 @@ fn test_loop() {
     assert_eq!(expected, func.insts);
 
     let cfg = CFG::new(func);
-    println!("{:#?}", cfg.basic_blocks);
+    let expected = expected_from_file("test_loop_bb.txt");
+    assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
 }
 
 #[test]

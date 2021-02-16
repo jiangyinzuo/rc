@@ -18,32 +18,7 @@ pub struct BasicBlock {
 impl CFG {
     /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
-        macro_rules! insert_leaders {
-            ($leaders:ident, $label:ident, $next_id:expr) => {
-                $leaders.insert(*$label);
-                $leaders.insert($next_id);
-            };
-        }
-
-        // get leaders
-        let mut leaders = BTreeSet::new();
-
-        for (i, inst) in func.insts.iter().enumerate() {
-            match inst {
-                IRInst::Jump { label }
-                | IRInst::JumpIf { label, .. }
-                | IRInst::JumpIfNot { label, .. }
-                | IRInst::JumpIfCond { label, .. } => {
-                    if i + 2 != *label {
-                        insert_leaders!(leaders, label, i + 2);
-                    }
-                }
-                _ => {}
-            }
-        }
-
-        leaders.remove(&1usize);
-        leaders.insert(func.insts.len() + 1);
+        let leaders = get_leaders(&func);
 
         // generate basic blocks and label map
         let mut label_map = HashMap::new();
@@ -121,7 +96,6 @@ impl CFG {
             }
         }
 
-        delete_unreachable_bb(&mut basic_blocks, unreachable_bb);
         CFG { basic_blocks }
     }
 
@@ -152,6 +126,34 @@ impl CFG {
     }
 }
 
+fn get_leaders(func: &Func) -> BTreeSet<usize> {
+    macro_rules! insert_leaders {
+        ($leaders:ident, $label:ident, $next_id:expr) => {
+            $leaders.insert(*$label);
+            $leaders.insert($next_id);
+        };
+    }
+
+    let mut leaders = BTreeSet::new();
+
+    for (i, inst) in func.insts.iter().enumerate() {
+        match inst {
+            IRInst::Jump { label }
+            | IRInst::JumpIf { label, .. }
+            | IRInst::JumpIfNot { label, .. }
+            | IRInst::JumpIfCond { label, .. } => {
+                if i + 2 != *label {
+                    insert_leaders!(leaders, label, i + 2);
+                }
+            }
+            _ => {}
+        }
+    }
+    leaders.remove(&1usize);
+    leaders.insert(func.insts.len() + 1);
+    leaders
+}
+
 impl BasicBlock {
     pub fn new(id: usize, instructions: LinkedList<IRInst>) -> BasicBlock {
         BasicBlock {
@@ -159,11 +161,5 @@ impl BasicBlock {
             predecessors: vec![],
             instructions,
         }
-    }
-}
-
-fn delete_unreachable_bb(basic_blocks: &mut Vec<BasicBlock>, unreachable_bb: Vec<usize>) {
-    while !unreachable_bb.is_empty() {
-        break; // todo
     }
 }
