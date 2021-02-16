@@ -180,7 +180,7 @@ fn test_if() {
 
 #[test]
 fn test_loop() {
-    let ir = ir_build(
+    let mut ir = ir_build(
         r#"
         fn main() {
             let mut a = 3;
@@ -221,7 +221,11 @@ fn test_loop() {
         IRInst::Ret(Operand::Unit),
     ]);
 
-    assert_eq!(expected, ir.funcs.last().unwrap().insts);
+    let func = ir.funcs.pop().unwrap();
+    assert_eq!(expected, func.insts);
+
+    let cfg = CFG::new(func);
+    println!("{:#?}", cfg.basic_blocks);
 }
 
 #[test]

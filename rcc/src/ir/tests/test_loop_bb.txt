@@ -1,0 +1,103 @@
+[
+    BasicBlock {
+        id: 0,
+        predecessors: [],
+        instructions: [
+            LoadData {
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src: I32(
+                    3,
+                ),
+            },
+        ],
+    },
+    BasicBlock {
+        id: 1,
+        predecessors: [
+            0,
+            1,
+        ],
+        instructions: [
+            BinOp {
+                op: +,
+                _type: I32,
+                dest: Place {
+                    label: "a_2",
+                    kind: LocalMut,
+                },
+                src1: Place(
+                    Place {
+                        label: "a_2",
+                        kind: LocalMut,
+                    },
+                ),
+                src2: I32(
+                    1,
+                ),
+            },
+            Jump {
+                label: 1,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 2,
+        predecessors: [
+            3,
+        ],
+        instructions: [
+            BinOp {
+                op: +,
+                _type: I32,
+                dest: Place {
+                    label: "a_4",
+                    kind: Local,
+                },
+                src1: I32(
+                    5,
+                ),
+                src2: I32(
+                    2,
+                ),
+            },
+            LoadData {
+                dest: Place {
+                    label: "b_2",
+                    kind: Local,
+                },
+                src: Place(
+                    Place {
+                        label: "a_4",
+                        kind: Local,
+                    },
+                ),
+            },
+            Jump {
+                label: 4,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 3,
+        predecessors: [],
+        instructions: [
+            Jump {
+                label: 2,
+            },
+        ],
+    },
+    BasicBlock {
+        id: 4,
+        predecessors: [
+            2,
+        ],
+        instructions: [
+            Ret(
+                Unit,
+            ),
+        ],
+    },
+]

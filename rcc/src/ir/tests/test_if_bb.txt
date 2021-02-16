@@ -286,6 +286,7 @@
             9,
             10,
             11,
+            12,
         ],
         instructions: [
             JumpIfCond {
@@ -323,6 +324,7 @@
         id: 15,
         predecessors: [
             13,
+            14,
         ],
         instructions: [
             Ret(

@@ -16,6 +16,7 @@ pub struct BasicBlock {
 }
 
 impl CFG {
+    /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
         macro_rules! insert_leaders {
             ($leaders:ident, $label:ident, $next_id:expr) => {
@@ -57,19 +58,19 @@ impl CFG {
                 leader = *next_leader;
                 let mut bb = LinkedList::new();
                 while inst_count > 0 {
-                    let inst = func.insts.pop_front().unwrap();
-                    match inst {
+                    let lead_inst = func.insts.pop_front().unwrap();
+                    match lead_inst {
                         // delete instructions like `(n) if cond goto n+1`
                         IRInst::Jump { label }
                         | IRInst::JumpIf { label, .. }
                         | IRInst::JumpIfNot { label, .. }
                         | IRInst::JumpIfCond { label, .. } => {
                             if i + 2 != label {
-                                bb.push_back(inst);
+                                bb.push_back(lead_inst);
                             }
                         }
                         _ => {
-                            bb.push_back(inst);
+                            bb.push_back(lead_inst);
                         }
                     }
                     inst_count -= 1;
@@ -79,6 +80,7 @@ impl CFG {
             .collect();
 
         // change goto labels to bb id
+        let mut unreachable_bb = vec![];
         let last_bb_id = basic_blocks.len() - 1;
         for i in 0..=last_bb_id {
             if let Some(bs) = match basic_blocks
@@ -102,7 +104,16 @@ impl CFG {
                         Some(vec![*label])
                     }
                 }
-                _ => None,
+                _ => {
+                    if i < last_bb_id {
+                        Some(vec![i + 1])
+                    } else {
+                        if i != 0 {
+                            unreachable_bb.push(i);
+                        }
+                        None
+                    }
+                }
             } {
                 for b in bs {
                     basic_blocks.get_mut(b).unwrap().predecessors.push(i);
@@ -110,7 +121,7 @@ impl CFG {
             }
         }
 
-        //
+        delete_unreachable_bb(&mut basic_blocks, unreachable_bb);
         CFG { basic_blocks }
     }
 
@@ -148,5 +159,11 @@ impl BasicBlock {
             predecessors: vec![],
             instructions,
         }
+    }
+}
+
+fn delete_unreachable_bb(basic_blocks: &mut Vec<BasicBlock>, unreachable_bb: Vec<usize>) {
+    while !unreachable_bb.is_empty() {
+        break; // todo
     }
 }
