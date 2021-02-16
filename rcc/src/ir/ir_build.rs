@@ -14,7 +14,7 @@ use crate::ast::types::TypeLitNum;
 use crate::ast::AST;
 use crate::ir::Jump::*;
 use crate::ir::{Func, IRInst, IRType, Jump, Operand, Place, IR};
-use crate::rcc::RccError;
+use crate::rcc::{OptimizeLevel, RccError};
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -27,15 +27,18 @@ pub struct IRBuilder {
 
     // (place = loop expr, break link)
     loop_var_stack: Vec<(Option<Place>, usize)>,
+
+    optimize_level: OptimizeLevel,
 }
 
 impl IRBuilder {
-    pub fn new() -> IRBuilder {
+    pub fn new(optimize_level: OptimizeLevel) -> IRBuilder {
         IRBuilder {
             ir_output: IR::new(),
             fn_ret_temp_var: vec![],
             scope_stack: ScopeStack::new(),
             loop_var_stack: vec![],
+            optimize_level,
         }
     }
 
@@ -210,6 +213,14 @@ impl IRBuilder {
         }
     }
 
+    fn lit(&mut self, operand: Operand, d: Place) -> Result<Operand, RccError> {
+        if !d.is_temp() {
+            self.ir_output
+                .add_instructions(IRInst::load_data(d, operand.clone()));
+        }
+        Ok(operand)
+    }
+
     fn visit_lit_num_expr(
         &mut self,
         lit_num_expr: &mut LitNumExpr,
@@ -234,12 +245,7 @@ impl IRBuilder {
                     TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
                     TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
                 };
-
-                if !d.is_temp() {
-                    self.ir_output
-                        .add_instructions(IRInst::load_data(d, operand.clone()));
-                }
-                Ok(operand)
+                self.lit(operand, d)
             }
             None => Ok(Operand::Unit),
         }
@@ -251,14 +257,7 @@ impl IRBuilder {
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
         match dest {
-            Some(d) => {
-                let operand = Operand::Bool(*lit_bool);
-                if !d.is_temp() {
-                    self.ir_output
-                        .add_instructions(IRInst::load_data(d, operand.clone()));
-                }
-                Ok(operand)
-            }
+            Some(d) => self.lit(Operand::Bool(*lit_bool), d),
             None => Ok(Operand::Unit),
         }
     }
@@ -269,14 +268,7 @@ impl IRBuilder {
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
         match dest {
-            Some(d) => {
-                let operand = Operand::Char(*lit_char);
-                if !d.is_temp() {
-                    self.ir_output
-                        .add_instructions(IRInst::load_data(d, operand.clone()));
-                }
-                Ok(operand)
-            }
+            Some(d) => self.lit(Operand::Char(*lit_char), d),
             None => Ok(Operand::Unit),
         }
     }
@@ -365,6 +357,19 @@ impl IRBuilder {
         unimplemented!()
     }
 
+    fn bin_op(
+        &mut self,
+        lhs: Operand,
+        rhs: Operand,
+        op: BinOperator,
+        ir_type: IRType,
+        dest: Place,
+    ) -> Result<Operand, RccError> {
+        self.ir_output
+            .add_instructions(IRInst::bin_op(op, ir_type, dest.clone(), lhs, rhs));
+        Ok(Operand::Place(dest))
+    }
+
     fn visit_bin_op_expr(
         &mut self,
         bin_op_expr: &mut BinOpExpr,
@@ -381,17 +386,19 @@ impl IRBuilder {
         let tp = t.deref();
         let ir_type = IRType::from_type_info(tp)?;
 
+        let fold_option = bin_op_may_constant_fold(&bin_op_expr.bin_op, &lhs, &rhs)?;
+
         match dest {
-            Some(d) => {
-                self.ir_output.add_instructions(IRInst::bin_op(
-                    bin_op_expr.bin_op,
-                    ir_type,
-                    d.clone(),
-                    lhs,
-                    rhs,
-                ));
-                Ok(Operand::Place(d))
-            }
+            Some(d) => match self.optimize_level {
+                OptimizeLevel::Zero => {
+                    self.bin_op(lhs, rhs, bin_op_expr.bin_op, ir_type, d.clone())
+                }
+
+                OptimizeLevel::One => match fold_option {
+                    Some(operand) => self.lit(operand, d),
+                    None => self.bin_op(lhs, rhs, bin_op_expr.bin_op, ir_type, d.clone()),
+                },
+            },
             None => Ok(Operand::Unit),
         }
     }
@@ -884,4 +891,57 @@ impl IRBuilder {
             None => Ok(Operand::Never),
         }
     }
+}
+
+/// Constant fold optimization.
+/// a = 2 * 3 -> a = 6
+/// TODO other primitive type
+pub(super) fn bin_op_may_constant_fold(
+    op: &BinOperator,
+    src1: &Operand,
+    src2: &Operand,
+) -> Result<Option<Operand>, RccError> {
+    Ok(match (src1, src2) {
+        (Operand::I32(l), Operand::I32(r)) => match op {
+            BinOperator::Plus => Some(Operand::I32(match l.checked_add(*r) {
+                Some(res) => res,
+                None => return Err("add overflow".into()),
+            })),
+            BinOperator::Minus => Some(Operand::I32(match l.checked_sub(*r) {
+                Some(res) => res,
+                None => return Err("sub overflow".into()),
+            })),
+            BinOperator::Star => Some(Operand::I32(match l.checked_mul(*r) {
+                Some(res) => res,
+                None => return Err("mul overflow".into()),
+            })),
+            BinOperator::Slash => Some(Operand::I32(match l.checked_div(*r) {
+                Some(res) => res,
+                None => return Err("div overflow".into()),
+            })),
+            BinOperator::Lt => Some(Operand::Bool(l < r)),
+            BinOperator::Le => Some(Operand::Bool(l <= r)),
+            BinOperator::Gt => Some(Operand::Bool(l > r)),
+            BinOperator::Ge => Some(Operand::Bool(l >= r)),
+            BinOperator::Ne => Some(Operand::Bool(l != r)),
+            BinOperator::EqEq => Some(Operand::Bool(l == r)),
+            BinOperator::Shl => Some(Operand::I32(match l.checked_shl(*r as u32) {
+                Some(res) => res,
+                None => return Err("shl overflow".into()),
+            })),
+            BinOperator::Shr => Some(Operand::I32(match l.checked_shr(*r as u32) {
+                Some(res) => res,
+                None => return Err("shr overflow".into()),
+            })),
+            BinOperator::And => Some(Operand::I32(l & r)),
+            BinOperator::Or => Some(Operand::I32(l | r)),
+            BinOperator::Caret => Some(Operand::I32(l ^ r)),
+            BinOperator::Percent => Some(Operand::I32(match l.checked_rem(*r) {
+                Some(res) => res,
+                None => return Err("rem overflow".into()),
+            })),
+            _ => None,
+        },
+        _ => None,
+    })
 }

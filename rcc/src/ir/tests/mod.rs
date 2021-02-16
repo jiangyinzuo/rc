@@ -1,3 +1,5 @@
+mod o1_test;
+
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::expr::BinOperator;
 use crate::ast::AST;
@@ -8,7 +10,7 @@ use crate::ir::Operand::{FnLabel, I32};
 use crate::ir::{IRInst, IRType, Operand, Place, IR};
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
-use crate::rcc::RccError;
+use crate::rcc::{OptimizeLevel, RccError};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
@@ -20,8 +22,8 @@ fn expected_from_file(file_name: &str) -> String {
     expected
 }
 
-fn ir_build(input: &str) -> Result<IR, RccError> {
-    let mut ir_builder = IRBuilder::new();
+fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<IR, RccError> {
+    let mut ir_builder = IRBuilder::new(opt_level);
     let mut lexer = Lexer::new(input);
     let mut cursor = ParseCursor::new(lexer.tokenize());
     let mut ast = AST::parse(&mut cursor)?;
@@ -30,6 +32,14 @@ fn ir_build(input: &str) -> Result<IR, RccError> {
     let ir = ir_builder.generate_ir(&mut ast)?;
 
     Ok(ir)
+}
+
+fn ir_build(input: &str) -> Result<IR, RccError> {
+    ir_build_with_optimize(input, OptimizeLevel::Zero)
+}
+
+fn ir_build_o1(input: &str) -> Result<IR, RccError> {
+    ir_build_with_optimize(input, OptimizeLevel::One)
 }
 
 #[test]
@@ -60,13 +70,43 @@ fn test_ir_builder() {
 }
 
 #[test]
+fn test_lit_num() {
+    let ir = ir_build(
+        r#"fn main() {let b: i8 = 99999999999999999999999999999;
+    }"#,
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        "ParseInt(ParseIntError { kind: PosOverflow })",
+        format!("{:?}", ir)
+    );
+}
+
+#[test]
+fn test_math_overflow() {
+    let b = 0x7fffffff;
+    println!("{}", b);
+    let ir = ir_build(
+        r#"fn main() {let b: i32 = 0x7fffffff + 9999;
+    }"#,
+    )
+    .err()
+    .unwrap();
+    assert_eq!(
+        "ParseInt(ParseIntError { kind: InvalidDigit })",
+        format!("{:?}", ir)
+    );
+}
+
+#[test]
 fn test_return() {
     let ir = ir_build(
         r#"fn main() -> i32{let b = 3 + 4;
         b + 3
     }"#,
     )
-        .unwrap();
+    .unwrap();
     let insts = VecDeque::from(vec![
         IRInst::bin_op(
             BinOperator::Plus,
@@ -144,7 +184,7 @@ fn test_if() {
         a
     }"#,
     )
-        .unwrap();
+    .unwrap();
 
     let mut expected = VecDeque::from(vec![
         IRInst::bin_op(
@@ -195,7 +235,7 @@ fn test_loop() {
         }
     "#,
     )
-        .unwrap();
+    .unwrap();
     let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::bin_op(
@@ -247,7 +287,7 @@ fn test_while() {
         }
     "#,
     )
-        .unwrap();
+    .unwrap();
     let expected = VecDeque::from(vec![
         IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
         IRInst::jump_if_cond(
@@ -315,7 +355,7 @@ fn fn_call_test() {
         }
     "#,
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(3, ir.funcs.len());
 
     let expected_ir = VecDeque::from(vec![

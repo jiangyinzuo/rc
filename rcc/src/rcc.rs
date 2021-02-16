@@ -1,11 +1,16 @@
 use crate::ast::file::File;
+use crate::code_gen::TargetPlatform;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::io::{BufReader, BufWriter, Read, Write};
-use crate::code_gen::TargetPlatform;
 use thiserror;
+
+pub enum OptimizeLevel {
+    Zero,
+    One,
+}
 
 pub struct RcCompiler<R: Read, W: Write> {
     input: BufReader<R>,
@@ -46,7 +51,7 @@ pub enum RccError {
     #[error("{0}")]
     ParseFloat(#[from] std::num::ParseFloatError),
     #[error("{0}")]
-    Parse(String)
+    Parse(String),
 }
 
 impl From<String> for RccError {
@@ -70,7 +75,7 @@ impl PartialEq for RccError {
                 }
                 false
             }
-            RccError::Parse(s)=> {
+            RccError::Parse(s) => {
                 if let RccError::Parse(o) = other {
                     return s == o;
                 }

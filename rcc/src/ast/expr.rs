@@ -159,6 +159,7 @@ impl TypeInfoSetter for Expr {
                 l.set_type_info(type_info);
             }
             Self::Unary(u) => u.set_type_info(type_info),
+            Self::BinOp(b) => b.set_type_info(type_info),
             e => unimplemented!("set type_info on {:?}", e),
         }
     }

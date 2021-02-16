@@ -9,6 +9,7 @@ use crate::ast::types::TypeLitNum;
 use crate::rcc::RccError;
 use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::fmt::Debug;
+use std::ops::Add;
 
 #[derive(Debug, PartialEq)]
 pub enum Jump {
