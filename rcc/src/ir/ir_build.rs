@@ -50,11 +50,11 @@ impl IRBuilder {
     }
 
     fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> Place {
-        Place::local(
-            self.scope_stack
-                .cur_scope_mut()
-                .gen_temp_variable(type_info),
-        )
+        let label = self
+            .scope_stack
+            .cur_scope_mut()
+            .gen_temp_variable(type_info);
+        Place::local(label)
     }
 
     fn gen_variable(&mut self, ident: &str, var_kind: VarKind) -> Place {

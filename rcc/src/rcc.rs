@@ -2,10 +2,7 @@ use crate::ast::file::File;
 use crate::code_gen::TargetPlatform;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
-use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::io::{BufReader, BufWriter, Read, Write};
-use thiserror;
 
 pub enum OptimizeLevel {
     Zero,

@@ -4,6 +4,7 @@ use std::collections::{BTreeSet, HashMap, LinkedList};
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
+    pub local_ids: HashMap<String, u64>,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -18,7 +19,9 @@ pub struct BasicBlock {
 impl CFG {
     /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
+
         let leaders = get_leaders(&func);
+        let local_ids = get_local_ids(&func);
 
         // generate basic blocks and label map
         let mut label_map = HashMap::new();
@@ -96,7 +99,7 @@ impl CFG {
             }
         }
 
-        CFG { basic_blocks }
+        CFG { basic_blocks, local_ids }
     }
 
     pub fn succ_of(&self, bb_id: usize) -> Vec<usize> {
@@ -152,6 +155,25 @@ fn get_leaders(func: &Func) -> BTreeSet<usize> {
     leaders.remove(&1usize);
     leaders.insert(func.insts.len() + 1);
     leaders
+}
+
+fn get_local_ids(func: &Func) -> HashMap<String, u64> {
+    let mut local_ids = HashMap::new();
+    let mut next_id = 0;
+    for inst in func.insts.iter() {
+        match inst {
+            IRInst::BinOp {
+                dest, ..
+            } | IRInst::LoadData { dest, ..} | IRInst::LoadAddr {dest, ..} => {
+                if !local_ids.contains_key(&dest.label) {
+                    local_ids.insert(dest.label.clone(), next_id);
+                    next_id += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    local_ids
 }
 
 impl BasicBlock {

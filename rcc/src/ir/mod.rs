@@ -2,14 +2,14 @@ mod cfg;
 pub mod ir_build;
 #[cfg(test)]
 mod tests;
+mod dataflow;
 
 use crate::analyser::sym_resolver::{TypeInfo, VarKind};
 use crate::ast::expr::BinOperator;
 use crate::ast::types::TypeLitNum;
 use crate::rcc::RccError;
-use std::collections::{BTreeSet, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
-use std::ops::Add;
 
 #[derive(Debug, PartialEq)]
 pub enum Jump {
@@ -61,12 +61,16 @@ pub struct Place {
 }
 
 impl Place {
+    pub fn label(ident: &str, scope_id: u64) -> String {
+        format!("{}_{}", ident, scope_id)
+    }
+
     pub fn new(label: String, kind: VarKind) -> Place {
         Place { label, kind }
     }
 
     pub fn variable(ident: &str, scope_id: u64, var_kind: VarKind) -> Place {
-        Place::new(format!("{}_{}", ident, scope_id), var_kind)
+        Place::new(Self::label(ident, scope_id), var_kind)
     }
 
     pub fn local(label: String) -> Place {
