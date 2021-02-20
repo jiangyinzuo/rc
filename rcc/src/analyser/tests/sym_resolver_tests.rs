@@ -92,7 +92,6 @@ fn str_test() {
     .unwrap();
     assert_eq!(1, ast_file.scope.types.len());
     assert_eq!(Ok(()), sym_resolver.visit_file(&mut ast_file));
-    assert_eq!(3, sym_resolver.str_constants.len());
 }
 
 #[test]

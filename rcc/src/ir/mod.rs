@@ -292,21 +292,22 @@ pub enum StrKind {
 }
 
 pub struct IR {
-    funcs: Vec<Func>,
-    strs: HashMap<String, String>,
+    pub funcs: Vec<Func>,
+    /// label, value
+    pub ro_local_strs: HashMap<String, String>,
 }
 
 impl IR {
     pub fn new() -> IR {
         IR {
             funcs: vec![],
-            strs: HashMap::new(),
+            ro_local_strs: HashMap::new(),
         }
     }
 
-    pub fn add_lit_str(&mut self, s: String) -> Operand {
-        let label = format!(".LC{}", self.strs.len());
-        self.strs.insert(label.clone(), s);
+    pub fn add_ro_local_str(&mut self, s: String) -> Operand {
+        let label = format!(".LC{}", self.ro_local_strs.len());
+        self.ro_local_strs.insert(label.clone(), s);
         Operand::Place(Place::lit_const(label))
     }
 

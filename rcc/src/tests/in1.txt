@@ -1,0 +1,6 @@
+fn foo() -> i32 {
+    let a = 3;
+    let b = 2;
+    let c = "hello";
+    return a + b; // add?
+}

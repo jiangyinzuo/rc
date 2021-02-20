@@ -1,9 +1,13 @@
-use crate::ast::file::File;
+use crate::ast::AST;
 use crate::code_gen::TargetPlatform;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use std::io::{BufReader, BufWriter, Read, Write};
+use crate::analyser::sym_resolver::SymbolResolver;
+use crate::ir::ir_build::IRBuilder;
+use crate::code_gen::code_generator::CodeGenerator;
 
+#[derive(Copy, Clone)]
 pub enum OptimizeLevel {
     Zero,
     One,
@@ -11,14 +15,16 @@ pub enum OptimizeLevel {
 
 pub struct RcCompiler<R: Read, W: Write> {
     input: BufReader<R>,
-    output: BufWriter<W>,
+    pub output: BufWriter<W>,
+    opt_level: OptimizeLevel,
 }
 
 impl<R: Read, W: Write> RcCompiler<R, W> {
-    pub fn new(target_platform: TargetPlatform, input: R, output: W) -> Self {
+    pub fn new(target_platform: TargetPlatform, input: R, output: W, opt_level: OptimizeLevel) -> Self {
         RcCompiler {
             input: BufReader::new(input),
             output: BufWriter::new(output),
+            opt_level,
         }
     }
 
@@ -32,9 +38,21 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
 
         // parse
         let mut cursor = ParseCursor::new(token_stream);
-        let ast_file = File::parse(&mut cursor)?;
+        let mut ast = AST::parse(&mut cursor)?;
 
-        // TODO semantic analyser, generate IR
+        let mut sym_resolver = SymbolResolver::new();
+        sym_resolver.visit_file(&mut ast.file)?;
+
+        let mut ir_builder = IRBuilder::new(self.opt_level);
+        let ir = ir_builder.generate_ir(&mut ast)?;
+
+        match self.opt_level {
+            OptimizeLevel::Zero => {
+                let mut code_gen = CodeGenerator::new(ir, &mut self.output);
+                code_gen.run()?;
+            }
+            OptimizeLevel::One => {todo!()}
+        }
         Ok(())
     }
 }

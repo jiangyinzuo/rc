@@ -42,7 +42,7 @@ impl IRBuilder {
         }
     }
 
-    pub(super) fn generate_ir(&mut self, ast: &mut AST) -> Result<IR, RccError> {
+    pub(crate) fn generate_ir(&mut self, ast: &mut AST) -> Result<IR, RccError> {
         self.visit_file(&mut ast.file)?;
         let mut output = IR::new();
         std::mem::swap(&mut self.ir_output, &mut output);
@@ -142,7 +142,7 @@ impl IRBuilder {
             Expr::LitNum(lit_num_expr) => self.visit_lit_num_expr(lit_num_expr, dest),
             Expr::LitBool(lit_bool) => self.visit_lit_bool(lit_bool, dest),
             Expr::LitChar(lit_char) => self.visit_lit_char(lit_char, dest),
-            Expr::LitStr(s) => self.visit_lit_str(s),
+            Expr::LitStr(s) => self.visit_lit_str(s, dest),
             Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr, dest),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
@@ -284,8 +284,8 @@ impl IRBuilder {
         }
     }
 
-    fn visit_lit_str(&mut self, s: &String) -> Result<Operand, RccError> {
-        Ok(self.ir_output.add_lit_str(s.to_string()))
+    fn visit_lit_str(&mut self, s: &str, _dest: Option<Place>) -> Result<Operand, RccError> {
+        Ok(self.ir_output.add_ro_local_str(s.to_string()))
     }
 
     fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<Operand, RccError> {

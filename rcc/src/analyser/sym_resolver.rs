@@ -222,7 +222,6 @@ pub struct SymbolResolver {
 
     // TODO: Operator override tables
     pub override_bin_ops: HashSet<(BinOperator, TypeInfo, TypeInfo)>,
-    pub str_constants: HashMap<String, u64>,
 }
 
 impl SymbolResolver {
@@ -234,7 +233,6 @@ impl SymbolResolver {
             cur_fn_ret_type: TypeInfo::Unknown,
             cur_fn_ret_type_stack: vec![],
             override_bin_ops: HashSet::new(),
-            str_constants: HashMap::new(),
         }
     }
 
@@ -605,11 +603,8 @@ impl SymbolResolver {
         }
     }
 
-    fn visit_lit_str(&mut self, s: &String) -> Result<(), RccError> {
-        if !self.str_constants.contains_key(s) {
-            self.str_constants
-                .insert(s.to_string(), self.str_constants.len() as u64);
-        }
+    fn visit_lit_str(&mut self, _: &str) -> Result<(), RccError> {
+        // do nothing
         Ok(())
     }
 

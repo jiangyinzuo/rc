@@ -1,0 +1,4 @@
+	.text
+	.section	.rodata
+.LC0:
+	.string "hello"
