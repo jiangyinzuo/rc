@@ -104,9 +104,9 @@ pub struct Func {
 }
 
 impl Func {
-    pub fn new() -> Func {
+    pub fn new(name: String) -> Func {
         Func {
-            name: "".to_string(),
+            name,
             insts: VecDeque::new(),
         }
     }
@@ -310,8 +310,8 @@ impl IR {
         Operand::Place(Place::lit_const(label))
     }
 
-    pub fn add_func(&mut self) {
-        self.funcs.push(Func::new());
+    pub fn add_func(&mut self, fn_name: String) {
+        self.funcs.push(Func::new(fn_name));
     }
 
     pub fn cur_func_mut(&mut self) -> &mut Func {

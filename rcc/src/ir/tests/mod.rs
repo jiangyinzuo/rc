@@ -58,6 +58,7 @@ fn test_ir_builder() {
     ]);
 
     let func = ir.funcs.pop().unwrap();
+    assert_eq!("main", func.name);
     assert_eq!(insts, func.insts);
 
     let cfg = CFG::new(func);

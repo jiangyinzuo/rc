@@ -1,7 +1,7 @@
 use crate::ir::cfg::{BasicBlock, CFG};
 use crate::ir::{IRInst, Operand, Place};
-use std::collections::VecDeque;
 use bit_vector::BitVector;
+use std::collections::VecDeque;
 
 trait AnalysisDomain {
     fn bottom_value(cfg: &CFG) -> Self;
@@ -11,7 +11,6 @@ pub struct LiveVariableAnalysis<'cfg> {
     cfg: &'cfg CFG,
     pub in_states: Vec<BitVector>,
     pub out_states: Vec<BitVector>,
-    in_exit: BitVector,
     in_changed: bool,
 }
 
@@ -25,15 +24,14 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
     pub fn new(cfg: &'cfg CFG) -> LiveVariableAnalysis<'cfg> {
         LiveVariableAnalysis {
             cfg,
-            in_states: vec![Self::init_value(cfg); cfg.local_ids.len()],
-            out_states: vec![Self::init_value(cfg); cfg.local_ids.len()],
-            in_exit: Self::boundary(cfg),
+            in_states: vec![Self::init_value(cfg); cfg.basic_blocks.len()],
+            out_states: vec![Self::init_value(cfg); cfg.basic_blocks.len()],
             in_changed: true,
         }
     }
 
     pub fn apply(&mut self) {
-        let mut visited = BitVector::new( self.cfg.basic_blocks.len());
+        let mut visited = BitVector::new(self.cfg.basic_blocks.len());
         let mut queue = VecDeque::<usize>::new();
         while self.in_changed {
             visited.set_all_false();
@@ -70,19 +68,16 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
 
     fn join_succ(&self, basic_block: &BasicBlock) -> BitVector {
         let bid = basic_block.id;
-        if bid == self.cfg.basic_blocks.len() - 1 {
-            self.in_exit.clone()
-        } else {
-            let succs = self.cfg.succ_of(bid);
-            let res = succs
-                .iter()
-                .map(|s_bid| self.in_states.get(*s_bid).unwrap())
-                .fold(BitVector::bottom_value(self.cfg), |mut acc, x| {
-                    acc.set_bitor(x);
-                    acc
-                });
-            res
-        }
+
+        let succs = self.cfg.succ_of(bid);
+        let res = succs
+            .iter()
+            .map(|s_bid| self.in_states.get(*s_bid).unwrap())
+            .fold(BitVector::bottom_value(self.cfg), |mut acc, x| {
+                acc.set_bitor(x);
+                acc
+            });
+        res
     }
 
     fn gen_kill(&mut self, bid: usize, inst: &IRInst) {
@@ -103,8 +98,8 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
             };
         }
 
-        let in_state = self.in_states.get_mut(bid).unwrap();
         let out_state = self.out_states.get_mut(bid).unwrap();
+        let in_state = self.in_states.get_mut(bid).unwrap();
         in_state.clone_from(out_state);
         match inst {
             IRInst::LoadAddr { .. } => {
@@ -127,6 +122,11 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
             IRInst::JumpIfCond { src1, src2, .. } => {
                 kill!(self, src1, in_state);
                 kill!(self, src2, in_state);
+            }
+            IRInst::Call {args, ..} => {
+                for arg in args {
+                    kill!(self, arg, in_state);
+                }
             }
             _ => {}
         }

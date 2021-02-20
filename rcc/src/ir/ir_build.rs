@@ -79,7 +79,7 @@ impl IRBuilder {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        self.ir_output.add_func();
+        self.ir_output.add_func(item_fn.name.clone());
 
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
         assert_eq!(info, TypeInfo::from_item_fn(item_fn));
@@ -117,7 +117,7 @@ impl IRBuilder {
 
     fn visit_let_stmt(&mut self, let_stmt: &mut LetStmt) -> Result<(), RccError> {
         let is_mut = let_stmt.is_mut();
-        if let Some(expr) = &mut let_stmt.rhs {
+        if let Some(rhs) = &mut let_stmt.rhs {
             match &let_stmt.pattern {
                 Pattern::Identifier(ident_pattern) => {
                     let ident = ident_pattern.ident();
@@ -129,7 +129,7 @@ impl IRBuilder {
                             VarKind::Local
                         },
                     );
-                    let rhs = self.visit_expr(expr, Some(dest))?;
+                    let rhs = self.visit_expr(rhs, Some(dest))?;
                 }
             }
         }
@@ -138,7 +138,7 @@ impl IRBuilder {
 
     fn visit_expr(&mut self, expr: &mut Expr, dest: Option<Place>) -> Result<Operand, RccError> {
         let result = match expr {
-            Expr::Path(path_expr) => self.visit_path_expr(path_expr),
+            Expr::Path(path_expr) => self.visit_path_expr(path_expr, dest),
             Expr::LitNum(lit_num_expr) => self.visit_lit_num_expr(lit_num_expr, dest),
             Expr::LitBool(lit_bool) => self.visit_lit_bool(lit_bool, dest),
             Expr::LitChar(lit_char) => self.visit_lit_char(lit_char, dest),
@@ -174,7 +174,7 @@ impl IRBuilder {
 
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<Operand, RccError> {
         let r = match lhs_expr {
-            LhsExpr::Path(expr) => self.visit_path_expr(expr)?,
+            LhsExpr::Path(expr) => self.visit_path_expr(expr, None)?,
             _ => todo!("visit lhs expr"),
         };
         Ok(r)
@@ -199,13 +199,24 @@ impl IRBuilder {
         unimplemented!()
     }
 
-    fn visit_path_expr(&mut self, path_expr: &mut PathExpr) -> Result<Operand, RccError> {
+    fn visit_path_expr(
+        &mut self,
+        path_expr: &mut PathExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
         // TODO path segmentation
         let ident = path_expr.segments.last().unwrap();
 
         let cur_scope = self.scope_stack.cur_scope();
         if let Some((var, scope_id)) = cur_scope.find_variable(ident) {
-            Ok(Operand::Place(Place::variable(ident, scope_id, var.kind())))
+            let operand = Operand::Place(Place::variable(ident, scope_id, var.kind()));
+            if let Some(d) = dest {
+                if !d.is_temp() {
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(d, operand.clone()));
+                }
+            }
+            Ok(operand)
         } else if !cur_scope.find_fn(ident).is_unknown() {
             Ok(Operand::FnLabel(ident.clone()))
         } else {
@@ -862,8 +873,8 @@ impl IRBuilder {
             Some(e) => {
                 if let Some(p) = break_place {
                     let p = p.clone();
-                    let d = Some(p.clone());
-                    let rhs = self.visit_expr(e, d)?;
+                    let temp_v = self.gen_temp_variable(e.type_info());
+                    let rhs = self.visit_expr(e, Some(temp_v))?;
                     self.ir_output.add_instructions(IRInst::load_data(p, rhs));
                 } else {
                     unreachable!("error in ir_builder: break expr has ret value");
