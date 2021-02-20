@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap, LinkedList};
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
-    pub local_ids: HashMap<String, u64>,
+    pub local_ids: HashMap<String, usize>,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -157,9 +157,9 @@ fn get_leaders(func: &Func) -> BTreeSet<usize> {
     leaders
 }
 
-fn get_local_ids(func: &Func) -> HashMap<String, u64> {
+fn get_local_ids(func: &Func) -> HashMap<String, usize> {
     let mut local_ids = HashMap::new();
-    let mut next_id = 0;
+    let mut next_id: usize = 0;
     for inst in func.insts.iter() {
         match inst {
             IRInst::BinOp {

@@ -34,7 +34,7 @@ fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<IR, R
     Ok(ir)
 }
 
-fn ir_build(input: &str) -> Result<IR, RccError> {
+pub(crate) fn ir_build(input: &str) -> Result<IR, RccError> {
     ir_build_with_optimize(input, OptimizeLevel::Zero)
 }
 

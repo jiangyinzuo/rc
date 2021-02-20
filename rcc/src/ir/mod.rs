@@ -1,7 +1,6 @@
 mod cfg;
 pub mod ir_build;
-#[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 mod dataflow;
 
 use crate::analyser::sym_resolver::{TypeInfo, VarKind};
