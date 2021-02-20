@@ -11,9 +11,9 @@ use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
-use crate::ast::AST;
+use crate::ast::{Visibility, AST};
 use crate::ir::Jump::*;
-use crate::ir::{Func, IRInst, IRType, Jump, Operand, Place, IR};
+use crate::ir::{IRInst, IRType, Jump, Operand, Place, IR};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::cell::RefCell;
 use std::ops::Deref;
@@ -79,7 +79,13 @@ impl IRBuilder {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        self.ir_output.add_func(item_fn.name.clone());
+        self.ir_output.add_func(
+            item_fn.name.clone(),
+            match item_fn.vis() {
+                Visibility::Pub => true,
+                Visibility::Priv => false,
+            },
+        );
 
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
         assert_eq!(info, TypeInfo::from_item_fn(item_fn));

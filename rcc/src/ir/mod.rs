@@ -99,15 +99,17 @@ impl Place {
 }
 
 pub struct Func {
-    name: String,
+    pub name: String,
     insts: VecDeque<IRInst>,
+    pub is_global: bool,
 }
 
 impl Func {
-    pub fn new(name: String) -> Func {
+    pub fn new(name: String, is_global: bool) -> Func {
         Func {
             name,
             insts: VecDeque::new(),
+            is_global,
         }
     }
 }
@@ -311,8 +313,8 @@ impl IR {
         Operand::Place(Place::lit_const(label))
     }
 
-    pub fn add_func(&mut self, fn_name: String) {
-        self.funcs.push(Func::new(fn_name));
+    pub fn add_func(&mut self, fn_name: String, is_global: bool) {
+        self.funcs.push(Func::new(fn_name, is_global));
     }
 
     pub fn cur_func_mut(&mut self) -> &mut Func {
