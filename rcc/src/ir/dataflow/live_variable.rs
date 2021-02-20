@@ -1,9 +1,7 @@
 use crate::ir::cfg::{BasicBlock, CFG};
 use crate::ir::{IRInst, Operand, Place};
-use bitvec::macros::internal::core::ops::BitOrAssign;
-use bitvec::order::Lsb0;
-use bitvec::vec::BitVec;
 use std::collections::VecDeque;
+use bit_vector::BitVector;
 
 trait AnalysisDomain {
     fn bottom_value(cfg: &CFG) -> Self;
@@ -11,15 +9,15 @@ trait AnalysisDomain {
 
 pub struct LiveVariableAnalysis<'cfg> {
     cfg: &'cfg CFG,
-    pub in_states: Vec<BitVec>,
-    pub out_states: Vec<BitVec>,
-    in_exit: BitVec,
+    pub in_states: Vec<BitVector>,
+    pub out_states: Vec<BitVector>,
+    in_exit: BitVector,
     in_changed: bool,
 }
 
-impl AnalysisDomain for BitVec {
+impl AnalysisDomain for BitVector {
     fn bottom_value(cfg: &CFG) -> Self {
-        BitVec::repeat(false, cfg.local_ids.len())
+        BitVector::new(cfg.local_ids.len())
     }
 }
 
@@ -35,10 +33,10 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
     }
 
     pub fn apply(&mut self) {
-        let mut visited: BitVec<Lsb0, usize> = BitVec::repeat(false, self.cfg.basic_blocks.len());
+        let mut visited = BitVector::new( self.cfg.basic_blocks.len());
         let mut queue = VecDeque::<usize>::new();
         while self.in_changed {
-            visited.set_all(false);
+            visited.set_all_false();
             self.in_changed = false;
             queue.clear();
             queue.push_back(self.cfg.basic_blocks.len() - 1);
@@ -62,31 +60,36 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
         }
     }
 
-    fn boundary(cfg: &CFG) -> BitVec {
-        BitVec::bottom_value(cfg)
+    fn boundary(cfg: &CFG) -> BitVector {
+        BitVector::bottom_value(cfg)
     }
 
-    fn init_value(cfg: &CFG) -> BitVec {
-        BitVec::bottom_value(cfg)
+    fn init_value(cfg: &CFG) -> BitVector {
+        BitVector::bottom_value(cfg)
     }
 
-    fn join_succ(&self, basic_block: &BasicBlock) -> BitVec {
+    fn join_succ(&self, basic_block: &BasicBlock) -> BitVector {
         let bid = basic_block.id;
-        let succs = self.cfg.succ_of(bid);
-        let res = succs
-            .iter()
-            .map(|s_bid| self.in_states.get(*s_bid).unwrap())
-            .fold(BitVec::bottom_value(self.cfg), |mut acc, x| {
-                acc.bitor_assign(x.clone());
-                acc
-            });
-        res
+        if bid == self.cfg.basic_blocks.len() - 1 {
+            self.in_exit.clone()
+        } else {
+            let succs = self.cfg.succ_of(bid);
+            let res = succs
+                .iter()
+                .map(|s_bid| self.in_states.get(*s_bid).unwrap())
+                .fold(BitVector::bottom_value(self.cfg), |mut acc, x| {
+                    acc.set_bitor(x);
+                    acc
+                });
+            res
+        }
     }
 
     fn gen_kill(&mut self, bid: usize, inst: &IRInst) {
         macro_rules! gen {
             ($cxt:tt, $dest:tt, $in_state:ident) => {
                 let dest_id = *$cxt.cfg.local_ids.get(&$dest.label).unwrap();
+
                 $in_state.set(dest_id, true);
             };
         }

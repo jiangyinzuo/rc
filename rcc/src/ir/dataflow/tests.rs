@@ -23,5 +23,6 @@ fn live_variable_test() {
     assert_eq!(3, cfg.local_ids.len());
     let mut analysis = LiveVariableAnalysis::new(&cfg);
     analysis.apply();
-
+    println!("{:?}", analysis.in_states);
+    println!("{:?}", analysis.out_states);
 }

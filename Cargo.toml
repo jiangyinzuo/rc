@@ -1,4 +1,4 @@
 [workspace]
 members = [
-    'rcc', 'rcalc', 'cursor'
+    'rcc', 'rcalc', 'cursor', 'bit_vector'
 ]

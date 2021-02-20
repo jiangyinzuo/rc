@@ -1,5 +1,5 @@
 [package]
-name = "rcc"
+name = "bit_vector"
 version = "0.1.0"
 authors = ["jiang <392711804@qq.com>"]
 edition = "2018"
@@ -7,9 +7,3 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-strenum = { path = "src/strenum" }
-cursor = { path = "../cursor" }
-clap = "3.0.0-beta.2"
-lazy_static = "1.4.0"
-thiserror = "1.0.24"
-bit_vector = { path = "../bit_vector" }
