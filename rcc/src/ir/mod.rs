@@ -1,5 +1,6 @@
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
 use crate::ast::expr::BinOperator;
+use crate::ast::item::FnParams;
 use crate::ast::types::TypeLitNum;
 use crate::rcc::RccError;
 use std::collections::VecDeque;
@@ -104,7 +105,7 @@ impl Place {
     }
 
     pub fn is_temp(&self) -> bool {
-        self.label.starts_with("$")
+        self.label.starts_with('$')
     }
 }
 
@@ -112,14 +113,16 @@ pub struct Func {
     pub name: String,
     insts: VecDeque<IRInst>,
     pub is_global: bool,
+    pub fn_args: Vec<String>,
 }
 
 impl Func {
-    pub fn new(name: String, is_global: bool) -> Func {
+    pub fn new(name: String, is_global: bool, fn_args: Vec<String>) -> Func {
         Func {
             name,
             insts: VecDeque::new(),
             is_global,
+            fn_args,
         }
     }
 }
@@ -150,6 +153,18 @@ pub enum IRType {
 }
 
 impl IRType {
+    pub fn byte_size(&self, addr_size: u32) -> u32 {
+        match self {
+            IRType::I8 | IRType::U8 | IRType::Char | IRType::Bool => 1,
+            IRType::I16 | IRType::U16 => 2,
+            IRType::I32 | IRType::U32 | IRType::F32 => 4,
+            IRType::I64 | IRType::U64 | IRType::F64 => 8,
+            IRType::I128 | IRType::U128 => 16,
+            IRType::Isize | IRType::Usize | IRType::Addr => addr_size,
+            IRType::Unit | IRType::Never => 0,
+        }
+    }
+    
     pub fn from_type_info(type_info: &TypeInfo) -> Result<IRType, RccError> {
         let ir_type = match type_info {
             TypeInfo::LitNum(num) => match num {

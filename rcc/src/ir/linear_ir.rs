@@ -1,5 +1,8 @@
 use std::collections::HashMap;
 
+use crate::ast::item::ItemFn;
+use crate::ast::pattern::Pattern;
+use crate::ast::Visibility;
 use crate::ir::{Func, IRInst, IRType, Operand, Place};
 
 pub struct LinearIR {
@@ -22,8 +25,19 @@ impl LinearIR {
         Operand::Place(Place::lit_const(label, IRType::Char))
     }
 
-    pub fn add_func(&mut self, fn_name: String, is_global: bool) {
-        self.funcs.push(Func::new(fn_name, is_global));
+    pub fn add_func(&mut self, item_fn: &ItemFn) {
+        let fn_name = item_fn.name.clone();
+        let is_global = item_fn.vis() == Visibility::Pub;
+
+        let fn_args: Vec<String> = item_fn
+            .fn_params
+            .params
+            .iter()
+            .map(|param| match &param.pattern {
+                Pattern::Identifier(i) => i.ident().to_string(),
+            })
+            .collect();
+        self.funcs.push(Func::new(fn_name, is_global, fn_args));
     }
 
     pub fn cur_func_mut(&mut self) -> &mut Func {

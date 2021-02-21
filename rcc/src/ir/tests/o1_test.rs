@@ -17,7 +17,7 @@ fn test_ir_builder() {
     assert_eq!(insts, func.insts);
 
     let cfg = CFG::new(func);
-    debug_assert_eq!("{\"a_2\": (0, I32)}", format!("{:?}", cfg.local_ids));
+    debug_assert_eq!("{\"a_2\": (0, I32)}", format!("{:?}", cfg.local_infos));
 
     assert_eq!(1, cfg.basic_blocks.len());
     let bb = cfg.basic_blocks.last().unwrap();

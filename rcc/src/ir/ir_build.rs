@@ -11,7 +11,7 @@ use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
-use crate::ast::{Visibility, AST};
+use crate::ast::{AST};
 use crate::ir::linear_ir::LinearIR;
 use crate::ir::Jump::*;
 use crate::ir::{IRInst, IRType, Jump, Operand, Place};
@@ -85,17 +85,12 @@ impl IRBuilder {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        self.ir_output.add_func(
-            item_fn.name.clone(),
-            match item_fn.vis() {
-                Visibility::Pub => true,
-                Visibility::Priv => false,
-            },
-        );
+        self.ir_output.add_func(item_fn);
 
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
         assert_eq!(info, TypeInfo::from_item_fn(item_fn));
 
+        // visit function block
         let dest = self.gen_temp_variable(item_fn.fn_block.type_info());
         self.fn_ret_temp_var.push(dest.clone());
         let operand = self.visit_block_expr(&mut item_fn.fn_block, Some(dest))?;

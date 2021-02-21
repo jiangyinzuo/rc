@@ -458,6 +458,7 @@ impl SymbolResolver {
         self.cur_fn_ret_type =
             TypeInfo::from_type_anno(&item_fn.ret_type, self.scope_stack.cur_scope());
 
+        // visit params of function
         for param in item_fn.fn_params.params.iter() {
             match &param.pattern {
                 Pattern::Identifier(ident_pattern) => item_fn.fn_block.scope.add_variable(

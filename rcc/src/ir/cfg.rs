@@ -12,7 +12,7 @@ pub struct CFGIR {
 
 impl CFGIR {
     pub fn new(linear_ir: LinearIR) -> CFGIR {
-        let cfgs: Vec<CFG> = linear_ir.funcs.into_iter().map(|f| CFG::new(f)).collect();
+        let cfgs: Vec<CFG> = linear_ir.funcs.into_iter().map(CFG::new).collect();
         CFGIR {
             cfgs,
             ro_local_strs: linear_ir.ro_local_strs,
@@ -23,9 +23,10 @@ impl CFGIR {
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
-    pub local_ids: HashMap<String, (usize, IRType)>,
+    pub local_infos: HashMap<String, (usize, IRType)>,
     pub func_name: String,
     pub func_is_global: bool,
+    pub fn_args: Vec<String>,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -121,9 +122,10 @@ impl CFG {
 
         CFG {
             basic_blocks,
-            local_ids,
+            local_infos: local_ids,
             func_name: func.name,
             func_is_global: func.is_global,
+            fn_args: func.fn_args,
         }
     }
 

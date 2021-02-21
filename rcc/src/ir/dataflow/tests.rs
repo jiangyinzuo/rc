@@ -19,7 +19,7 @@ fn one_block_test() {
             let c = a + b;
         }
     "#).unwrap();
-    assert_eq!(3, cfg.local_ids.len());
+    assert_eq!(3, cfg.local_infos.len());
     let mut analysis = LiveVariableAnalysis::new(&cfg);
     analysis.apply();
 
@@ -43,7 +43,7 @@ fn multiple_blocks_test() {
             }
         }
     "#).unwrap();
-    assert_eq!(3, cfg.local_ids.len());
+    assert_eq!(3, cfg.local_infos.len());
     let mut analysis = LiveVariableAnalysis::new(&cfg);
     analysis.apply();
     println!("{:?}", analysis.in_states);

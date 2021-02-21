@@ -4,4 +4,8 @@
 	.string "hello"
 	.text
 foo:
+	addi	sp,sp,-40
+	sw	ra,36(sp)
+	sw	s0,32(sp)
+	addi	s0,sp,40
 	ret

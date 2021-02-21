@@ -50,7 +50,7 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
 
         match self.opt_level {
             OptimizeLevel::Zero => {
-                let mut code_gen = CodeGen::new(cfg_ir, &mut self.output);
+                let mut code_gen = CodeGen::new(cfg_ir, &mut self.output, self.opt_level);
                 code_gen.run()?;
             }
             OptimizeLevel::One => {todo!()}
