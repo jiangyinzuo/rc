@@ -3,9 +3,8 @@ use crate::analyser::sym_resolver::LoopKind::NotIn;
 use crate::analyser::sym_resolver::TypeInfo::Unknown;
 use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, BreakExpr,
-    CallExpr, Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr, LoopExpr,
-    PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp,
-    WhileExpr,
+    CallExpr, Expr, ExprKind, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LoopExpr, PathExpr,
+    RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr, UnOp, WhileExpr,
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
@@ -15,8 +14,8 @@ use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::Visibility;
 use crate::rcc::RccError;
-use std::cell::{Ref, RefCell};
-use std::collections::{HashMap, HashSet};
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::rc::Rc;

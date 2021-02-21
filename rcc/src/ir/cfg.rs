@@ -1,10 +1,31 @@
+use crate::ir::linear_ir::LinearIR;
 use crate::ir::{Func, IRInst, IRType};
 use std::collections::{BTreeSet, HashMap, LinkedList};
+
+/// Control FLow Graph's immediate representation
+pub struct CFGIR {
+    pub cfgs: Vec<CFG>,
+
+    /// label, value
+    pub ro_local_strs: HashMap<String, String>,
+}
+
+impl CFGIR {
+    pub fn new(linear_ir: LinearIR) -> CFGIR {
+        let cfgs: Vec<CFG> = linear_ir.funcs.into_iter().map(|f| CFG::new(f)).collect();
+        CFGIR {
+            cfgs,
+            ro_local_strs: linear_ir.ro_local_strs,
+        }
+    }
+}
 
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
     pub local_ids: HashMap<String, (usize, IRType)>,
+    pub func_name: String,
+    pub func_is_global: bool,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -19,7 +40,6 @@ pub struct BasicBlock {
 impl CFG {
     /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
-
         let leaders = get_leaders(&func);
         let local_ids = get_local_ids(&func);
 
@@ -99,7 +119,12 @@ impl CFG {
             }
         }
 
-        CFG { basic_blocks, local_ids }
+        CFG {
+            basic_blocks,
+            local_ids,
+            func_name: func.name,
+            func_is_global: func.is_global,
+        }
     }
 
     pub fn succ_of(&self, bb_id: usize) -> Vec<usize> {
@@ -162,11 +187,10 @@ fn get_local_ids(func: &Func) -> HashMap<String, (usize, IRType)> {
     let mut next_id: usize = 0;
     for inst in func.insts.iter() {
         match inst {
-            IRInst::BinOp {
-                dest, ..
-            } | IRInst::LoadData { dest, ..} | IRInst::LoadAddr {dest, ..} => {
+            IRInst::BinOp { dest, .. }
+            | IRInst::LoadData { dest, .. }
+            | IRInst::LoadAddr { dest, .. } => {
                 if !local_ids.contains_key(&dest.label) {
-
                     local_ids.insert(dest.label.clone(), (next_id, dest.ir_type));
                     next_id += 1;
                 }

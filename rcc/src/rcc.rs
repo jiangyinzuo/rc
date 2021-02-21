@@ -5,7 +5,8 @@ use crate::parser::{Parse, ParseCursor};
 use std::io::{BufReader, BufWriter, Read, Write};
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ir::ir_build::IRBuilder;
-use crate::code_gen::code_generator::CodeGenerator;
+use crate::code_gen::code_generator::CodeGen;
+use crate::ir::cfg::CFGIR;
 
 #[derive(Copy, Clone)]
 pub enum OptimizeLevel {
@@ -44,11 +45,12 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
         sym_resolver.visit_file(&mut ast.file)?;
 
         let mut ir_builder = IRBuilder::new(self.opt_level);
-        let ir = ir_builder.generate_ir(&mut ast)?;
+        let linear_ir = ir_builder.generate_ir(&mut ast)?;
+        let cfg_ir = CFGIR::new(linear_ir);
 
         match self.opt_level {
             OptimizeLevel::Zero => {
-                let mut code_gen = CodeGenerator::new(ir, &mut self.output);
+                let mut code_gen = CodeGen::new(cfg_ir, &mut self.output);
                 code_gen.run()?;
             }
             OptimizeLevel::One => {todo!()}

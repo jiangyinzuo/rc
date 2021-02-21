@@ -1,19 +1,21 @@
-mod o1_test;
-
-use crate::analyser::sym_resolver::SymbolResolver;
-use crate::ast::expr::BinOperator;
-use crate::ast::AST;
-use crate::ir::cfg::CFG;
-use crate::ir::ir_build::IRBuilder;
-use crate::ir::Jump::*;
-use crate::ir::Operand::{FnLabel, I32};
-use crate::ir::{IRInst, IRType, Operand, Place, IR};
-use crate::lexer::Lexer;
-use crate::parser::{Parse, ParseCursor};
-use crate::rcc::{OptimizeLevel, RccError};
 use std::collections::VecDeque;
 use std::fs::File;
 use std::io::Read;
+
+use crate::analyser::sym_resolver::SymbolResolver;
+use crate::ast::AST;
+use crate::ast::expr::BinOperator;
+use crate::ir::{IRInst, IRType, Operand, Place};
+use crate::ir::cfg::CFG;
+use crate::ir::ir_build::IRBuilder;
+use crate::ir::Jump::*;
+use crate::ir::linear_ir::LinearIR;
+use crate::ir::Operand::{FnLabel, I32};
+use crate::lexer::Lexer;
+use crate::parser::{Parse, ParseCursor};
+use crate::rcc::{OptimizeLevel, RccError};
+
+mod o1_test;
 
 fn expected_from_file(file_name: &str) -> String {
     let mut file = File::open(format!("./src/ir/tests/{}", file_name)).unwrap();
@@ -22,7 +24,7 @@ fn expected_from_file(file_name: &str) -> String {
     expected
 }
 
-fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<IR, RccError> {
+fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<LinearIR, RccError> {
     let mut ir_builder = IRBuilder::new(opt_level);
     let mut lexer = Lexer::new(input);
     let mut cursor = ParseCursor::new(lexer.tokenize());
@@ -34,11 +36,11 @@ fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<IR, R
     Ok(ir)
 }
 
-pub(crate) fn ir_build(input: &str) -> Result<IR, RccError> {
+pub(crate) fn ir_build(input: &str) -> Result<LinearIR, RccError> {
     ir_build_with_optimize(input, OptimizeLevel::Zero)
 }
 
-fn ir_build_o1(input: &str) -> Result<IR, RccError> {
+fn ir_build_o1(input: &str) -> Result<LinearIR, RccError> {
     ir_build_with_optimize(input, OptimizeLevel::One)
 }
 

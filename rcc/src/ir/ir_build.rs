@@ -12,15 +12,16 @@ use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
 use crate::ast::{Visibility, AST};
+use crate::ir::linear_ir::LinearIR;
 use crate::ir::Jump::*;
-use crate::ir::{IRInst, IRType, Jump, Operand, Place, IR};
+use crate::ir::{IRInst, IRType, Jump, Operand, Place};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::cell::RefCell;
 use std::ops::Deref;
 use std::rc::Rc;
 
 pub struct IRBuilder {
-    ir_output: IR,
+    ir_output: LinearIR,
     fn_ret_temp_var: Vec<Place>,
 
     scope_stack: ScopeStack,
@@ -34,7 +35,7 @@ pub struct IRBuilder {
 impl IRBuilder {
     pub fn new(optimize_level: OptimizeLevel) -> IRBuilder {
         IRBuilder {
-            ir_output: IR::new(),
+            ir_output: LinearIR::new(),
             fn_ret_temp_var: vec![],
             scope_stack: ScopeStack::new(),
             loop_var_stack: vec![],
@@ -42,9 +43,9 @@ impl IRBuilder {
         }
     }
 
-    pub(crate) fn generate_ir(&mut self, ast: &mut AST) -> Result<IR, RccError> {
+    pub(crate) fn generate_ir(&mut self, ast: &mut AST) -> Result<LinearIR, RccError> {
         self.visit_file(&mut ast.file)?;
-        let mut output = IR::new();
+        let mut output = LinearIR::new();
         std::mem::swap(&mut self.ir_output, &mut output);
         Ok(output)
     }
@@ -383,7 +384,7 @@ impl IRBuilder {
         dest: Place,
     ) -> Result<Operand, RccError> {
         self.ir_output
-            .add_instructions(IRInst::bin_op(op,  dest.clone(), lhs, rhs));
+            .add_instructions(IRInst::bin_op(op, dest.clone(), lhs, rhs));
         Ok(Operand::Place(dest))
     }
 
@@ -403,13 +404,11 @@ impl IRBuilder {
 
         match dest {
             Some(d) => match self.optimize_level {
-                OptimizeLevel::Zero => {
-                    self.bin_op(lhs, rhs, bin_op_expr.bin_op,  d)
-                }
+                OptimizeLevel::Zero => self.bin_op(lhs, rhs, bin_op_expr.bin_op, d),
 
                 OptimizeLevel::One => match fold_option {
                     Some(operand) => self.lit(operand, d),
-                    None => self.bin_op(lhs, rhs, bin_op_expr.bin_op,  d),
+                    None => self.bin_op(lhs, rhs, bin_op_expr.bin_op, d),
                 },
             },
             None => Ok(Operand::Unit),
