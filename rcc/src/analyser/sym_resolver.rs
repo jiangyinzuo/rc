@@ -34,15 +34,15 @@ pub enum VarKind {
 pub struct VarInfo {
     stmt_id: u64,
     kind: VarKind,
-    _type: Rc<RefCell<TypeInfo>>,
+    pub type_info: Rc<RefCell<TypeInfo>>,
 }
 
 impl VarInfo {
-    pub fn new(stmt_id: u64, kind: VarKind, _type: Rc<RefCell<TypeInfo>>) -> VarInfo {
+    pub fn new(stmt_id: u64, kind: VarKind, type_info: Rc<RefCell<TypeInfo>>) -> VarInfo {
         VarInfo {
             stmt_id,
             kind,
-            _type,
+            type_info,
         }
     }
 
@@ -581,7 +581,7 @@ impl SymbolResolver {
         if let Some(ident) = path_expr.segments.last() {
             let cur_scope = self.scope_stack.cur_scope_mut();
             if let Some((var_info, _scope_id)) = cur_scope.find_variable(ident) {
-                path_expr.set_type_info_ref(var_info._type.clone());
+                path_expr.set_type_info_ref(var_info.type_info.clone());
                 path_expr.expr_kind = match var_info.kind {
                     VarKind::Static | VarKind::LocalMut => ExprKind::MutablePlace,
                     VarKind::Const | VarKind::Local => ExprKind::Place,

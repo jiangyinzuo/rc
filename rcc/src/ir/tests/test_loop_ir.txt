@@ -1,0 +1,70 @@
+[
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            3,
+        ),
+    },
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "a_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            1,
+        ),
+    },
+    Jump {
+        label: 2,
+    },
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "a_4",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: I32(
+            5,
+        ),
+        src2: I32(
+            2,
+        ),
+    },
+    LoadData {
+        dest: Place {
+            label: "b_2",
+            kind: Local,
+            ir_type: I32,
+        },
+        src: Place(
+            Place {
+                label: "a_4",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+    },
+    Jump {
+        label: 8,
+    },
+    Jump {
+        label: 4,
+    },
+    Ret(
+        Unit,
+    ),
+]

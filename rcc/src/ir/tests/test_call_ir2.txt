@@ -1,0 +1,29 @@
+[
+    Call {
+        callee: FnLabel(
+            "bar",
+        ),
+        args: [
+            I32(
+                3,
+            ),
+        ],
+    },
+    LoadData {
+        dest: Place {
+            label: "cc_4",
+            kind: Local,
+            ir_type: Unit,
+        },
+        src: FnRetPlace,
+    },
+    Call {
+        callee: FnLabel(
+            "baz",
+        ),
+        args: [],
+    },
+    Ret(
+        Unit,
+    ),
+]

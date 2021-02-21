@@ -1,0 +1,43 @@
+[
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "b_2",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: I32(
+            3,
+        ),
+        src2: I32(
+            4,
+        ),
+    },
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "$0_1",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            3,
+        ),
+    },
+    Ret(
+        Place(
+            Place {
+                label: "$0_1",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+    ),
+]

@@ -46,20 +46,10 @@ fn ir_build_o1(input: &str) -> Result<IR, RccError> {
 fn test_ir_builder() {
     let mut ir = ir_build("fn main() {let a = 2 + 3;}").unwrap();
 
-    let insts = VecDeque::from(vec![
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("a_2".into()),
-            I32(2),
-            I32(3),
-        ),
-        IRInst::Ret(Operand::Unit),
-    ]);
-
     let func = ir.funcs.pop().unwrap();
     assert_eq!("main", func.name);
-    assert_eq!(insts, func.insts);
+    let excepted = expected_from_file("test_ir_builder_ir.txt");
+    assert_eq!(excepted, format!("{:#?}", func.insts));
 
     let cfg = CFG::new(func);
     assert_eq!(1, cfg.basic_blocks.len());
@@ -108,58 +98,13 @@ fn test_return() {
     }"#,
     )
     .unwrap();
-    let insts = VecDeque::from(vec![
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("b_2".into()),
-            I32(3),
-            I32(4),
-        ),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("$0_1".into()),
-            Operand::Place(Place::local("b_2".into())),
-            I32(3),
-        ),
-        IRInst::Ret(Operand::Place(Place::local("$0_1".into()))),
-    ]);
-    assert_eq!(insts, ir.funcs.last().unwrap().insts);
+
+    let expected = expected_from_file("test_return_ir.txt");
+    assert_eq!(expected, format!("{:#?}", ir.funcs.last().unwrap().insts));
 }
 
 #[test]
 fn test_if() {
-    let last_ir_id = 22;
-    macro_rules! triple {
-        ($cond:ident, $src2:literal, $load_a:literal) => {
-            &mut VecDeque::from(vec![
-                IRInst::jump_if_cond(
-                    $cond,
-                    Operand::Place(Place::local("b_2".into())),
-                    Operand::I32($src2),
-                    last_ir_id,
-                ),
-                IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
-                IRInst::jump(last_ir_id),
-            ])
-        };
-    }
-
-    macro_rules! triple_reverse {
-        ($cond:ident, $src1:literal, $load_a:literal) => {
-            &mut VecDeque::from(vec![
-                IRInst::jump_if_cond(
-                    $cond,
-                    Operand::I32($src1),
-                    Operand::Place(Place::local("b_2".into())),
-                    last_ir_id,
-                ),
-                IRInst::load_data(Place::local_mut("a_2".into()), I32($load_a)),
-                IRInst::jump(last_ir_id),
-            ])
-        };
-    }
 
     let mut ir = ir_build(
         r#"fn main() -> i32{let b = 3 + 4;
@@ -187,31 +132,9 @@ fn test_if() {
     )
     .unwrap();
 
-    let mut expected = VecDeque::from(vec![
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("b_2".into()),
-            I32(3),
-            I32(4),
-        ),
-        IRInst::load_data(Place::local_mut("a_2".into()), I32(0)),
-    ]);
-    expected.append(triple!(JNe, 7, 5));
-    expected.append(triple!(JEq, 9, 8));
-    expected.append(triple_reverse!(JGe, 100, 1));
-    expected.append(triple!(JGe, 2, 3));
-    expected.append(triple_reverse!(JLt, 33, 2));
-    expected.append(triple!(JLt, 50, 22));
-    expected.append(&mut VecDeque::from(vec![
-        IRInst::load_data(Place::local_mut("a_2".into()), I32(333)),
-        IRInst::jump_if_cond(JNe, Operand::Place(Place::local("b_2".into())), I32(2), 24),
-        IRInst::Ret(Operand::Place(Place::local("b_2".into()))),
-        IRInst::Ret(Operand::Place(Place::local_mut("a_2".into()))),
-    ]));
-
+    let expected = expected_from_file("test_if_ir.txt");
     let func = ir.funcs.pop().unwrap();
-    assert_eq!(expected, func.insts);
+    assert_eq!(expected, format!("{:#?}", func.insts));
 
     let cfg = CFG::new(func);
     assert_eq!(16, cfg.basic_blocks.len());
@@ -237,34 +160,10 @@ fn test_loop() {
     "#,
     )
     .unwrap();
-    let expected = VecDeque::from(vec![
-        IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local_mut("a_2".into()),
-            Operand::Place(Place::local_mut("a_2".into())),
-            I32(1),
-        ),
-        IRInst::jump(2),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("a_4".into()),
-            I32(5),
-            I32(2),
-        ),
-        IRInst::load_data(
-            Place::local("b_2".into()),
-            Operand::Place(Place::local("a_4".into())),
-        ),
-        IRInst::jump(8),
-        IRInst::jump(4),
-        IRInst::Ret(Operand::Unit),
-    ]);
 
     let func = ir.funcs.pop().unwrap();
-    assert_eq!(expected, func.insts);
+    let expected = expected_from_file("test_loop_ir.txt");
+    assert_eq!(expected, format!("{:#?}", func.insts));
 
     let cfg = CFG::new(func);
     let expected = expected_from_file("test_loop_bb.txt");
@@ -289,53 +188,9 @@ fn test_while() {
     "#,
     )
     .unwrap();
-    let expected = VecDeque::from(vec![
-        IRInst::load_data(Place::local_mut("a_2".into()), I32(3)),
-        IRInst::jump_if_cond(
-            JGe,
-            Operand::Place(Place::local_mut("a_2".into())),
-            I32(10),
-            7,
-        ),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local_mut("a_2".into()),
-            Operand::Place(Place::local_mut("a_2".into())),
-            I32(1),
-        ),
-        IRInst::jump_if_cond(
-            JNe,
-            Operand::Place(Place::local_mut("a_2".into())),
-            I32(5),
-            6,
-        ),
-        IRInst::jump(7),
-        IRInst::jump(2),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("$4_2".into()),
-            I32(1),
-            I32(2),
-        ),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("$3_2".into()),
-            Operand::Place(Place::local("$4_2".into())),
-            I32(3),
-        ),
-        IRInst::jump_if_cond(
-            JGe,
-            Operand::Place(Place::local("$3_2".into())),
-            Operand::Place(Place::local_mut("a_2".into())),
-            11,
-        ),
-        IRInst::jump(7),
-        IRInst::Ret(Operand::Unit),
-    ]);
-    assert_eq!(expected, ir.funcs.last().unwrap().insts);
+
+    let expected = expected_from_file("test_while_ir.txt");
+    assert_eq!(expected, format!("{:#?}", ir.funcs.last().unwrap().insts));
 }
 
 #[test]
@@ -359,42 +214,8 @@ fn fn_call_test() {
     .unwrap();
     assert_eq!(3, ir.funcs.len());
 
-    let expected_ir = VecDeque::from(vec![
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("a_2".into()),
-            I32(3),
-            I32(4),
-        ),
-        IRInst::Ret(Operand::Place(Place::local("a_2".into()))),
-    ]);
-    assert_eq!(expected_ir, ir.funcs.get(0).unwrap().insts);
-    let expected_ir = VecDeque::from(vec![
-        IRInst::call(Operand::FnLabel("foo".to_string()), vec![]),
-        IRInst::load_data(Place::local("b_3".into()), Operand::FnRetPlace),
-        IRInst::bin_op(
-            BinOperator::Star,
-            IRType::I32,
-            Place::local("$1_3".into()),
-            Operand::Place(Place::local("b_3".into())),
-            I32(2),
-        ),
-        IRInst::bin_op(
-            BinOperator::Plus,
-            IRType::I32,
-            Place::local("a_3".into()),
-            Operand::Place(Place::local("$1_3".into())),
-            Operand::Place(Place::local("c_3".into())),
-        ),
-        IRInst::Ret(Operand::Unit),
-    ]);
-    assert_eq!(expected_ir, ir.funcs.get(1).unwrap().insts);
-    let expected_ir = VecDeque::from(vec![
-        IRInst::call(Operand::FnLabel("bar".to_string()), vec![I32(3)]),
-        IRInst::load_data(Place::local("cc_4".into()), Operand::FnRetPlace),
-        IRInst::call(FnLabel("baz".into()), vec![]),
-        IRInst::Ret(Operand::Unit),
-    ]);
-    assert_eq!(expected_ir, ir.funcs.last().unwrap().insts);
+    for i in 0..=2 {
+        let expected_ir = expected_from_file(&format!("test_call_ir{}.txt", i));
+        assert_eq!(expected_ir, format!("{:#?}",ir.funcs.get(i).unwrap().insts));
+    }
 }

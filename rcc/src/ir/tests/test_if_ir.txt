@@ -1,0 +1,230 @@
+[
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "b_2",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: I32(
+            3,
+        ),
+        src2: I32(
+            4,
+        ),
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            0,
+        ),
+    },
+    JumpIfCond {
+        cond: JNe,
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            7,
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            5,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    JumpIfCond {
+        cond: JEq,
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            9,
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            8,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    JumpIfCond {
+        cond: JGe,
+        src1: I32(
+            100,
+        ),
+        src2: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            1,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    JumpIfCond {
+        cond: JGe,
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            2,
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            3,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    JumpIfCond {
+        cond: JLt,
+        src1: I32(
+            33,
+        ),
+        src2: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            2,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    JumpIfCond {
+        cond: JLt,
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            50,
+        ),
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            22,
+        ),
+    },
+    Jump {
+        label: 22,
+    },
+    LoadData {
+        dest: Place {
+            label: "a_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            333,
+        ),
+    },
+    JumpIfCond {
+        cond: JNe,
+        src1: Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            2,
+        ),
+        label: 24,
+    },
+    Ret(
+        Place(
+            Place {
+                label: "b_2",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+    ),
+    Ret(
+        Place(
+            Place {
+                label: "a_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+    ),
+]

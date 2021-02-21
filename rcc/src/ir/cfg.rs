@@ -1,10 +1,10 @@
-use crate::ir::{Func, IRInst};
+use crate::ir::{Func, IRInst, IRType};
 use std::collections::{BTreeSet, HashMap, LinkedList};
 
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
-    pub local_ids: HashMap<String, usize>,
+    pub local_ids: HashMap<String, (usize, IRType)>,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -157,7 +157,7 @@ fn get_leaders(func: &Func) -> BTreeSet<usize> {
     leaders
 }
 
-fn get_local_ids(func: &Func) -> HashMap<String, usize> {
+fn get_local_ids(func: &Func) -> HashMap<String, (usize, IRType)> {
     let mut local_ids = HashMap::new();
     let mut next_id: usize = 0;
     for inst in func.insts.iter() {
@@ -166,7 +166,8 @@ fn get_local_ids(func: &Func) -> HashMap<String, usize> {
                 dest, ..
             } | IRInst::LoadData { dest, ..} | IRInst::LoadAddr {dest, ..} => {
                 if !local_ids.contains_key(&dest.label) {
-                    local_ids.insert(dest.label.clone(), next_id);
+
+                    local_ids.insert(dest.label.clone(), (next_id, dest.ir_type));
                     next_id += 1;
                 }
             }

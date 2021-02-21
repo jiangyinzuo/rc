@@ -4,3 +4,4 @@
 	.string "hello"
 	.text
 foo:
+	ret

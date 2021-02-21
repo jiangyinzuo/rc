@@ -43,6 +43,7 @@ impl<'w, W: Write> CodeGenerator<'w, W> {
             writeln!(output, "\t.globl  {}", func.name)?;
         }
         writeln!(output, "{}:", func.name)?;
+        writeln!(output, "\tret")?;
         Ok(())
     }
 }

@@ -1,14 +1,15 @@
-mod cfg;
+pub mod cfg;
+mod dataflow;
 pub mod ir_build;
 pub(crate) mod tests;
-mod dataflow;
 
-use crate::analyser::sym_resolver::{TypeInfo, VarKind};
+use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
 use crate::ast::expr::BinOperator;
 use crate::ast::types::TypeLitNum;
 use crate::rcc::RccError;
 use std::collections::{HashMap, VecDeque};
 use std::fmt::Debug;
+use std::ops::Deref;
 
 #[derive(Debug, PartialEq)]
 pub enum Jump {
@@ -55,8 +56,9 @@ impl Operand {
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Place {
-    label: String,
-    kind: VarKind,
+    pub label: String,
+    pub kind: VarKind,
+    pub ir_type: IRType,
 }
 
 impl Place {
@@ -64,32 +66,39 @@ impl Place {
         format!("{}_{}", ident, scope_id)
     }
 
-    pub fn new(label: String, kind: VarKind) -> Place {
-        Place { label, kind }
+    pub fn new(label: String, kind: VarKind, ir_type: IRType) -> Place {
+        Place {
+            label,
+            kind,
+            ir_type,
+        }
     }
 
-    pub fn variable(ident: &str, scope_id: u64, var_kind: VarKind) -> Place {
-        Place::new(Self::label(ident, scope_id), var_kind)
+    pub fn variable(ident: &str, scope_id: u64, var_kind: VarKind, ir_type: IRType) -> Place {
+        Place::new(Self::label(ident, scope_id), var_kind, ir_type)
     }
 
-    pub fn local(label: String) -> Place {
+    pub fn local(label: String, ir_type: IRType) -> Place {
         Place {
             label,
             kind: VarKind::Local,
+            ir_type,
         }
     }
 
-    pub fn local_mut(label: String) -> Place {
+    pub fn local_mut(label: String, ir_type: IRType) -> Place {
         Place {
             label,
             kind: VarKind::LocalMut,
+            ir_type,
         }
     }
 
-    pub fn lit_const(label: String) -> Place {
+    pub fn lit_const(label: String, ir_type: IRType) -> Place {
         Place {
             label,
             kind: VarKind::LitConst,
+            ir_type,
         }
     }
 
@@ -132,6 +141,11 @@ pub enum IRType {
     U64,
     U128,
     Usize,
+    /// zero sized type
+    Unit,
+    Never,
+    /// address
+    Addr,
 }
 
 impl IRType {
@@ -155,9 +169,18 @@ impl IRType {
             },
             TypeInfo::Bool => IRType::Bool,
             TypeInfo::Char => IRType::Char,
-            t => return Err(RccError::Parse(format!("invalid type {:?}", t).into())),
+            TypeInfo::Unit => IRType::Unit,
+            TypeInfo::Never => IRType::Never,
+            TypeInfo::Ptr {..} => IRType::Addr,
+            t => return Err(RccError::Parse(format!("invalid type {:?}", t))),
         };
         Ok(ir_type)
+    }
+
+    pub fn from_var_info(var_info: &VarInfo) -> Result<IRType, RccError> {
+        let t = var_info.type_info.borrow();
+        let tp = t.deref();
+        Self::from_type_info(tp)
     }
 }
 
@@ -166,7 +189,6 @@ impl IRType {
 pub enum IRInst {
     BinOp {
         op: BinOperator,
-        _type: IRType,
         dest: Place,
         src1: Operand,
         src2: Operand,
@@ -214,14 +236,12 @@ pub enum IRInst {
 impl IRInst {
     pub fn bin_op(
         op: BinOperator,
-        _type: IRType,
         dest: Place,
         src1: Operand,
         src2: Operand,
     ) -> IRInst {
         IRInst::BinOp {
             op,
-            _type,
             dest,
             src1,
             src2,
@@ -310,7 +330,7 @@ impl IR {
     pub fn add_ro_local_str(&mut self, s: String) -> Operand {
         let label = format!(".LC{}", self.ro_local_strs.len());
         self.ro_local_strs.insert(label.clone(), s);
-        Operand::Place(Place::lit_const(label))
+        Operand::Place(Place::lit_const(label, IRType::Char))
     }
 
     pub fn add_func(&mut self, fn_name: String, is_global: bool) {

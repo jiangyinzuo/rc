@@ -1,0 +1,59 @@
+[
+    Call {
+        callee: FnLabel(
+            "foo",
+        ),
+        args: [],
+    },
+    LoadData {
+        dest: Place {
+            label: "b_3",
+            kind: Local,
+            ir_type: I32,
+        },
+        src: FnRetPlace,
+    },
+    BinOp {
+        op: *,
+        dest: Place {
+            label: "$1_3",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "b_3",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            2,
+        ),
+    },
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "a_3",
+            kind: Local,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "$1_3",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+        src2: Place(
+            Place {
+                label: "c_3",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+    },
+    Ret(
+        Unit,
+    ),
+]

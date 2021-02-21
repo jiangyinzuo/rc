@@ -50,16 +50,21 @@ impl IRBuilder {
     }
 
     fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> Place {
+        let t = type_info.borrow();
+        let tp = t.deref();
+        let ir_type = IRType::from_type_info(tp).unwrap();
+        std::mem::drop(t);
         let label = self
             .scope_stack
             .cur_scope_mut()
             .gen_temp_variable(type_info);
-        Place::local(label)
+        Place::local(label, ir_type)
     }
 
     fn gen_variable(&mut self, ident: &str, var_kind: VarKind) -> Place {
         let res = self.scope_stack.cur_scope().find_variable(ident).unwrap();
-        Place::variable(ident, res.1, var_kind)
+        let ir_type = IRType::from_var_info(res.0).unwrap();
+        Place::variable(ident, res.1, var_kind, ir_type)
     }
 
     fn visit_file(&mut self, file: &mut File) -> Result<(), RccError> {
@@ -215,7 +220,8 @@ impl IRBuilder {
 
         let cur_scope = self.scope_stack.cur_scope();
         if let Some((var, scope_id)) = cur_scope.find_variable(ident) {
-            let operand = Operand::Place(Place::variable(ident, scope_id, var.kind()));
+            let ir_type = IRType::from_var_info(var)?;
+            let operand = Operand::Place(Place::variable(ident, scope_id, var.kind(), ir_type));
             if let Some(d) = dest {
                 if !d.is_temp() {
                     self.ir_output
@@ -334,10 +340,6 @@ impl IRBuilder {
             Operand::Place(p) => p,
             _ => unimplemented!(),
         };
-        let type_info = assign_expr.lhs.type_info();
-        let tp = type_info.borrow();
-        let tp = tp.deref();
-        let t = IRType::from_type_info(tp)?;
 
         macro_rules! add_inst {
             ($bin_op:path) => {{
@@ -345,7 +347,6 @@ impl IRBuilder {
                 let rhs = self.visit_expr(&mut assign_expr.rhs, Some(rhs_dest))?;
                 self.ir_output.add_instructions(IRInst::bin_op(
                     $bin_op,
-                    t,
                     p.clone(),
                     Operand::Place(p),
                     rhs.clone(),
@@ -379,11 +380,10 @@ impl IRBuilder {
         lhs: Operand,
         rhs: Operand,
         op: BinOperator,
-        ir_type: IRType,
         dest: Place,
     ) -> Result<Operand, RccError> {
         self.ir_output
-            .add_instructions(IRInst::bin_op(op, ir_type, dest.clone(), lhs, rhs));
+            .add_instructions(IRInst::bin_op(op,  dest.clone(), lhs, rhs));
         Ok(Operand::Place(dest))
     }
 
@@ -398,22 +398,18 @@ impl IRBuilder {
         let rhs = self.visit_expr(&mut bin_op_expr.rhs, Some(d))?;
 
         // TODO operator override
-        let _type = bin_op_expr.type_info();
-        let t = _type.borrow();
-        let tp = t.deref();
-        let ir_type = IRType::from_type_info(tp)?;
 
         let fold_option = bin_op_may_constant_fold(&bin_op_expr.bin_op, &lhs, &rhs)?;
 
         match dest {
             Some(d) => match self.optimize_level {
                 OptimizeLevel::Zero => {
-                    self.bin_op(lhs, rhs, bin_op_expr.bin_op, ir_type, d.clone())
+                    self.bin_op(lhs, rhs, bin_op_expr.bin_op,  d)
                 }
 
                 OptimizeLevel::One => match fold_option {
                     Some(operand) => self.lit(operand, d),
-                    None => self.bin_op(lhs, rhs, bin_op_expr.bin_op, ir_type, d.clone()),
+                    None => self.bin_op(lhs, rhs, bin_op_expr.bin_op,  d),
                 },
             },
             None => Ok(Operand::Unit),

@@ -5,10 +5,10 @@
         instructions: [
             BinOp {
                 op: +,
-                _type: I32,
                 dest: Place {
                     label: "b_2",
                     kind: Local,
+                    ir_type: I32,
                 },
                 src1: I32(
                     3,
@@ -21,6 +21,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     0,
@@ -32,6 +33,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 src2: I32(
@@ -51,6 +53,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     5,
@@ -71,6 +74,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 src2: I32(
@@ -90,6 +94,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     8,
@@ -113,6 +118,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 label: 13,
@@ -129,6 +135,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     1,
@@ -149,6 +156,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 src2: I32(
@@ -168,6 +176,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     3,
@@ -191,6 +200,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 label: 13,
@@ -207,6 +217,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     2,
@@ -227,6 +238,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 src2: I32(
@@ -246,6 +258,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     22,
@@ -264,6 +277,7 @@
                 dest: Place {
                     label: "a_2",
                     kind: LocalMut,
+                    ir_type: I32,
                 },
                 src: I32(
                     333,
@@ -295,6 +309,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
                 src2: I32(
@@ -315,6 +330,7 @@
                     Place {
                         label: "b_2",
                         kind: Local,
+                        ir_type: I32,
                     },
                 ),
             ),
@@ -332,6 +348,7 @@
                     Place {
                         label: "a_2",
                         kind: LocalMut,
+                        ir_type: I32,
                     },
                 ),
             ),

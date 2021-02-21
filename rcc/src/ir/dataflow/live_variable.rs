@@ -83,7 +83,7 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
     fn gen_kill(&mut self, bid: usize, inst: &IRInst) {
         macro_rules! gen {
             ($cxt:tt, $dest:tt, $in_state:ident) => {
-                let dest_id = *$cxt.cfg.local_ids.get(&$dest.label).unwrap();
+                let dest_id = $cxt.cfg.local_ids.get(&$dest.label).unwrap().0;
 
                 $in_state.set(dest_id, true);
             };
@@ -92,7 +92,7 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
         macro_rules! kill {
             ($cxt:tt, $src:tt, $in_state:ident) => {
                 if let Operand::Place(p) = $src {
-                    let src_id = *$cxt.cfg.local_ids.get(&p.label).unwrap();
+                    let src_id = $cxt.cfg.local_ids.get(&p.label).unwrap().0;
                     $in_state.set(src_id, false);
                 }
             };

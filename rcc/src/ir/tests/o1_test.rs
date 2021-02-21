@@ -1,6 +1,6 @@
 use crate::ir::tests::ir_build_o1;
 use crate::ir::cfg::CFG;
-use crate::ir::{Operand, IRInst, Place};
+use crate::ir::{Operand, IRInst, Place, IRType};
 use crate::ir::Operand::I32;
 use std::collections::VecDeque;
 
@@ -9,7 +9,7 @@ fn test_ir_builder() {
     let mut ir = ir_build_o1("fn main() {let a = 2 + 3 + 4 * 1;}").unwrap();
 
     let insts = VecDeque::from(vec![
-        IRInst::load_data(Place::local("a_2".into()), I32(9)),
+        IRInst::load_data(Place::local("a_2".into(), IRType::I32), I32(9)),
         IRInst::Ret(Operand::Unit),
     ]);
 
@@ -17,7 +17,7 @@ fn test_ir_builder() {
     assert_eq!(insts, func.insts);
 
     let cfg = CFG::new(func);
-    debug_assert_eq!("{\"a_2\": 0}", format!("{:?}", cfg.local_ids));
+    debug_assert_eq!("{\"a_2\": (0, I32)}", format!("{:?}", cfg.local_ids));
 
     assert_eq!(1, cfg.basic_blocks.len());
     let bb = cfg.basic_blocks.last().unwrap();
