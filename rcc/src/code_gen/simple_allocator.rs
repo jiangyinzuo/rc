@@ -16,7 +16,7 @@ impl<'cfg> SimpleAllocator<'cfg> {
 impl<'cfg> Allocator for SimpleAllocator<'cfg> {
     fn get_frame_size(&self) -> u32 {
         // ra
-        let mut frame_size = self.addr_size;
+        let mut frame_size = self.addr_size / 8;
         // locals
         for (_id, ir_type) in self.cfg.local_infos.values() {
             frame_size += ir_type.byte_size(self.addr_size);

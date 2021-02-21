@@ -24,4 +24,5 @@ fn test_compile(input: &str, expected_output: &str) -> Result<(), RccError> {
 #[test]
 fn rcc_test() {
     test_compile("in1.txt", "out1.txt").unwrap();
+    test_compile("in2.txt", "out2.txt").unwrap();
 }

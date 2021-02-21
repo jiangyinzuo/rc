@@ -1,0 +1,20 @@
+	.text
+	.globl  main
+main:
+	addi	sp,sp,-8
+	sw	ra,4(sp)
+	sw	s0,0(sp)
+	addi	s0,sp,8
+	lw	ra,4(sp)
+	lw	s0,0(sp)
+	addi	sp,sp,8
+	ret
+foo:
+	addi	sp,sp,-8
+	sw	ra,4(sp)
+	sw	s0,0(sp)
+	addi	s0,sp,8
+	lw	ra,4(sp)
+	lw	s0,0(sp)
+	addi	sp,sp,8
+	ret

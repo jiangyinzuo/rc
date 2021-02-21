@@ -1,4 +1,4 @@
-pub mod code_generator;
+pub mod riscv32;
 pub(crate) mod simple_allocator;
 
 use strenum::StrEnum;

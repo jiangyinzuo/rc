@@ -5,7 +5,7 @@ use crate::parser::{Parse, ParseCursor};
 use std::io::{BufReader, BufWriter, Read, Write};
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ir::ir_build::IRBuilder;
-use crate::code_gen::code_generator::CodeGen;
+use crate::code_gen::riscv32::Riscv32CodeGen;
 use crate::ir::cfg::CFGIR;
 
 #[derive(Copy, Clone)]
@@ -50,7 +50,7 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
 
         match self.opt_level {
             OptimizeLevel::Zero => {
-                let mut code_gen = CodeGen::new(cfg_ir, &mut self.output, self.opt_level);
+                let mut code_gen = Riscv32CodeGen::new(cfg_ir, &mut self.output, self.opt_level);
                 code_gen.run()?;
             }
             OptimizeLevel::One => {todo!()}
