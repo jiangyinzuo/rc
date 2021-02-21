@@ -27,6 +27,7 @@ pub struct CFG {
     pub func_name: String,
     pub func_is_global: bool,
     pub fn_args: Vec<String>,
+    pub is_leaf: bool,
 }
 
 /// number of successors less equal than 2 (the next leader or goto label)
@@ -41,8 +42,8 @@ pub struct BasicBlock {
 impl CFG {
     /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
-        let leaders = get_leaders(&func);
-        let local_ids = get_local_ids(&func);
+        let (leaders, is_leaf) = get_leaders_and_is_leaf(&func);
+        let local_infos = get_local_infos(&func);
 
         // generate basic blocks and label map
         let mut label_map = HashMap::new();
@@ -122,10 +123,11 @@ impl CFG {
 
         CFG {
             basic_blocks,
-            local_infos: local_ids,
+            local_infos,
             func_name: func.name,
             func_is_global: func.is_global,
             fn_args: func.fn_args,
+            is_leaf
         }
     }
 
@@ -156,7 +158,7 @@ impl CFG {
     }
 }
 
-fn get_leaders(func: &Func) -> BTreeSet<usize> {
+fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
     macro_rules! insert_leaders {
         ($leaders:ident, $label:ident, $next_id:expr) => {
             $leaders.insert(*$label);
@@ -165,7 +167,7 @@ fn get_leaders(func: &Func) -> BTreeSet<usize> {
     }
 
     let mut leaders = BTreeSet::new();
-
+    let mut is_leaf = true;
     for (i, inst) in func.insts.iter().enumerate() {
         match inst {
             IRInst::Jump { label }
@@ -176,15 +178,18 @@ fn get_leaders(func: &Func) -> BTreeSet<usize> {
                     insert_leaders!(leaders, label, i + 2);
                 }
             }
+            IRInst::Call {..} => {
+                is_leaf = false;
+            }
             _ => {}
         }
     }
     leaders.remove(&1usize);
     leaders.insert(func.insts.len() + 1);
-    leaders
+    (leaders, is_leaf)
 }
 
-fn get_local_ids(func: &Func) -> HashMap<String, (usize, IRType)> {
+fn get_local_infos(func: &Func) -> HashMap<String, (usize, IRType)> {
     let mut local_ids = HashMap::new();
     let mut next_id: usize = 0;
     for inst in func.insts.iter() {

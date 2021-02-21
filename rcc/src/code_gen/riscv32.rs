@@ -138,8 +138,10 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         debug_assert!(self.frame_size >= 8);
         // set sp
         writeln!(self.output, "\taddi\tsp,sp,-{}", self.frame_size)?;
-        // save ra
-        writeln!(self.output, "\tsw\tra,{}(sp)", self.frame_size - 4)?;
+        if !self.cfg.is_leaf {
+            // save ra
+            writeln!(self.output, "\tsw\tra,{}(sp)", self.frame_size - 4)?;
+        }
         // save old fp(s0)
         writeln!(self.output, "\tsw\ts0,{}(sp)", self.frame_size - 8)?;
         // set fp
@@ -148,8 +150,10 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     }
 
     fn gen_exit_function(&mut self) -> Result<(), RccError> {
-        // restore ra
-        writeln!(self.output, "\tlw\tra,{}(sp)", self.frame_size - 4)?;
+        if !self.cfg.is_leaf {
+            // restore ra
+            writeln!(self.output, "\tlw\tra,{}(sp)", self.frame_size - 4)?;
+        }
         // restore old fp
         writeln!(self.output, "\tlw\ts0,{}(sp)", self.frame_size - 8)?;
         // restore sp
@@ -161,6 +165,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         for i in 0..self.cfg.fn_args.len().min(8) {
             let arg_name = self.cfg.fn_args.get(i).unwrap();
             // writeln!(self.output, "\tsw\ta{},-20(s0)", i)?;
+            todo!()
         }
         Ok(())
     }
