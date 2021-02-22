@@ -1,8 +1,7 @@
-use std::collections::{BTreeSet, HashMap, LinkedList};
-
-use crate::ir::{IRInst, IRType};
 use crate::ir::linear_ir::{Func, LinearIR};
 use crate::ir::var_name::local_var;
+use crate::ir::{IRInst, IRType};
+use std::collections::{BTreeSet, HashMap, LinkedList};
 
 /// Control FLow Graph's immediate representation
 pub struct CFGIR {
@@ -167,6 +166,10 @@ impl CFG {
         let (raw_name, _) = self.fn_args.get(i)?;
         Some(local_var(raw_name, self.func_scope_id))
     }
+
+    pub fn iter_inst(&self) -> CFGIter {
+        CFGIter::new(self)
+    }
 }
 
 fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
@@ -230,6 +233,46 @@ impl BasicBlock {
             id,
             predecessors: vec![],
             instructions,
+        }
+    }
+}
+
+pub struct CFGIter<'cfg> {
+    bb_iter: std::slice::Iter<'cfg, BasicBlock>,
+    ir_iter: Option<std::collections::linked_list::Iter<'cfg, IRInst>>,
+}
+
+impl<'cfg> CFGIter<'cfg> {
+    pub fn new(cfg: &'cfg CFG) -> CFGIter<'cfg> {
+        let iter = cfg.basic_blocks.iter();
+        CFGIter {
+            bb_iter: iter,
+            ir_iter: None,
+        }
+    }
+
+    #[inline]
+    fn reset_bb(&mut self) -> Option<<Self as Iterator>::Item> {
+        match self.bb_iter.next() {
+            Some(b) => {
+                self.ir_iter = Some(b.instructions.iter());
+                self.next()
+            }
+            None => None,
+        }
+    }
+}
+
+impl<'cfg> Iterator for CFGIter<'cfg> {
+    type Item = &'cfg IRInst;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.ir_iter.as_mut() {
+            Some(ir_iter) => match ir_iter.next() {
+                Some(item) => Some(item),
+                None => self.reset_bb(),
+            },
+            None => self.reset_bb(),
         }
     }
 }

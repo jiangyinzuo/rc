@@ -1,19 +1,14 @@
-use std::collections::VecDeque;
-use std::fs::File;
-use std::io::Read;
-
 use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::AST;
-use crate::ast::expr::BinOperator;
-use crate::ir::{IRInst, IRType, Operand, Place};
 use crate::ir::cfg::CFG;
 use crate::ir::ir_build::IRBuilder;
-use crate::ir::Jump::*;
 use crate::ir::linear_ir::LinearIR;
-use crate::ir::Operand::{FnLabel, I32};
+use crate::ir::IRInst;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::{OptimizeLevel, RccError};
+use std::fs::File;
+use std::io::Read;
 
 mod o1_test;
 
@@ -44,14 +39,20 @@ fn ir_build_o1(input: &str) -> Result<LinearIR, RccError> {
     ir_build_with_optimize(input, OptimizeLevel::One)
 }
 
+fn test_cfg_iter(expected: &str, cfg: &CFG) {
+    let iter: Vec<&IRInst> = cfg.iter_inst().collect();
+    assert_eq!(expected, format!("{:#?}", iter));
+}
+
 #[test]
 fn test_ir_builder() {
     let mut ir = ir_build("fn main() {let a = 2 + 3;}").unwrap();
 
     let func = ir.funcs.pop().unwrap();
+
     assert_eq!("main", func.name);
-    let excepted = expected_from_file("test_ir_builder_ir.txt");
-    assert_eq!(excepted, format!("{:#?}", func.insts));
+    let expected = expected_from_file("test_ir_builder_ir.txt");
+    assert_eq!(expected, format!("{:#?}", func.insts));
 
     let cfg = CFG::new(func);
     assert_eq!(1, cfg.basic_blocks.len());
@@ -60,6 +61,8 @@ fn test_ir_builder() {
     assert!(bb.predecessors.is_empty());
     assert_eq!(2, bb.instructions.len());
     assert!(cfg.succ_of(0).is_empty());
+
+    test_cfg_iter(&expected, &cfg);
 }
 
 #[test]
@@ -107,7 +110,6 @@ fn test_return() {
 
 #[test]
 fn test_if() {
-
     let mut ir = ir_build(
         r#"fn main() -> i32{let b = 3 + 4;
         let mut a = 0;
@@ -141,6 +143,9 @@ fn test_if() {
     let cfg = CFG::new(func);
     assert_eq!(16, cfg.basic_blocks.len());
 
+    let expected = expected_from_file("test_if_cfg_iter.txt");
+    test_cfg_iter(&expected, &cfg);
+
     let expected = expected_from_file("test_if_bb.txt");
     assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
 }
@@ -168,6 +173,9 @@ fn test_loop() {
     assert_eq!(expected, format!("{:#?}", func.insts));
 
     let cfg = CFG::new(func);
+    let expected = expected_from_file("test_loop_cfg_iter.txt");
+    test_cfg_iter(&expected, &cfg);
+
     let expected = expected_from_file("test_loop_bb.txt");
     assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
 }
@@ -218,6 +226,9 @@ fn fn_call_test() {
 
     for i in 0..=2 {
         let expected_ir = expected_from_file(&format!("test_call_ir{}.txt", i));
-        assert_eq!(expected_ir, format!("{:#?}",ir.funcs.get(i).unwrap().insts));
+        assert_eq!(
+            expected_ir,
+            format!("{:#?}", ir.funcs.get(i).unwrap().insts)
+        );
     }
 }

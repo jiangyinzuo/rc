@@ -3,7 +3,7 @@
 //! w(word): 32bit
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
-use crate::ir::var_name::{local_var, FP, RA};
+use crate::ir::var_name::{FP, RA};
 use crate::ir::IRType;
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
@@ -130,6 +130,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         if !self.cfg.basic_blocks.is_empty() {
             self.gen_function_entry()?;
             self.gen_save_args()?;
+            self.gen_instructions()?;
             self.gen_exit_function()?;
         }
         writeln!(self.output, "\tret")?;
@@ -176,6 +177,11 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
             let offset = self.allocator.get_var_offset(&arg_name, ir_type);
             writeln!(self.output, "\tsw\ta{},-{}(s0)", i, offset)?;
         }
+        Ok(())
+    }
+
+    fn gen_instructions(&mut self) -> Result<(), RccError> {
+
         Ok(())
     }
 }
