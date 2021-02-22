@@ -13,6 +13,7 @@ mod lexer;
 mod parser;
 mod rcc;
 mod tests;
+mod c_abi;
 
 #[derive(Clap)]
 struct Opts {

@@ -4,7 +4,7 @@
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
 use crate::ir::var_name::{FP, RA};
-use crate::ir::IRType;
+use crate::ir::{IRType, IRInst, Operand};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -181,7 +181,24 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     }
 
     fn gen_instructions(&mut self) -> Result<(), RccError> {
+        for inst in self.cfg.iter_inst() {
+            self.gen_instruction(inst)?;
+        }
+        Ok(())
+    }
 
+    fn gen_instruction(&mut self, inst: &IRInst)-> Result<(), RccError> {
+        match inst {
+            IRInst::Ret(o) => {
+                match o {
+                    Operand::I32(i) => {}
+                    _ => {}
+                }
+            }
+            _ => {
+                // TODO
+            }
+        }
         Ok(())
     }
 }

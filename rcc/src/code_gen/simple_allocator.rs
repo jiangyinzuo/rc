@@ -1,8 +1,7 @@
-use std::collections::HashMap;
-
 use crate::code_gen::Allocator;
 use crate::ir::cfg::CFG;
 use crate::ir::IRType;
+use std::collections::HashMap;
 
 pub struct SimpleAllocator<'cfg> {
     cfg: &'cfg CFG,

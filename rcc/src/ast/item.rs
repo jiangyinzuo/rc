@@ -28,7 +28,7 @@ pub enum Item {
     Impl,
 
     /// extern "C" {}
-    ExternalBlock,
+    ExternalBlock(ItemExternalBlock),
 }
 
 impl TokenStart for Item {
@@ -220,4 +220,45 @@ pub struct StructField {
 pub struct TupleField {
     pub vis: Visibility,
     pub _type: TypeAnnotation,
+}
+
+/// `extern "C" { fn foo(); }`
+#[derive(Debug, PartialEq)]
+pub struct ItemExternalBlock {
+    abi: ABI,
+    external_items: Vec<ExternalItem>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ABI {
+    C,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ExternalItem {
+    Fn(ExternalItemFn),
+}
+
+#[derive(Debug, PartialEq)]
+pub struct ExternalItemFn {
+    vis: Visibility,
+    pub name: String,
+    pub fn_params: FnParams,
+    pub ret_type: TypeAnnotation,
+}
+
+impl ExternalItemFn {
+    pub fn new(
+        vis: Visibility,
+        name: String,
+        fn_params: FnParams,
+        ret_type: TypeAnnotation,
+    ) -> ExternalItemFn {
+        ExternalItemFn {
+            vis,
+            name,
+            fn_params,
+            ret_type,
+        }
+    }
 }
