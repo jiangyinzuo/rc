@@ -8,7 +8,7 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum};
+use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum, ItemExternalBlock};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
@@ -398,6 +398,7 @@ impl SymbolResolver {
         match item {
             Item::Fn(item_fn) => self.visit_item_fn(item_fn),
             Item::Struct(item_struct) => self.visit_item_struct(item_struct),
+            Item::ExternalBlock(external_block) => self.visit_item_external_block(external_block),
             _ => unimplemented!(),
         }
     }
@@ -506,6 +507,10 @@ impl SymbolResolver {
 
     fn visit_item_struct(&mut self, item_struct: &mut ItemStruct) -> Result<(), RccError> {
         Ok(())
+    }
+
+    fn visit_item_external_block(&mut self, external_block: &mut ItemExternalBlock) -> Result<(), RccError> {
+        todo!()
     }
 
     fn visit_stmt(&mut self, stmt: &mut Stmt) -> Result<(), RccError> {

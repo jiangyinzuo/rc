@@ -1,9 +1,13 @@
 use crate::ast::expr::BlockExpr;
-use crate::ast::item::{ExternalItem, ExternalItemFn, FnParam, FnParams, Item, ItemExternalBlock, ItemFn, ItemStruct, StructField, TupleField, TypeEnum, ABI};
+use crate::ast::item::{
+    ExternalItem, ExternalItemFn, FnParam, FnParams, Item, ItemExternalBlock, ItemFn, ItemStruct,
+    StructField, TupleField, TypeEnum, ABI,
+};
 use crate::ast::pattern::Pattern;
 use crate::ast::types::TypeAnnotation;
 use crate::ast::{TokenStart, Visibility};
 use crate::lexer::token::Token;
+use crate::parser::expr::primitive::parse_lit_string;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
 use std::string::ToString;
@@ -86,8 +90,7 @@ fn parse_fn_signature(
             cursor.bump_token()?;
             TypeAnnotation::parse(cursor)?
         }
-        Token::Semi => unimplemented!("fn declaration without block not implemented"),
-        Token::LeftCurlyBraces => TypeAnnotation::Unit,
+        Token::Semi | Token::LeftCurlyBraces => TypeAnnotation::Unit,
         _ => return Err("except '->' or '{'".into()),
     };
     Ok((fn_name, fn_params, ret_type))
@@ -131,14 +134,21 @@ impl Parse for FnParam {
 impl Parse for ItemExternalBlock {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         cursor.eat_token_eq(Token::Extern)?;
-        todo!()
+        let abi = ABI::parse(cursor)?;
+        cursor.eat_token_eq(Token::LeftCurlyBraces)?;
+        let mut external_items = vec![];
+        while cursor.next_token()? != &Token::RightCurlyBraces {
+            external_items.push(ExternalItem::parse(cursor)?);
+        }
+        cursor.eat_token_eq(Token::RightCurlyBraces)?;
+        Ok(ItemExternalBlock::new(abi, external_items))
     }
 }
 
 impl Parse for ABI {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
-        // cursor.eat_literal()
-        todo!()
+        let s = parse_lit_string(cursor)?;
+        ABI::from_string(&s)
     }
 }
 /// ExternalItem -> ExternalItemFn
@@ -157,13 +167,14 @@ impl Parse for ExternalItem {
     }
 }
 
-/// ExternalItemFn -> vis? `fn` identifier `(` FnParams? `)` ( `->` Type )?
+/// ExternalItemFn -> vis? `fn` identifier `(` FnParams? `)` ( `->` Type )? `;`
 impl ExternalItemFn {
     fn parse_after_vis(
         cursor: &mut ParseCursor,
         vis: Visibility,
     ) -> Result<ExternalItemFn, RccError> {
         let (fn_name, fn_params, ret_type) = parse_fn_signature(cursor)?;
+        cursor.eat_token_eq(Token::Semi)?;
         Ok(ExternalItemFn::new(vis, fn_name, fn_params, ret_type))
     }
 }

@@ -1,0 +1,44 @@
+ItemExternalBlock {
+    abi: C,
+    external_items: [
+        Fn(
+            ExternalItemFn {
+                vis: Pub,
+                name: "foo",
+                fn_params: FnParams {
+                    params: [],
+                },
+                ret_type: (),
+            },
+        ),
+        Fn(
+            ExternalItemFn {
+                vis: Priv,
+                name: "bar",
+                fn_params: FnParams {
+                    params: [
+                        FnParam {
+                            pattern: Identifier(
+                                IdentPattern {
+                                    ident: "a",
+                                    is_mut: false,
+                                },
+                            ),
+                            _type: i32,
+                        },
+                        FnParam {
+                            pattern: Identifier(
+                                IdentPattern {
+                                    ident: "b",
+                                    is_mut: false,
+                                },
+                            ),
+                            _type: i32,
+                        },
+                    ],
+                },
+                ret_type: (),
+            },
+        ),
+    ],
+}

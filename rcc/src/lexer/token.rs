@@ -75,6 +75,11 @@ pub enum Token<'a> {
         value: &'a str,
     },
 
+    /// "hello"
+    /// field 0 contains quote
+    #[strenum(disabled)]
+    LitString(&'a str),
+
     /// Symbols
     #[strenum("+")]
     Plus,
@@ -252,7 +257,6 @@ pub enum LiteralKind<'a> {
     Float {
         suffix: &'a str
     },
-    String,
 }
 
 impl<'a> LiteralKind<'a> {

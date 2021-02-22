@@ -406,7 +406,7 @@ impl<'a: 'b, 'b> Lexer<'a> {
         if self.cursor.bump() == EOF_CHAR {
             Unknown
         } else {
-            self.lit(start, self.cursor.eaten_len(), String)
+            LitString(&self.input[start..self.cursor.eaten_len()])
         }
     }
 

@@ -264,7 +264,8 @@ impl<V> ConstantExpr<V> {
 impl TokenStart for Expr {
     fn is_token_start(tk: &Token) -> bool {
         matches!(tk,
-            Token::Identifier(_) | Token::Literal {..} | Token::True | Token::False | Token::DotDot |
+            Token::Identifier(_) | Token::Literal {..} |Token::LitString(_) | Token::True | Token::False |
+            Token::DotDot |
             Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
             Token::For | Token::Loop | Token::While |
             Token::If | Token::Match | Token::Break | Token::Return

@@ -3,6 +3,7 @@ use crate::ast::pattern::Pattern;
 use crate::ast::types::TypeAnnotation;
 use crate::ast::{NamedASTNode, TokenStart, Visibility};
 use crate::lexer::token::Token;
+use crate::rcc::RccError;
 
 #[derive(Debug, PartialEq)]
 pub enum Item {
@@ -229,9 +230,27 @@ pub struct ItemExternalBlock {
     external_items: Vec<ExternalItem>,
 }
 
+impl ItemExternalBlock {
+    pub fn new(abi: ABI, external_items: Vec<ExternalItem>) -> ItemExternalBlock {
+        ItemExternalBlock {
+            abi,
+            external_items,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum ABI {
     C,
+}
+
+impl ABI {
+    pub fn from_string(s: &str) -> Result<ABI, RccError> {
+        match s {
+            "C" => Ok(ABI::C),
+            _ => Err(format!("invalid abi {}", s).into()),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]

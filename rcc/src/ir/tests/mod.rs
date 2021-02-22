@@ -7,16 +7,14 @@ use crate::ir::IRInst;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::{OptimizeLevel, RccError};
-use std::fs::File;
-use std::io::Read;
+use crate::tests;
+use crate::tests::assert_fmt_eq;
 
 mod o1_test;
 
+#[inline]
 fn expected_from_file(file_name: &str) -> String {
-    let mut file = File::open(format!("./src/ir/tests/{}", file_name)).unwrap();
-    let mut expected = String::new();
-    file.read_to_string(&mut expected).unwrap();
-    expected
+    tests::read_from_file(file_name, "./src/ir/tests")
 }
 
 fn ir_build_with_optimize(input: &str, opt_level: OptimizeLevel) -> Result<LinearIR, RccError> {
@@ -52,7 +50,7 @@ fn test_ir_builder() {
 
     assert_eq!("main", func.name);
     let expected = expected_from_file("test_ir_builder_ir.txt");
-    assert_eq!(expected, format!("{:#?}", func.insts));
+    assert_fmt_eq(&expected, &func.insts);
 
     let cfg = CFG::new(func);
     assert_eq!(1, cfg.basic_blocks.len());

@@ -1,6 +1,6 @@
 mod lexer_tests {
     use crate::lexer::token::Token::*;
-    use crate::lexer::token::{LiteralKind::*, Token, LiteralKind};
+    use crate::lexer::token::{LiteralKind, LiteralKind::*, Token};
     use crate::lexer::Lexer;
 
     fn validate_tokenize(inputs: Vec<&str>, excepted_outputs: Vec<Vec<Token>>) {
@@ -90,10 +90,7 @@ mod lexer_tests {
                     Semi,
                     Identifier("printf"),
                     LeftParen,
-                    Literal {
-                        literal_kind: String,
-                        value: r#""%d""#,
-                    },
+                    LitString(r#""%d""#),
                     Comma,
                     Identifier("res"),
                     RightParen,
@@ -155,7 +152,7 @@ mod lexer_tests {
                     Literal {
                         literal_kind: Integer { suffix: "usize" },
                         value: "1",
-                    }
+                    },
                 ],
             ],
         );
@@ -171,22 +168,9 @@ mod lexer_tests {
                 r#""hello\""#,
             ],
             vec![
-                vec![Literal {
-                    literal_kind: String,
-                    value: r#""hello""#,
-                }],
-                vec![
-                    Identifier("x"),
-                    Eq,
-                    Literal {
-                        literal_kind: String,
-                        value: r#""\n\\\"'\'\0\t\r""#,
-                    },
-                ],
-                vec![Literal {
-                    literal_kind: String,
-                    value: "\"\"",
-                }],
+                vec![LitString(r#""hello""#)],
+                vec![Identifier("x"), Eq, LitString(r#""\n\\\"'\'\0\t\r""#)],
+                vec![LitString("\"\"")],
                 vec![Unknown],
             ],
         );
@@ -259,7 +243,7 @@ mod lexer_tests {
             vec![
                 vec![Unknown],
                 vec![],
-                vec![SlashEq, Slash, ],
+                vec![SlashEq, Slash],
                 vec![],
                 vec![Unknown],
                 vec![],
@@ -338,13 +322,7 @@ mod lexer_tests {
     fn lt_gt_test() {
         validate_tokenize(
             vec!["<  <= << <<= > >= >> >>=", "<<<"],
-            vec![
-                vec![
-                    Lt, Le, Shl, ShlEq, Gt,
-                    Ge, Shr, ShrEq,
-                ],
-                vec![Shl, Lt],
-            ],
+            vec![vec![Lt, Le, Shl, ShlEq, Gt, Ge, Shr, ShrEq], vec![Shl, Lt]],
         );
     }
 }

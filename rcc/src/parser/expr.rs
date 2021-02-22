@@ -99,7 +99,11 @@ pub mod prec {
     /// ||               left to right
     fn bin_op_expr(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
         // 1|2|3&4+4+4+5*6*7+7&8
-        fn reduce(bin_ops: &mut Vec<BinOperator>, exprs: &mut Vec<Expr>, next_prec: Precedence) -> Result<(), RccError> {
+        fn reduce(
+            bin_ops: &mut Vec<BinOperator>,
+            exprs: &mut Vec<Expr>,
+            next_prec: Precedence,
+        ) -> Result<(), RccError> {
             while !bin_ops.is_empty() && bin_ops.last().unwrap().prec_gt(&next_prec)? {
                 let rhs = exprs.pop().unwrap();
                 let lhs = exprs.pop().unwrap();
@@ -120,7 +124,11 @@ pub mod prec {
                         if let Some(last_op) = bin_ops.last() {
                             // 1 + 2 * 3   <- -
                             if !last_op.prec_lt(&next_op)? {
-                                reduce(&mut bin_ops, &mut exprs, Precedence::from_bin_op(&next_op))?;
+                                reduce(
+                                    &mut bin_ops,
+                                    &mut exprs,
+                                    Precedence::from_bin_op(&next_op),
+                                )?;
                             }
                         }
                         // shift
@@ -255,6 +263,7 @@ pub mod primitive {
         let expr = match cursor.next_token()? {
             Token::Identifier(_) | Token::PathSep => Path(PathExpr::parse(cursor)?),
             Token::Literal { .. } => parse_literal(cursor)?,
+            Token::LitString(_) => Expr::LitStr(parse_lit_string(cursor)?),
             Token::True | Token::False => LitBool(*cursor.bump_token()? == Token::True),
             Token::LeftCurlyBraces => Block(BlockExpr::parse(cursor)?),
             Token::LeftParen => parse_grouped_or_tuple_expr(cursor)?,
@@ -344,11 +353,19 @@ pub mod primitive {
         }
     }
 
+    pub fn parse_lit_string(cursor: &mut ParseCursor) -> Result<String, RccError> {
+        if let Token::LitString(s) = cursor.bump_token()? {
+            let s = *s;
+            Ok(s[1..s.len() - 1].to_string())
+        } else {
+            Err("expected LitString".into())
+        }
+    }
+
     fn parse_literal(cursor: &mut ParseCursor) -> Result<Expr, RccError> {
         let (literal_kind, value) = cursor.eat_literal()?;
         Ok(match literal_kind {
             Char => Expr::LitChar(value.chars().nth(1).unwrap()),
-            String => Expr::LitStr(value[1..value.len() - 1].to_string()),
             Integer { suffix } => {
                 Expr::LitNum(LitNumExpr::integer(value).lit_type(if suffix.is_empty() {
                     TypeLitNum::I
