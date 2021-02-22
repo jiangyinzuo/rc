@@ -118,11 +118,11 @@ fn test_if() {
         } else if b > 100 {
             a = 1;
         } else if b < 2 {
-            a = 3;
+            a = -3;
         } else if b <= 33 {
             a = 2;
         } else if b >= 50 {
-            a = 22;
+            a = -22;
         } else {
             a = 333;
         }

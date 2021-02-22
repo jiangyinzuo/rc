@@ -4,7 +4,7 @@
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
 use crate::ir::var_name::{FP, RA};
-use crate::ir::{IRType, IRInst, Operand};
+use crate::ir::{IRInst, IRType, Operand};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -187,14 +187,29 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         Ok(())
     }
 
-    fn gen_instruction(&mut self, inst: &IRInst)-> Result<(), RccError> {
+    fn gen_instruction(&mut self, inst: &IRInst) -> Result<(), RccError> {
         match inst {
-            IRInst::Ret(o) => {
-                match o {
-                    Operand::I32(i) => {}
-                    _ => {}
+            IRInst::Ret(o) => match o {
+                Operand::I8(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
                 }
-            }
+                Operand::I16(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
+                }
+                Operand::I32(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
+                }
+                Operand::U8(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
+                }
+                Operand::U16(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
+                }
+                Operand::U32(i) => {
+                    writeln!(self.output, "\tli\ta0,{}", i)?;
+                }
+                _ => {}
+            },
             _ => {
                 // TODO
             }

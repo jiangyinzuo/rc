@@ -4,14 +4,14 @@ use crate::ast::expr::{
     ArrayExpr, ArrayIndexExpr, AssignExpr, AssignOp, BinOpExpr, BinOperator, BlockExpr, BreakExpr,
     CallExpr, Expr, ExprKind, ExprVisit, FieldAccessExpr, GroupedExpr, IfExpr, LhsExpr, LitNumExpr,
     LoopExpr, PathExpr, RangeExpr, ReturnExpr, StructExpr, TupleExpr, TupleIndexExpr, UnAryExpr,
-    WhileExpr,
+    UnOp, WhileExpr,
 };
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::TypeLitNum;
-use crate::ast::{AST};
+use crate::ast::AST;
 use crate::ir::linear_ir::LinearIR;
 use crate::ir::Jump::*;
 use crate::ir::{IRInst, IRType, Jump, Operand, Place};
@@ -150,7 +150,7 @@ impl IRBuilder {
             Expr::LitBool(lit_bool) => self.visit_lit_bool(lit_bool, dest),
             Expr::LitChar(lit_char) => self.visit_lit_char(lit_char, dest),
             Expr::LitStr(s) => self.visit_lit_str(s, dest),
-            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr),
+            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr, dest),
             Expr::Block(block_expr) => self.visit_block_expr(block_expr, dest),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
             // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
@@ -296,10 +296,29 @@ impl IRBuilder {
         Ok(self.ir_output.add_ro_local_str(s.to_string()))
     }
 
-    fn visit_unary_expr(&mut self, unary_expr: &mut UnAryExpr) -> Result<Operand, RccError> {
-        // let d = self.gen_temp_variable(unary_expr.expr.type_info());
+    fn visit_unary_expr(
+        &mut self,
+        unary_expr: &mut UnAryExpr,
+        dest: Option<Place>,
+    ) -> Result<Operand, RccError> {
         // let operand = self.visit_expr(&mut unary_expr.expr, d)?;
-        todo!()
+        match unary_expr.op {
+            UnOp::Neg => {
+                let temp_dest = self.gen_temp_variable(unary_expr.expr.type_info());
+                let operand = self.visit_expr(&mut unary_expr.expr, Some(temp_dest))?;
+                let operand = match operand {
+                    Operand::I8(i) => Operand::I8(-i),
+                    Operand::I16(i) => Operand::I16(-i),
+                    Operand::I32(i) => Operand::I32(-i),
+                    _ => todo!(),
+                };
+                match dest {
+                    Some(d) => self.lit(operand, d),
+                    None => Ok(Operand::Unit),
+                }
+            }
+            _ => todo!(),
+        }
     }
 
     fn visit_block_expr(
