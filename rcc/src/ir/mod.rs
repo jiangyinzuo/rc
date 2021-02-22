@@ -1,17 +1,19 @@
-use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
-use crate::ast::expr::BinOperator;
-use crate::ast::item::FnParams;
-use crate::ast::types::TypeLitNum;
-use crate::rcc::RccError;
 use std::collections::VecDeque;
 use std::fmt::Debug;
 use std::ops::Deref;
+
+use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
+use crate::ast::expr::BinOperator;
+use crate::ast::types::TypeLitNum;
+use crate::ir::var_name::{is_temp_var, local_var};
+use crate::rcc::RccError;
 
 pub mod cfg;
 mod dataflow;
 pub mod ir_build;
 mod linear_ir;
 pub(crate) mod tests;
+pub mod var_name;
 
 #[derive(Debug, PartialEq)]
 pub enum Jump {
@@ -64,10 +66,6 @@ pub struct Place {
 }
 
 impl Place {
-    pub fn label(ident: &str, scope_id: u64) -> String {
-        format!("{}_{}", ident, scope_id)
-    }
-
     pub fn new(label: String, kind: VarKind, ir_type: IRType) -> Place {
         Place {
             label,
@@ -77,7 +75,7 @@ impl Place {
     }
 
     pub fn variable(ident: &str, scope_id: u64, var_kind: VarKind, ir_type: IRType) -> Place {
-        Place::new(Self::label(ident, scope_id), var_kind, ir_type)
+        Place::new(local_var(ident, scope_id), var_kind, ir_type)
     }
 
     pub fn local(label: String, ir_type: IRType) -> Place {
@@ -105,25 +103,7 @@ impl Place {
     }
 
     pub fn is_temp(&self) -> bool {
-        self.label.starts_with('$')
-    }
-}
-
-pub struct Func {
-    pub name: String,
-    insts: VecDeque<IRInst>,
-    pub is_global: bool,
-    pub fn_args: Vec<String>,
-}
-
-impl Func {
-    pub fn new(name: String, is_global: bool, fn_args: Vec<String>) -> Func {
-        Func {
-            name,
-            insts: VecDeque::new(),
-            is_global,
-            fn_args,
-        }
+        is_temp_var(&self.label)
     }
 }
 
@@ -160,11 +140,14 @@ impl IRType {
             IRType::I32 | IRType::U32 | IRType::F32 => 4,
             IRType::I64 | IRType::U64 | IRType::F64 => 8,
             IRType::I128 | IRType::U128 => 16,
-            IRType::Isize | IRType::Usize | IRType::Addr => addr_size,
+            IRType::Isize | IRType::Usize | IRType::Addr => {
+                debug_assert!(addr_size % 8 == 0);
+                addr_size / 8
+            }
             IRType::Unit | IRType::Never => 0,
         }
     }
-    
+
     pub fn from_type_info(type_info: &TypeInfo) -> Result<IRType, RccError> {
         let ir_type = match type_info {
             TypeInfo::LitNum(num) => match num {

@@ -1,0 +1,11 @@
+	.text
+foo:
+	addi	sp,sp,-24
+	sw	s0,20(sp)
+	addi	s0,sp,24
+	sw	a0,-8(s0)
+	sw	a1,-12(s0)
+	sw	a2,-16(s0)
+	lw	s0,20(sp)
+	addi	sp,sp,24
+	ret

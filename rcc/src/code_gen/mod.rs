@@ -5,6 +5,7 @@ use strenum::StrEnum;
 use crate::ir::cfg::CFG;
 use crate::rcc::OptimizeLevel;
 use crate::code_gen::simple_allocator::SimpleAllocator;
+use crate::ir::IRType;
 
 #[derive(StrEnum)]
 pub enum TargetPlatform {
@@ -13,6 +14,9 @@ pub enum TargetPlatform {
 
 pub trait Allocator {
     fn get_frame_size(&self) -> u32;
+
+    /// Return offset from fp
+    fn get_var_offset(&mut self, var_name: &str, ir_type: &IRType) -> u32;
 }
 
 pub fn create_allocator<'cfg>(opt_level: OptimizeLevel, cfg: &'cfg CFG, addr_size: u32) -> Box<dyn Allocator + 'cfg>  {

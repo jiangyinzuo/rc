@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-
 use crate::ast::item::ItemFn;
 use crate::ast::pattern::Pattern;
 use crate::ast::Visibility;
-use crate::ir::{Func, IRInst, IRType, Operand, Place};
+use crate::ir::{IRInst, IRType, Operand, Place};
+use crate::rcc::RccError;
+use std::collections::{HashMap, VecDeque};
 
 pub struct LinearIR {
     pub funcs: Vec<Func>,
@@ -25,19 +25,27 @@ impl LinearIR {
         Operand::Place(Place::lit_const(label, IRType::Char))
     }
 
-    pub fn add_func(&mut self, item_fn: &ItemFn) {
+    pub fn add_func(&mut self, item_fn: &ItemFn) -> Result<(), RccError> {
         let fn_name = item_fn.name.clone();
         let is_global = item_fn.vis() == Visibility::Pub;
 
-        let fn_args: Vec<String> = item_fn
-            .fn_params
-            .params
-            .iter()
-            .map(|param| match &param.pattern {
-                Pattern::Identifier(i) => i.ident().to_string(),
-            })
-            .collect();
-        self.funcs.push(Func::new(fn_name, is_global, fn_args));
+        let scope = &item_fn.fn_block.scope;
+        let scope_id = scope.scope_id;
+        debug_assert_ne!(0, scope_id);
+
+        let mut fn_args = Vec::new();
+        for param in item_fn.fn_params.params.iter() {
+            fn_args.push(match &param.pattern {
+                Pattern::Identifier(i) => {
+                    let (var_info, _) = scope.find_variable(i.ident()).unwrap();
+                    (i.ident().to_string(), IRType::from_var_info(var_info)?)
+                }
+            });
+        }
+
+        self.funcs
+            .push(Func::new(fn_name, is_global, fn_args, scope_id));
+        Ok(())
     }
 
     pub fn cur_func_mut(&mut self) -> &mut Func {
@@ -55,5 +63,30 @@ impl LinearIR {
 
     pub fn get_inst_by_id(&mut self, id: usize) -> &mut IRInst {
         self.cur_func_mut().insts.get_mut(id - 1).unwrap()
+    }
+}
+
+pub struct Func {
+    pub name: String,
+    pub insts: VecDeque<IRInst>,
+    pub is_global: bool,
+    pub fn_args: Vec<(String, IRType)>,
+    pub block_scope_id: u64,
+}
+
+impl Func {
+    pub fn new(
+        name: String,
+        is_global: bool,
+        fn_args: Vec<(String, IRType)>,
+        block_scope_id: u64,
+    ) -> Func {
+        Func {
+            name,
+            insts: VecDeque::new(),
+            is_global,
+            fn_args,
+            block_scope_id,
+        }
     }
 }

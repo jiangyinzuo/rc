@@ -1,5 +1,5 @@
-use crate::rcc::{RcCompiler, RccError, OptimizeLevel};
 use crate::code_gen::TargetPlatform;
+use crate::rcc::{OptimizeLevel, RcCompiler, RccError};
 use std::io::Read;
 
 fn file_path(file_name: &str) -> String {
@@ -8,7 +8,7 @@ fn file_path(file_name: &str) -> String {
 
 fn test_compile(input: &str, expected_output: &str) -> Result<(), RccError> {
     let input = std::fs::File::open(file_path(input))?;
-    let mut expected_output =std::fs::File::open(file_path(expected_output))?;
+    let mut expected_output = std::fs::File::open(file_path(expected_output))?;
     let output = Vec::<u8>::new();
     let mut rcc = RcCompiler::new(TargetPlatform::Riscv32, input, output, OptimizeLevel::Zero);
 
@@ -23,6 +23,7 @@ fn test_compile(input: &str, expected_output: &str) -> Result<(), RccError> {
 
 #[test]
 fn rcc_test() {
-    test_compile("in1.txt", "out1.txt").unwrap();
-    test_compile("in2.txt", "out2.txt").unwrap();
+    for i in 1..=3 {
+        test_compile(&format!("in{}.txt", i), &format!("out{}.txt", i)).unwrap();
+    }
 }

@@ -4,6 +4,7 @@ use crate::ast::expr::BlockExpr;
 use crate::ast::file::File;
 use crate::ast::item::{Item, ItemFn, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
+use crate::ir::var_name::temp_local_var;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -36,12 +37,12 @@ lazy_static! {
 }
 
 pub struct Scope {
+    pub scope_id: u64,
     father: Option<NonNull<Scope>>,
     pub(crate) types: HashMap<String, TypeInfo>,
     variables: HashMap<String, Vec<VarInfo>>,
     pub cur_stmt_id: u64,
     temp_count: u64,
-    scope_id: u64,
 }
 
 unsafe impl std::marker::Sync for Scope {}
@@ -49,18 +50,18 @@ unsafe impl std::marker::Sync for Scope {}
 impl Scope {
     pub fn new(scope_id: u64) -> Scope {
         Scope {
+            scope_id,
             father: None,
             types: HashMap::new(),
             variables: HashMap::new(),
             cur_stmt_id: 0,
             temp_count: 0,
-            scope_id,
         }
     }
 
     pub fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> String {
         let kind = VarKind::Local;
-        let ident = format!("${}_{}", self.temp_count, self.scope_id);
+        let ident = temp_local_var(self.temp_count, self.scope_id);
         self.temp_count += 1;
         self.add_variable(&ident, kind, type_info);
         ident
@@ -76,7 +77,7 @@ impl Scope {
     }
 
     /// Return (var info, scope id)
-    pub fn find_variable(& self, ident: &str) -> Option<(&VarInfo, u64)> {
+    pub fn find_variable(&self, ident: &str) -> Option<(&VarInfo, u64)> {
         let mut cur_scope: *const Scope = self;
         loop {
             let s = unsafe { &*cur_scope };

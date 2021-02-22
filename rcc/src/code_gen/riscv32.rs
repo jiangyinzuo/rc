@@ -3,6 +3,8 @@
 //! w(word): 32bit
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
+use crate::ir::var_name::{local_var, FP, RA};
+use crate::ir::IRType;
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -140,10 +142,13 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         writeln!(self.output, "\taddi\tsp,sp,-{}", self.frame_size)?;
         if !self.cfg.is_leaf {
             // save ra
+            let offset = self.allocator.get_var_offset(RA, &IRType::Addr);
+            debug_assert_eq!(4, offset);
             writeln!(self.output, "\tsw\tra,{}(sp)", self.frame_size - 4)?;
         }
         // save old fp(s0)
-        writeln!(self.output, "\tsw\ts0,{}(sp)", self.frame_size - 8)?;
+        let offset = self.allocator.get_var_offset(FP, &IRType::Addr);
+        writeln!(self.output, "\tsw\ts0,{}(sp)", self.frame_size - offset)?;
         // set fp
         writeln!(self.output, "\taddi\ts0,sp,{}", self.frame_size)?;
         Ok(())
@@ -152,10 +157,13 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     fn gen_exit_function(&mut self) -> Result<(), RccError> {
         if !self.cfg.is_leaf {
             // restore ra
-            writeln!(self.output, "\tlw\tra,{}(sp)", self.frame_size - 4)?;
+            let offset = self.allocator.get_var_offset(RA, &IRType::Addr);
+            debug_assert_eq!(4, offset);
+            writeln!(self.output, "\tlw\tra,{}(sp)", self.frame_size - offset)?;
         }
         // restore old fp
-        writeln!(self.output, "\tlw\ts0,{}(sp)", self.frame_size - 8)?;
+        let offset = self.allocator.get_var_offset(FP, &IRType::Addr);
+        writeln!(self.output, "\tlw\ts0,{}(sp)", self.frame_size - offset)?;
         // restore sp
         writeln!(self.output, "\taddi\tsp,sp,{}", self.frame_size)?;
         Ok(())
@@ -163,9 +171,10 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
 
     fn gen_save_args(&mut self) -> Result<(), RccError> {
         for i in 0..self.cfg.fn_args.len().min(8) {
-            let arg_name = self.cfg.fn_args.get(i).unwrap();
-            // writeln!(self.output, "\tsw\ta{},-20(s0)", i)?;
-            todo!()
+            let arg_name = self.cfg.get_name_of_fn_arg(i).unwrap();
+            let (_, ir_type) = self.cfg.local_infos.get(&arg_name).unwrap();
+            let offset = self.allocator.get_var_offset(&arg_name, ir_type);
+            writeln!(self.output, "\tsw\ta{},-{}(s0)", i, offset)?;
         }
         Ok(())
     }

@@ -1,6 +1,8 @@
-use crate::ir::linear_ir::LinearIR;
-use crate::ir::{Func, IRInst, IRType};
 use std::collections::{BTreeSet, HashMap, LinkedList};
+
+use crate::ir::{IRInst, IRType};
+use crate::ir::linear_ir::{Func, LinearIR};
+use crate::ir::var_name::local_var;
 
 /// Control FLow Graph's immediate representation
 pub struct CFGIR {
@@ -24,9 +26,12 @@ impl CFGIR {
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
     pub local_infos: HashMap<String, (usize, IRType)>,
+
+    /// function information
     pub func_name: String,
+    pub func_scope_id: u64,
     pub func_is_global: bool,
-    pub fn_args: Vec<String>,
+    pub fn_args: Vec<(String, IRType)>,
     pub is_leaf: bool,
 }
 
@@ -125,9 +130,10 @@ impl CFG {
             basic_blocks,
             local_infos,
             func_name: func.name,
+            func_scope_id: func.block_scope_id,
             func_is_global: func.is_global,
             fn_args: func.fn_args,
-            is_leaf
+            is_leaf,
         }
     }
 
@@ -156,6 +162,11 @@ impl CFG {
             _ => vec![],
         }
     }
+
+    pub fn get_name_of_fn_arg(&self, i: usize) -> Option<String> {
+        let (raw_name, _) = self.fn_args.get(i)?;
+        Some(local_var(raw_name, self.func_scope_id))
+    }
 }
 
 fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
@@ -178,7 +189,7 @@ fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
                     insert_leaders!(leaders, label, i + 2);
                 }
             }
-            IRInst::Call {..} => {
+            IRInst::Call { .. } => {
                 is_leaf = false;
             }
             _ => {}
@@ -190,22 +201,27 @@ fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
 }
 
 fn get_local_infos(func: &Func) -> HashMap<String, (usize, IRType)> {
-    let mut local_ids = HashMap::new();
+    let mut local_infos = HashMap::new();
     let mut next_id: usize = 0;
+    for arg in &func.fn_args {
+        let var_name = local_var(&arg.0, func.block_scope_id);
+        local_infos.insert(var_name, (next_id, arg.1));
+    }
+
     for inst in func.insts.iter() {
         match inst {
             IRInst::BinOp { dest, .. }
             | IRInst::LoadData { dest, .. }
             | IRInst::LoadAddr { dest, .. } => {
-                if !local_ids.contains_key(&dest.label) {
-                    local_ids.insert(dest.label.clone(), (next_id, dest.ir_type));
+                if !local_infos.contains_key(&dest.label) {
+                    local_infos.insert(dest.label.clone(), (next_id, dest.ir_type));
                     next_id += 1;
                 }
             }
             _ => {}
         }
     }
-    local_ids
+    local_infos
 }
 
 impl BasicBlock {
