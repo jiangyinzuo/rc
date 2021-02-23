@@ -167,8 +167,8 @@ impl CFG {
         Some(local_var(raw_name, self.func_scope_id))
     }
 
-    pub fn iter_inst(&self) -> CFGIter {
-        CFGIter::new(self)
+    pub fn iter_inst(&self) -> CFGIterMut {
+        CFGIterMut::new(self)
     }
 }
 
@@ -237,15 +237,15 @@ impl BasicBlock {
     }
 }
 
-pub struct CFGIter<'cfg> {
+pub struct CFGIterMut<'cfg> {
     bb_iter: std::slice::Iter<'cfg, BasicBlock>,
     ir_iter: Option<std::collections::linked_list::Iter<'cfg, IRInst>>,
 }
 
-impl<'cfg> CFGIter<'cfg> {
-    pub fn new(cfg: &'cfg CFG) -> CFGIter<'cfg> {
+impl<'cfg> CFGIterMut<'cfg> {
+    pub fn new(cfg: &'cfg CFG) -> CFGIterMut<'cfg> {
         let iter = cfg.basic_blocks.iter();
-        CFGIter {
+        CFGIterMut {
             bb_iter: iter,
             ir_iter: None,
         }
@@ -263,7 +263,7 @@ impl<'cfg> CFGIter<'cfg> {
     }
 }
 
-impl<'cfg> Iterator for CFGIter<'cfg> {
+impl<'cfg> Iterator for CFGIterMut<'cfg> {
     type Item = &'cfg IRInst;
 
     fn next(&mut self) -> Option<Self::Item> {

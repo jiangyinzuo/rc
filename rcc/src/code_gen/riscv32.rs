@@ -2,10 +2,11 @@
 //! h(half word): 16bit
 //! w(word): 32bit
 use crate::analyser::sym_resolver::VarKind;
+use crate::ast::expr::BinOperator;
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
 use crate::ir::var_name::{FP, RA};
-use crate::ir::{IRInst, IRType, Operand};
+use crate::ir::{IRInst, IRType, Operand, Place};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -190,15 +191,15 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
 
     fn gen_instruction(&mut self, inst: &IRInst) -> Result<(), RccError> {
         match inst {
-            IRInst::Ret(o) => self.write_load_data("a0", o)?,
+            IRInst::Ret(o) => self.load_data("a0", o)?,
             IRInst::LoadData { dest, src } => match dest.kind {
                 VarKind::Local | VarKind::LocalMut => {
                     let offset = self.allocator.get_fp_offset(&dest.label, &dest.ir_type);
-                    self.write_load_data("a5", src)?;
-                    let size = src.byte_size();
-                    self.write_store(size, "a5", -(offset as i32), "s0")?;
+                    self.load_data("a5", src)?;
+                    let size = src.byte_size(RISCV32_ADDR_SIZE);
+                    self.store_data(size, "a5", -(offset as i32), "s0")?;
                 }
-                _ => unimplemented!()
+                _ => unimplemented!(),
             },
             IRInst::BinOp {
                 op,
@@ -206,8 +207,15 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                 src1,
                 src2,
             } => {
-                debug_assert!(!src1.is_imm() || !src2.is_imm());
-                // let operand = bin_op_may_constant_fold(op, src1, src2)?;
+                debug_assert!(!src1.is_imm());
+                if src2.is_imm() {
+                    self.load_data("a5", src1)?;
+                    self.bin_op_imm(op, dest, "a5", src2)?;
+                } else {
+                    self.load_data("a4", src1)?;
+                    self.load_data("a5", src2)?;
+                    self.bin_op(op, dest, "a4", "a5")?;
+                }
             }
             _ => {
                 todo!()
@@ -216,11 +224,19 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         Ok(())
     }
 
-    fn write_load_data(&mut self, reg_name: &str, operand: &Operand) -> Result<(), RccError> {
-        let asm_operand = AsmOperand::from_operand(operand);
+    fn load_data(&mut self, reg_name: &str, operand: &Operand) -> Result<(), RccError> {
+        let asm_operand = AsmOperand::from_operand(operand, &mut *self.allocator);
         match asm_operand {
             AsmOperand::Imm(s) => {
                 writeln!(self.output, "\tli\t{},{}", reg_name, s)?;
+            }
+            AsmOperand::FpOffset(offset) => {
+                let size = operand.byte_size(RISCV32_ADDR_SIZE);
+                let inst = match size {
+                    4 => "lw",
+                    _ => todo!(),
+                };
+                writeln!(self.output, "\t{}\t{},-{}(s0)", inst, reg_name, offset)?;
             }
             AsmOperand::Never | AsmOperand::Unit => {}
             _ => unimplemented!("{:?}", asm_operand),
@@ -229,7 +245,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     }
 
     /// sb(store byte), sh(store half-word), sw(store word)
-    fn write_store(
+    fn store_data(
         &mut self,
         src_byte_size: u32,
         src_reg_name: &str,
@@ -249,6 +265,80 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         )?;
         Ok(())
     }
+
+    fn bin_op(
+        &mut self,
+        op: &BinOperator,
+        dest: &Place,
+        reg_src1: &str,
+        reg_src2: &str,
+    ) -> Result<(), RccError> {
+        match dest.kind {
+            VarKind::LocalMut | VarKind::Local => {
+                let offset = self.allocator.get_fp_offset(&dest.label, &dest.ir_type);
+                let inst = match op {
+                    BinOperator::Plus => "add",
+                    BinOperator::Star => "mul",
+                    BinOperator::Minus => "sub",
+                    BinOperator::Slash => "div",
+                    _ => todo!(),
+                };
+                writeln!(self.output, "\t{}\ta5,{},{}", inst, reg_src1, reg_src2)?;
+                self.store_data(
+                    dest.ir_type.byte_size(RISCV32_ADDR_SIZE),
+                    "a5",
+                    -(offset as i32),
+                    "s0",
+                )?;
+            }
+            _ => unimplemented!(),
+        }
+        Ok(())
+    }
+
+    fn bin_op_imm(
+        &mut self,
+        op: &BinOperator,
+        dest: &Place,
+        reg_src1: &str,
+        src2: &Operand,
+    ) -> Result<(), RccError> {
+        let asm_src2 = AsmOperand::from_operand(src2, &mut *self.allocator);
+        match asm_src2 {
+            AsmOperand::Imm(s) => match dest.kind {
+                VarKind::LocalMut | VarKind::Local => {
+                    let offset = self.allocator.get_fp_offset(&dest.label, &dest.ir_type);
+                    match op {
+                        BinOperator::Plus => {
+                            writeln!(self.output, "\taddi\ta5,{},{}", reg_src1, s)?;
+                            self.store_data(
+                                dest.ir_type.byte_size(RISCV32_ADDR_SIZE),
+                                "a5",
+                                -(offset as i32),
+                                "s0",
+                            )?;
+                        }
+                        BinOperator::Minus => {
+                            writeln!(self.output, "\taddi\ta5,{},-{}", reg_src1, s)?;
+                            self.store_data(
+                                dest.ir_type.byte_size(RISCV32_ADDR_SIZE),
+                                "a5",
+                                -(offset as i32),
+                                "s0",
+                            )?;
+                        }
+                        _ => {
+                            self.load_data("a4", &src2)?;
+                            self.bin_op(op, dest, reg_src1, "a4")?;
+                        }
+                    }
+                }
+                _ => unimplemented!(),
+            },
+            _ => todo!(),
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -263,7 +353,7 @@ pub enum AsmOperand {
 }
 
 impl AsmOperand {
-    pub fn from_operand(operand: &Operand) -> AsmOperand {
+    pub fn from_operand(operand: &Operand, allocator: &mut dyn Allocator) -> AsmOperand {
         match operand {
             Operand::Char(c) => Self::Imm((*c as u8).to_string()),
             Operand::I8(i) => Self::Imm(i.to_string()),
@@ -273,8 +363,13 @@ impl AsmOperand {
             Operand::U16(i) => Self::Imm(i.to_string()),
             Operand::U32(i) => Self::Imm(i.to_string()),
             Operand::Place(p) => {
-                // todo
-                Self::Unit
+                match p.kind {
+                    VarKind::Local | VarKind::LocalMut => {
+                        Self::FpOffset(allocator.get_fp_offset(&p.label, &p.ir_type))
+                    }
+                    // todo
+                    _ => Self::Unit,
+                }
             }
             Operand::Unit => Self::Unit,
             Operand::Never => Self::Never,

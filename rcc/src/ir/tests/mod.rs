@@ -8,7 +8,7 @@ use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::{OptimizeLevel, RccError};
 use crate::tests;
-use crate::tests::{assert_pretty_fmt_eq, assert_fmt_eq};
+use crate::tests::{assert_fmt_eq, assert_pretty_fmt_eq};
 
 mod o1_test;
 
@@ -79,11 +79,14 @@ fn test_lit_num() {
 
 #[test]
 fn test_lit_char() {
-    let ir = ir_build(r#"
+    let ir = ir_build(
+        r#"
         fn fff() -> char {
             'a'
         }
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
     assert_fmt_eq("[Ret(Char('a'))]", &ir.funcs.first().unwrap().insts);
 }
 
@@ -118,7 +121,8 @@ fn test_return() {
 
 #[test]
 fn test_return2() {
-    let ir = ir_build(r#"
+    let ir = ir_build(
+        r#"
 pub fn main() -> i32 {
     let a = 3;
     let b = 2;
@@ -126,7 +130,9 @@ pub fn main() -> i32 {
     return a + b; // add?
 }
 
-    "#).unwrap();
+    "#,
+    )
+    .unwrap();
     let expected = expected_from_file("test_return2_ir.txt");
     assert_pretty_fmt_eq(&expected, &ir.funcs.last().unwrap().insts);
 }

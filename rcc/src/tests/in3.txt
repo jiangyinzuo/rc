@@ -5,3 +5,11 @@ fn foo(a: i32, b: i32, c: i32) -> i32 {
 fn int8() -> i8 {
     -8
 }
+
+fn add3(x: i32) -> i32 {
+    x + 3
+}
+
+fn mul4(x: i32) -> i32 {
+    x * 4
+}

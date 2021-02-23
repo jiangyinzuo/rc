@@ -49,12 +49,15 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn byte_size(&self) -> u32 {
+    pub fn byte_size(&self, addr_size: u32) -> u32 {
         match self {
             Self::Unit | Self::Never => 0,
             Self::Bool(_) | Self::Char(_) => 1,
             Self::I32(_) | Self::U32(_) => 4,
             Self::I64(_) | Self::U64(_) => 8,
+            Self::Place(p) => {
+                p.ir_type.byte_size(addr_size)
+            }
             _ => unimplemented!("{:?}", self),
         }
     }
@@ -254,11 +257,21 @@ pub enum IRInst {
 
 impl IRInst {
     pub fn bin_op(op: BinOperator, dest: Place, src1: Operand, src2: Operand) -> IRInst {
-        IRInst::BinOp {
-            op,
-            dest,
-            src1,
-            src2,
+        debug_assert!(!src1.is_imm() || !src2.is_imm());
+        if src2.is_imm() {
+            IRInst::BinOp {
+                op,
+                dest,
+                src1,
+                src2,
+            }
+        } else {
+            IRInst::BinOp {
+                op,
+                dest,
+                src2,
+                src1,
+            }
         }
     }
 
