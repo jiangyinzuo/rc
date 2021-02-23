@@ -61,46 +61,10 @@
     Jump {
         label: 2,
     },
-    BinOp {
-        op: +,
-        dest: Place {
-            label: "$4_2",
-            kind: Local,
-            ir_type: I32,
-        },
-        src1: I32(
-            1,
-        ),
-        src2: I32(
-            2,
-        ),
-    },
-    BinOp {
-        op: +,
-        dest: Place {
-            label: "$3_2",
-            kind: Local,
-            ir_type: Bool,
-        },
-        src1: Place(
-            Place {
-                label: "$4_2",
-                kind: Local,
-                ir_type: I32,
-            },
-        ),
-        src2: I32(
-            3,
-        ),
-    },
     JumpIfCond {
         cond: JGe,
-        src1: Place(
-            Place {
-                label: "$3_2",
-                kind: Local,
-                ir_type: Bool,
-            },
+        src1: I32(
+            6,
         ),
         src2: Place(
             Place {
@@ -109,7 +73,7 @@
                 ir_type: I32,
             },
         ),
-        label: 11,
+        label: 9,
     },
     Jump {
         label: 7,

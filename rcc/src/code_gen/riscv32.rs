@@ -1,6 +1,7 @@
 //! b(byte): 8bit
 //! h(half word): 16bit
 //! w(word): 32bit
+use crate::analyser::sym_resolver::VarKind;
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
 use crate::ir::var_name::{FP, RA};
@@ -143,12 +144,12 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         writeln!(self.output, "\taddi\tsp,sp,-{}", self.frame_size)?;
         if !self.cfg.is_leaf {
             // save ra
-            let offset = self.allocator.get_var_offset(RA, &IRType::Addr);
+            let offset = self.allocator.get_fp_offset(RA, &IRType::Addr);
             debug_assert_eq!(4, offset);
             writeln!(self.output, "\tsw\tra,{}(sp)", self.frame_size - 4)?;
         }
         // save old fp(s0)
-        let offset = self.allocator.get_var_offset(FP, &IRType::Addr);
+        let offset = self.allocator.get_fp_offset(FP, &IRType::Addr);
         writeln!(self.output, "\tsw\ts0,{}(sp)", self.frame_size - offset)?;
         // set fp
         writeln!(self.output, "\taddi\ts0,sp,{}", self.frame_size)?;
@@ -158,12 +159,12 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     fn gen_exit_function(&mut self) -> Result<(), RccError> {
         if !self.cfg.is_leaf {
             // restore ra
-            let offset = self.allocator.get_var_offset(RA, &IRType::Addr);
+            let offset = self.allocator.get_fp_offset(RA, &IRType::Addr);
             debug_assert_eq!(4, offset);
             writeln!(self.output, "\tlw\tra,{}(sp)", self.frame_size - offset)?;
         }
         // restore old fp
-        let offset = self.allocator.get_var_offset(FP, &IRType::Addr);
+        let offset = self.allocator.get_fp_offset(FP, &IRType::Addr);
         writeln!(self.output, "\tlw\ts0,{}(sp)", self.frame_size - offset)?;
         // restore sp
         writeln!(self.output, "\taddi\tsp,sp,{}", self.frame_size)?;
@@ -174,7 +175,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         for i in 0..self.cfg.fn_args.len().min(8) {
             let arg_name = self.cfg.get_name_of_fn_arg(i).unwrap();
             let (_, ir_type) = self.cfg.local_infos.get(&arg_name).unwrap();
-            let offset = self.allocator.get_var_offset(&arg_name, ir_type);
+            let offset = self.allocator.get_fp_offset(&arg_name, ir_type);
             writeln!(self.output, "\tsw\ta{},-{}(s0)", i, offset)?;
         }
         Ok(())
@@ -190,14 +191,23 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     fn gen_instruction(&mut self, inst: &IRInst) -> Result<(), RccError> {
         match inst {
             IRInst::Ret(o) => self.write_load_data("a0", o)?,
-            IRInst::LoadData { dest, src } => {}
+            IRInst::LoadData { dest, src } => match dest.kind {
+                VarKind::Local | VarKind::LocalMut => {
+                    let offset = self.allocator.get_fp_offset(&dest.label, &dest.ir_type);
+                    self.write_load_data("a5", src)?;
+                    let size = src.byte_size();
+                    self.write_store(size, "a5", -(offset as i32), "s0")?;
+                }
+                _ => unimplemented!()
+            },
             IRInst::BinOp {
                 op,
                 dest,
                 src1,
                 src2,
             } => {
-                // TODO
+                debug_assert!(!src1.is_imm() || !src2.is_imm());
+                // let operand = bin_op_may_constant_fold(op, src1, src2)?;
             }
             _ => {
                 todo!()
@@ -217,6 +227,28 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         }
         Ok(())
     }
+
+    /// sb(store byte), sh(store half-word), sw(store word)
+    fn write_store(
+        &mut self,
+        src_byte_size: u32,
+        src_reg_name: &str,
+        offset: i32,
+        tar_reg_name: &str,
+    ) -> Result<(), RccError> {
+        let inst = match src_byte_size {
+            1 => "sb",
+            2 => "sh",
+            4 => "sw",
+            _ => todo!(),
+        };
+        writeln!(
+            self.output,
+            "\t{}\t{},{}({})",
+            inst, src_reg_name, offset, tar_reg_name
+        )?;
+        Ok(())
+    }
 }
 
 #[derive(Debug)]
@@ -225,7 +257,7 @@ pub enum AsmOperand {
     Imm64(String, String),
     Imm128(String, String, String, String),
     Reg(String),
-    SpOffset(String),
+    FpOffset(u32),
     Never,
     Unit,
 }

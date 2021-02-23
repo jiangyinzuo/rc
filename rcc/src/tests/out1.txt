@@ -1,13 +1,13 @@
 	.text
-	.section	.rodata
-.LC0:
-	.string "hello"
-	.text
 	.globl  main
 main:
-	addi	sp,sp,-24
-	sw	s0,20(sp)
-	addi	s0,sp,24
-	lw	s0,20(sp)
-	addi	sp,sp,24
+	addi	sp,sp,-16
+	sw	s0,12(sp)
+	addi	s0,sp,16
+	li	a5,3
+	sw	a5,-8(s0)
+	li	a5,2
+	sw	a5,-12(s0)
+	lw	s0,12(sp)
+	addi	sp,sp,16
 	ret

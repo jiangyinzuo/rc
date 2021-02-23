@@ -49,6 +49,26 @@ pub enum Operand {
 }
 
 impl Operand {
+    pub fn byte_size(&self) -> u32 {
+        match self {
+            Self::Unit | Self::Never => 0,
+            Self::Bool(_) | Self::Char(_) => 1,
+            Self::I32(_) | Self::U32(_) => 4,
+            Self::I64(_) | Self::U64(_) => 8,
+            _ => unimplemented!("{:?}", self),
+        }
+    }
+
+    pub fn is_imm(&self) -> bool {
+        matches!(self, Self::Bool(_) | Self::Char(_) |
+         Self::F32(_) | Self::F64(_) |
+         Self::I8(_) | Self::U8(_) |
+         Self::I16(_) | Self::U16(_) |
+                       Self::I32(_) | Self::U32(_) |
+                       Self::I64(_) | Self::U64(_) |
+                       Self::I128(_) | Self::U128(_) |
+                       Self::Isize(_) | Self::Usize(_))
+    }
     pub fn is_unit_or_never(&self) -> bool {
         matches!(self, Self::Unit | Self::Never)
     }
@@ -305,4 +325,64 @@ impl IRInst {
 pub enum StrKind {
     Lit,
     Const,
+}
+
+/// Constant fold optimization.
+/// a = 2 * 3 -> a = 6
+/// TODO other primitive type
+pub fn bin_op_may_constant_fold(
+    op: &BinOperator,
+    src1: &Operand,
+    src2: &Operand,
+) -> Result<Option<Operand>, RccError> {
+    macro_rules! try_fold_int {
+        ($i:path, $l:ident, $r:ident) => {
+            match op {
+                BinOperator::Plus => Some($i(match $l.checked_add(*$r) {
+                    Some(res) => res,
+                    None => return Err("add overflow".into()),
+                })),
+                BinOperator::Minus => Some($i(match $l.checked_sub(*$r) {
+                    Some(res) => res,
+                    None => return Err("sub overflow".into()),
+                })),
+                BinOperator::Star => Some($i(match $l.checked_mul(*$r) {
+                    Some(res) => res,
+                    None => return Err("mul overflow".into()),
+                })),
+                BinOperator::Slash => Some($i(match $l.checked_div(*$r) {
+                    Some(res) => res,
+                    None => return Err("div overflow".into()),
+                })),
+                BinOperator::Lt => Some(Operand::Bool($l < $r)),
+                BinOperator::Le => Some(Operand::Bool($l <= $r)),
+                BinOperator::Gt => Some(Operand::Bool($l > $r)),
+                BinOperator::Ge => Some(Operand::Bool($l >= $r)),
+                BinOperator::Ne => Some(Operand::Bool($l != $r)),
+                BinOperator::EqEq => Some(Operand::Bool($l == $r)),
+                BinOperator::Shl => Some($i(match $l.checked_shl(*$r as u32) {
+                    Some(res) => res,
+                    None => return Err("shl overflow".into()),
+                })),
+                BinOperator::Shr => Some($i(match $l.checked_shr(*$r as u32) {
+                    Some(res) => res,
+                    None => return Err("shr overflow".into()),
+                })),
+                BinOperator::And => Some($i($l & $r)),
+                BinOperator::Or => Some($i($l | $r)),
+                BinOperator::Caret => Some($i($l ^ $r)),
+                BinOperator::Percent => Some($i(match $l.checked_rem(*$r) {
+                    Some(res) => res,
+                    None => return Err("rem overflow".into()),
+                })),
+                _ => None,
+            }
+        };
+    }
+    Ok(match (src1, src2) {
+        (Operand::I32(l), Operand::I32(r)) => try_fold_int!(Operand::I32, l, r),
+        (Operand::I64(l), Operand::I64(r)) => try_fold_int!(Operand::I64, l, r),
+        (Operand::I128(l), Operand::I128(r)) => try_fold_int!(Operand::I128, l, r),
+        _ => None,
+    })
 }

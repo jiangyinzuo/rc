@@ -30,18 +30,14 @@
     Jump {
         label: 2,
     },
-    BinOp {
-        op: +,
+    LoadData {
         dest: Place {
             label: "a_4",
             kind: Local,
             ir_type: I32,
         },
-        src1: I32(
-            5,
-        ),
-        src2: I32(
-            2,
+        src: I32(
+            7,
         ),
     },
     LoadData {

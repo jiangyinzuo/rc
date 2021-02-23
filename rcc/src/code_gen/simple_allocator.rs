@@ -37,7 +37,7 @@ impl<'cfg> Allocator for SimpleAllocator<'cfg> {
         }
     }
 
-    fn get_var_offset(&mut self, var_name: &str, ir_type: &IRType) -> u32 {
+    fn get_fp_offset(&mut self, var_name: &str, ir_type: &IRType) -> u32 {
         match self.var_offsets.get(var_name) {
             Some(offset) => *offset,
             None => {

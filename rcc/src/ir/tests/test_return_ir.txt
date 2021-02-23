@@ -1,16 +1,12 @@
 [
-    BinOp {
-        op: +,
+    LoadData {
         dest: Place {
             label: "b_2",
             kind: Local,
             ir_type: I32,
         },
-        src1: I32(
-            3,
-        ),
-        src2: I32(
-            4,
+        src: I32(
+            7,
         ),
     },
     BinOp {

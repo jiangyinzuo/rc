@@ -16,7 +16,7 @@ pub trait Allocator {
     fn get_frame_size(&self) -> u32;
 
     /// Return offset from fp
-    fn get_var_offset(&mut self, var_name: &str, ir_type: &IRType) -> u32;
+    fn get_fp_offset(&mut self, var_name: &str, ir_type: &IRType) -> u32;
 }
 
 pub fn create_allocator<'cfg>(opt_level: OptimizeLevel, cfg: &'cfg CFG, addr_size: u32) -> Box<dyn Allocator + 'cfg>  {
