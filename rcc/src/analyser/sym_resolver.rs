@@ -8,7 +8,7 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemFn, ItemStruct, TypeEnum, ItemExternalBlock};
+use crate::ast::item::{Fields, Item, ItemExternalBlock, ItemFn, ItemStruct, TypeEnum};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
@@ -278,9 +278,19 @@ impl SymbolResolver {
                 }
                 Rc::new(RefCell::new(Unknown))
             }
-            BinOperator::Percent => {
-                todo!()
-            }
+            BinOperator::Percent => match (l_type.borrow().deref(), r_type.borrow().deref()) {
+                (TypeInfo::LitNum(l_lit), TypeInfo::LitNum(r_lit)) => {
+                    if l_lit == &TypeLitNum::I && r_lit.is_integer() {
+                        lhs.set_type_info_ref(r_type.clone());
+                    } else if r_lit == &TypeLitNum::I && l_lit.is_integer()  {
+                        rhs.set_type_info_ref(l_type.clone())
+                    } else if l_lit != r_lit || !l_lit.is_integer() {
+                        return Rc::new(RefCell::new(Unknown))
+                    }
+                    lhs.type_info()
+                }
+                _ => Rc::new(RefCell::new(Unknown)),
+            },
             BinOperator::Lt
             | BinOperator::Gt
             | BinOperator::Le
@@ -509,7 +519,10 @@ impl SymbolResolver {
         Ok(())
     }
 
-    fn visit_item_external_block(&mut self, external_block: &mut ItemExternalBlock) -> Result<(), RccError> {
+    fn visit_item_external_block(
+        &mut self,
+        external_block: &mut ItemExternalBlock,
+    ) -> Result<(), RccError> {
         todo!()
     }
 

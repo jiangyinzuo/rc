@@ -217,6 +217,12 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                     self.bin_op(op, dest, "a4", "a5")?;
                 }
             }
+            IRInst::Call { callee, args } => {
+
+            }
+            IRInst::Jump { label } => {
+
+            }
             _ => {
                 todo!()
             }
@@ -281,6 +287,13 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                     BinOperator::Star => "mul",
                     BinOperator::Minus => "sub",
                     BinOperator::Slash => "div",
+                    BinOperator::Percent => {
+                        match dest.ir_type {
+                            IRType::I8 | IRType::I16 | IRType::I32 => "rem",
+                            IRType::U8 | IRType::U16 | IRType::U32 => "remu",
+                            _ => unimplemented!()
+                        }
+                    },
                     _ => todo!(),
                 };
                 writeln!(self.output, "\t{}\ta5,{},{}", inst, reg_src1, reg_src2)?;

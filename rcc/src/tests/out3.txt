@@ -51,3 +51,16 @@ mul4:
 	lw	s0,12(sp)
 	addi	sp,sp,16
 	ret
+rem2:
+	addi	sp,sp,-16
+	sw	s0,12(sp)
+	addi	s0,sp,16
+	sw	a0,-8(s0)
+	lw	a5,-8(s0)
+	li	a4,2
+	remu	a5,a5,a4
+	sw	a5,-12(s0)
+	lw	a0,-12(s0)
+	lw	s0,12(sp)
+	addi	sp,sp,16
+	ret

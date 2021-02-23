@@ -13,3 +13,7 @@ fn add3(x: i32) -> i32 {
 fn mul4(x: i32) -> i32 {
     x * 4
 }
+
+fn rem2(x: u32) -> u32 {
+    x %2
+}

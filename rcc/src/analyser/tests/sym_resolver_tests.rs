@@ -63,16 +63,17 @@ fn type_annotation_test() {
         fn foo() {
             let a: i32 = 4i64;
         }
-    "#, r#"
+    "#,
+            r#"
         fn fff() -> char {
             'a'
         }
-    "#
+    "#,
         ],
         &[
             Ok(()),
             Err("invalid type in let stmt: expected `LitNum(i32)`, found `LitNum(i64)`".into()),
-            Ok(())
+            Ok(()),
         ],
     );
 }
@@ -159,6 +160,24 @@ fn assign_expr_test() {
             Err("lhs is not mutable".into()),
             Err("invalid type `LitNum(#i)` for `^=`".into()),
         ],
+    );
+}
+
+#[test]
+fn bin_op_test() {
+    file_validate(
+        &[
+            r#"
+        fn rem3(x: i32) -> i32 {
+            x % 3.3
+        }
+      
+    "#,
+            "fn rem2(x: u32) -> u32 {x%2}",
+        ],
+        &[Err(
+            "invalid operand type `LitNum(i32)` and `LitNum(#f)` for `%`".into(),
+        ), Ok(())],
     );
 }
 
@@ -357,7 +376,7 @@ fn control_flow_test() {
         }
     "#,
             r#"fn fff() { if 2 {let a = 3;}}"#,
-            r#"fn bbb() { while true {2}}"#
+            r#"fn bbb() { while true {2}}"#,
         ],
         &[
             Ok(()),
