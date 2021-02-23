@@ -2,6 +2,8 @@ pub fn main() -> i32 {
     99
 }
 
-fn foo() {
-
+fn foo() {}
+/////
+fn fff() -> char {
+    'a'////////
 }

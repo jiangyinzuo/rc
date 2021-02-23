@@ -8,7 +8,7 @@ use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::{OptimizeLevel, RccError};
 use crate::tests;
-use crate::tests::assert_fmt_eq;
+use crate::tests::{assert_pretty_fmt_eq, assert_fmt_eq};
 
 mod o1_test;
 
@@ -50,7 +50,7 @@ fn test_ir_builder() {
 
     assert_eq!("main", func.name);
     let expected = expected_from_file("test_ir_builder_ir.txt");
-    assert_fmt_eq(&expected, &func.insts);
+    assert_pretty_fmt_eq(&expected, &func.insts);
 
     let cfg = CFG::new(func);
     assert_eq!(1, cfg.basic_blocks.len());
@@ -75,6 +75,16 @@ fn test_lit_num() {
         "ParseInt(ParseIntError { kind: PosOverflow })",
         format!("{:?}", ir)
     );
+}
+
+#[test]
+fn test_lit_char() {
+    let ir = ir_build(r#"
+        fn fff() -> char {
+            'a'
+        }
+    "#).unwrap();
+    assert_fmt_eq("[Ret(Char('a'))]", &ir.funcs.first().unwrap().insts);
 }
 
 #[test]
@@ -103,7 +113,22 @@ fn test_return() {
     .unwrap();
 
     let expected = expected_from_file("test_return_ir.txt");
-    assert_eq!(expected, format!("{:#?}", ir.funcs.last().unwrap().insts));
+    assert_pretty_fmt_eq(&expected, &ir.funcs.last().unwrap().insts);
+}
+
+#[test]
+fn test_return2() {
+    let ir = ir_build(r#"
+pub fn main() -> i32 {
+    let a = 3;
+    let b = 2;
+    let c = "hello";
+    return a + b; // add?
+}
+
+    "#).unwrap();
+    let expected = expected_from_file("test_return2_ir.txt");
+    assert_pretty_fmt_eq(&expected, &ir.funcs.last().unwrap().insts);
 }
 
 #[test]

@@ -189,31 +189,64 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
 
     fn gen_instruction(&mut self, inst: &IRInst) -> Result<(), RccError> {
         match inst {
-            IRInst::Ret(o) => match o {
-                Operand::I8(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                Operand::I16(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                Operand::I32(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                Operand::U8(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                Operand::U16(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                Operand::U32(i) => {
-                    writeln!(self.output, "\tli\ta0,{}", i)?;
-                }
-                _ => {}
-            },
-            _ => {
+            IRInst::Ret(o) => self.write_load_data("a0", o)?,
+            IRInst::LoadData { dest, src } => {}
+            IRInst::BinOp {
+                op,
+                dest,
+                src1,
+                src2,
+            } => {
                 // TODO
+            }
+            _ => {
+                todo!()
             }
         }
         Ok(())
+    }
+
+    fn write_load_data(&mut self, reg_name: &str, operand: &Operand) -> Result<(), RccError> {
+        let asm_operand = AsmOperand::from_operand(operand);
+        match asm_operand {
+            AsmOperand::Imm(s) => {
+                writeln!(self.output, "\tli\t{},{}", reg_name, s)?;
+            }
+            AsmOperand::Never | AsmOperand::Unit => {}
+            _ => unimplemented!("{:?}", asm_operand),
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug)]
+pub enum AsmOperand {
+    Imm(String),
+    Imm64(String, String),
+    Imm128(String, String, String, String),
+    Reg(String),
+    SpOffset(String),
+    Never,
+    Unit,
+}
+
+impl AsmOperand {
+    pub fn from_operand(operand: &Operand) -> AsmOperand {
+        match operand {
+            Operand::Char(c) => Self::Imm((*c as u8).to_string()),
+            Operand::I8(i) => Self::Imm(i.to_string()),
+            Operand::I16(i) => Self::Imm(i.to_string()),
+            Operand::I32(i) => Self::Imm(i.to_string()),
+            Operand::U8(i) => Self::Imm(i.to_string()),
+            Operand::U16(i) => Self::Imm(i.to_string()),
+            Operand::U32(i) => Self::Imm(i.to_string()),
+            Operand::Place(p) => {
+                // todo
+                Self::Unit
+            }
+            Operand::Unit => Self::Unit,
+            Operand::Never => Self::Never,
+            _ => unimplemented!("{:?}", operand),
+        }
     }
 }

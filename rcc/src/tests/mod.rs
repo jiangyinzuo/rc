@@ -12,6 +12,12 @@ pub fn read_from_file(file_name: &str, path: &str) -> String {
     expected
 }
 
-pub fn assert_fmt_eq<T: Debug + PartialEq>(expected: &str, actual: &T) {
+#[inline]
+pub fn assert_pretty_fmt_eq<T: Debug + PartialEq>(expected: &str, actual: &T) {
     assert_eq!(expected, format!("{:#?}", actual));
+}
+
+#[inline]
+pub fn assert_fmt_eq<T: Debug + PartialEq>(expected: &str, actual: &T) {
+    assert_eq!(expected, format!("{:?}", actual));
 }

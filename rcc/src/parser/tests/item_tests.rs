@@ -5,7 +5,7 @@ use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::types::TypeAnnotation;
 use crate::ast::Visibility::Priv;
 use crate::parser::tests::{parse_input, parse_validate};
-use crate::tests::{assert_fmt_eq, read_from_file};
+use crate::tests::{assert_pretty_fmt_eq, read_from_file};
 
 #[test]
 fn item_fn_test() {
@@ -74,5 +74,5 @@ fn item_external_block_test() {
     "#,
     );
     let expected = expected_from_file("item_external_block.txt");
-    assert_fmt_eq(&expected, &result.unwrap());
+    assert_pretty_fmt_eq(&expected, &result.unwrap());
 }

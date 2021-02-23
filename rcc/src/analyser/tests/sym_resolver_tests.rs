@@ -63,11 +63,16 @@ fn type_annotation_test() {
         fn foo() {
             let a: i32 = 4i64;
         }
-    "#,
+    "#, r#"
+        fn fff() -> char {
+            'a'
+        }
+    "#
         ],
         &[
             Ok(()),
             Err("invalid type in let stmt: expected `LitNum(i32)`, found `LitNum(i64)`".into()),
+            Ok(())
         ],
     );
 }

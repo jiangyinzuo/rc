@@ -85,13 +85,14 @@ impl IRBuilder {
     }
 
     fn visit_item_fn(&mut self, item_fn: &mut ItemFn) -> Result<(), RccError> {
-        self.ir_output.add_func(item_fn);
+        self.ir_output.add_func(item_fn)?;
 
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
         assert_eq!(info, TypeInfo::from_item_fn(item_fn));
 
+        let ret_info = TypeInfo::from_type_anno(&item_fn.ret_type, self.scope_stack.cur_scope());
         // visit function block
-        let dest = self.gen_temp_variable(item_fn.fn_block.type_info());
+        let dest = self.gen_temp_variable(Rc::new(RefCell::new(ret_info)));
         self.fn_ret_temp_var.push(dest.clone());
         let operand = self.visit_block_expr(&mut item_fn.fn_block, Some(dest))?;
 
@@ -232,12 +233,17 @@ impl IRBuilder {
         }
     }
 
-    fn lit(&mut self, operand: Operand, d: Place) -> Result<Operand, RccError> {
-        if !d.is_temp() {
-            self.ir_output
-                .add_instructions(IRInst::load_data(d, operand.clone()));
+    fn lit(&mut self, operand: Operand, dest: Option<Place>) -> Result<Operand, RccError> {
+        match dest {
+            Some(d) => {
+                if !d.is_temp() {
+                    self.ir_output
+                        .add_instructions(IRInst::load_data(d, operand.clone()));
+                }
+                Ok(operand)
+            }
+            None => Ok(Operand::Unit),
         }
-        Ok(operand)
     }
 
     fn visit_lit_num_expr(
@@ -245,29 +251,24 @@ impl IRBuilder {
         lit_num_expr: &mut LitNumExpr,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        match dest {
-            Some(d) => {
-                let t = lit_num_expr.get_lit_type();
-                let operand = match t {
-                    TypeLitNum::I8 => Operand::I8(lit_num_expr.value.parse()?),
-                    TypeLitNum::I16 => Operand::I16(lit_num_expr.value.parse()?),
-                    TypeLitNum::I | TypeLitNum::I32 => Operand::I32(lit_num_expr.value.parse()?),
-                    TypeLitNum::I64 => Operand::I64(lit_num_expr.value.parse()?),
-                    TypeLitNum::I128 => Operand::I128(lit_num_expr.value.parse()?),
-                    TypeLitNum::Isize => Operand::Isize(lit_num_expr.value.parse()?),
-                    TypeLitNum::U8 => Operand::U8(lit_num_expr.value.parse()?),
-                    TypeLitNum::U16 => Operand::U16(lit_num_expr.value.parse()?),
-                    TypeLitNum::U32 => Operand::U32(lit_num_expr.value.parse()?),
-                    TypeLitNum::U64 => Operand::U64(lit_num_expr.value.parse()?),
-                    TypeLitNum::U128 => Operand::U128(lit_num_expr.value.parse()?),
-                    TypeLitNum::Usize => Operand::Usize(lit_num_expr.value.parse()?),
-                    TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
-                    TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
-                };
-                self.lit(operand, d)
-            }
-            None => Ok(Operand::Unit),
-        }
+        let t = lit_num_expr.get_lit_type();
+        let operand = match t {
+            TypeLitNum::I8 => Operand::I8(lit_num_expr.value.parse()?),
+            TypeLitNum::I16 => Operand::I16(lit_num_expr.value.parse()?),
+            TypeLitNum::I | TypeLitNum::I32 => Operand::I32(lit_num_expr.value.parse()?),
+            TypeLitNum::I64 => Operand::I64(lit_num_expr.value.parse()?),
+            TypeLitNum::I128 => Operand::I128(lit_num_expr.value.parse()?),
+            TypeLitNum::Isize => Operand::Isize(lit_num_expr.value.parse()?),
+            TypeLitNum::U8 => Operand::U8(lit_num_expr.value.parse()?),
+            TypeLitNum::U16 => Operand::U16(lit_num_expr.value.parse()?),
+            TypeLitNum::U32 => Operand::U32(lit_num_expr.value.parse()?),
+            TypeLitNum::U64 => Operand::U64(lit_num_expr.value.parse()?),
+            TypeLitNum::U128 => Operand::U128(lit_num_expr.value.parse()?),
+            TypeLitNum::Usize => Operand::Usize(lit_num_expr.value.parse()?),
+            TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
+            TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
+        };
+        self.lit(operand, dest)
     }
 
     fn visit_lit_bool(
@@ -275,10 +276,7 @@ impl IRBuilder {
         lit_bool: &mut bool,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        match dest {
-            Some(d) => self.lit(Operand::Bool(*lit_bool), d),
-            None => Ok(Operand::Unit),
-        }
+        self.lit(Operand::Bool(*lit_bool), dest)
     }
 
     fn visit_lit_char(
@@ -286,14 +284,12 @@ impl IRBuilder {
         lit_char: &mut char,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        match dest {
-            Some(d) => self.lit(Operand::Char(*lit_char), d),
-            None => Ok(Operand::Unit),
-        }
+        self.lit(Operand::Char(*lit_char), dest)
     }
 
-    fn visit_lit_str(&mut self, s: &str, _dest: Option<Place>) -> Result<Operand, RccError> {
-        Ok(self.ir_output.add_ro_local_str(s.to_string()))
+    fn visit_lit_str(&mut self, s: &str, dest: Option<Place>) -> Result<Operand, RccError> {
+        let operand = self.ir_output.add_ro_local_str(s.to_string());
+        self.lit(operand, dest)
     }
 
     fn visit_unary_expr(
@@ -312,10 +308,7 @@ impl IRBuilder {
                     Operand::I32(i) => Operand::I32(-i),
                     _ => todo!(),
                 };
-                match dest {
-                    Some(d) => self.lit(operand, d),
-                    None => Ok(Operand::Unit),
-                }
+                self.lit(operand, dest)
             }
             _ => todo!(),
         }
@@ -421,7 +414,7 @@ impl IRBuilder {
                 OptimizeLevel::Zero => self.bin_op(lhs, rhs, bin_op_expr.bin_op, d),
 
                 OptimizeLevel::One => match fold_option {
-                    Some(operand) => self.lit(operand, d),
+                    Some(operand) => self.lit(operand, Some(d)),
                     None => self.bin_op(lhs, rhs, bin_op_expr.bin_op, d),
                 },
             },
@@ -922,7 +915,7 @@ impl IRBuilder {
 /// Constant fold optimization.
 /// a = 2 * 3 -> a = 6
 /// TODO other primitive type
-pub(super) fn bin_op_may_constant_fold(
+pub fn bin_op_may_constant_fold(
     op: &BinOperator,
     src1: &Operand,
     src2: &Operand,
