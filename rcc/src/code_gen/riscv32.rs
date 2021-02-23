@@ -6,7 +6,7 @@ use crate::ast::expr::BinOperator;
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
 use crate::ir::var_name::{FP, RA, branch_name};
-use crate::ir::{IRInst, IRType, Operand, Place};
+use crate::ir::{IRInst, IRType, Operand, Place, Jump};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -228,7 +228,22 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
             IRInst::Jump { label } => {
                 writeln!(self.output, "\tj\t{}", branch_name(*label))?;
             }
-            IRInst::JumpIfCond { cond, src1, src2, label } => {}
+            IRInst::JumpIfCond { cond, src1, src2, label } => {
+                self.load_data("a4", src1)?;
+                self.load_data("a5", src2)?;
+                let inst  =match cond {
+                    Jump::JEq => "beq",
+                    Jump::JGe => "ble",
+                    Jump::JLt => "bgt",
+                    Jump::JNe => "beq",
+                };
+                writeln!(self.output, "\t{}\ta5,a4,{}", inst, branch_name(*label))?;
+            }
+            IRInst::JumpIfNot { cond, label } => {
+                self.load_data("a5", cond)?;
+                // writeln!(self.output, "\t")?;
+                todo!()
+            }
             _ => {
                 todo!()
             }

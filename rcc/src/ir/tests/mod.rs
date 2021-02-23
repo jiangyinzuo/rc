@@ -249,6 +249,33 @@ fn test_while() {
 }
 
 #[test]
+fn fib10_test() {
+    let mut ir = ir_build(
+        r#"
+pub fn fib10() -> i32 {
+    let mut f1 = 1;
+    let mut f2 = 1;
+    let mut i = 9;
+    while i > 0 {
+        let temp = f2;
+        f2 += f1;
+        f1 = temp;
+        i -= 1;
+    }
+    f1
+}
+        "#
+    ).unwrap();
+    let expected = expected_from_file("test_fib10_ir.txt");
+    let func = ir.funcs.pop().unwrap();
+    assert_eq!(expected, format!("{:#?}", func.insts));
+
+    let cfg = CFG::new(func);
+    let expected = expected_from_file("test_fib10_bb.txt");
+    assert_eq!(expected.trim_end(), format!("{:#?}", cfg.basic_blocks));
+}
+
+#[test]
 fn fn_call_test() {
     let ir = ir_build(
         r#"

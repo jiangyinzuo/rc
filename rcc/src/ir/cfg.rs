@@ -53,6 +53,7 @@ impl CFG {
         let mut label_map = HashMap::new();
         let mut leader = 1usize;
 
+        let mut inst_id = 1;
         let mut basic_blocks: Vec<BasicBlock> = leaders
             .iter()
             .enumerate()
@@ -62,22 +63,23 @@ impl CFG {
                 leader = *next_leader;
                 let mut bb = LinkedList::new();
                 while inst_count > 0 {
-                    let lead_inst = func.insts.pop_front().unwrap();
-                    match lead_inst {
+                    let inst = func.insts.pop_front().unwrap();
+                    match inst {
                         // delete instructions like `(n) if cond goto n+1`
                         IRInst::Jump { label }
                         | IRInst::JumpIf { label, .. }
                         | IRInst::JumpIfNot { label, .. }
                         | IRInst::JumpIfCond { label, .. } => {
-                            if i + 2 != label {
-                                bb.push_back(lead_inst);
+                            if inst_id + 1 != label {
+                                bb.push_back(inst);
                             }
                         }
                         _ => {
-                            bb.push_back(lead_inst);
+                            bb.push_back(inst);
                         }
                     }
                     inst_count -= 1;
+                    inst_id += 1;
                 }
                 BasicBlock::new(i, bb)
             })

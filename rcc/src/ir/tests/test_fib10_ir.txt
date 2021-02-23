@@ -1,0 +1,126 @@
+[
+    LoadData {
+        dest: Place {
+            label: "f1_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            1,
+        ),
+    },
+    LoadData {
+        dest: Place {
+            label: "f2_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            1,
+        ),
+    },
+    LoadData {
+        dest: Place {
+            label: "i_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: I32(
+            9,
+        ),
+    },
+    JumpIfCond {
+        cond: JGe,
+        src1: I32(
+            0,
+        ),
+        src2: Place(
+            Place {
+                label: "i_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+        label: 10,
+    },
+    LoadData {
+        dest: Place {
+            label: "temp_3",
+            kind: Local,
+            ir_type: I32,
+        },
+        src: Place(
+            Place {
+                label: "f2_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+    },
+    BinOp {
+        op: +,
+        dest: Place {
+            label: "f2_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "f2_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+        src2: Place(
+            Place {
+                label: "f1_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+    },
+    LoadData {
+        dest: Place {
+            label: "f1_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src: Place(
+            Place {
+                label: "temp_3",
+                kind: Local,
+                ir_type: I32,
+            },
+        ),
+    },
+    BinOp {
+        op: -,
+        dest: Place {
+            label: "i_2",
+            kind: LocalMut,
+            ir_type: I32,
+        },
+        src1: Place(
+            Place {
+                label: "i_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+        src2: I32(
+            1,
+        ),
+    },
+    Jump {
+        label: 4,
+    },
+    Ret(
+        Place(
+            Place {
+                label: "f1_2",
+                kind: LocalMut,
+                ir_type: I32,
+            },
+        ),
+    ),
+]

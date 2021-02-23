@@ -1,3 +1,17 @@
+// 1 1 2 3 5 8 13 21 34 55
+pub fn fib10() -> i32 {
+    let mut f1 = 1;
+    let mut f2 = 1;
+    let mut i = 9;
+    while i > 0 {
+        let temp = f2;
+        f2 += f1;
+        f1 = temp;
+        i -= 1;
+    }
+    f1
+}
+
 fn max(a: i32, b: i32) -> i32 {
     if a > b {
         a
@@ -10,7 +24,8 @@ fn foo() -> i32 {
     let a = 3;
     let mut b = 2;
     if a > 4 {
-        let b = 5;
+        let c = 5;
+        b = c;
     }
     b
 }
