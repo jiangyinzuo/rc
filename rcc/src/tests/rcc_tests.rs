@@ -23,7 +23,7 @@ fn test_compile(input: &str, expected_output: &str) -> Result<(), RccError> {
 
 #[test]
 fn rcc_test() {
-    for i in 1..=3 {
+    for i in 4..=4 {
         test_compile(&format!("in{}.txt", i), &format!("out{}.txt", i)).unwrap();
     }
 }

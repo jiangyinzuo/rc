@@ -5,7 +5,7 @@ use crate::analyser::sym_resolver::VarKind;
 use crate::ast::expr::BinOperator;
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
-use crate::ir::var_name::{FP, RA};
+use crate::ir::var_name::{FP, RA, branch_name};
 use crate::ir::{IRInst, IRType, Operand, Place};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
@@ -183,8 +183,13 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     }
 
     fn gen_instructions(&mut self) -> Result<(), RccError> {
-        for inst in self.cfg.iter_inst() {
-            self.gen_instruction(inst)?;
+        for bb in self.cfg.basic_blocks.iter() {
+            if !bb.predecessors.is_empty() {
+                writeln!(self.output, "{}:", branch_name(bb.id))?;
+            }
+            for inst in bb.instructions.iter() {
+                self.gen_instruction(inst)?;
+            }
         }
         Ok(())
     }
@@ -221,8 +226,9 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
 
             }
             IRInst::Jump { label } => {
-
+                writeln!(self.output, "\tj\t{}", branch_name(*label))?;
             }
+            IRInst::JumpIfCond { cond, src1, src2, label } => {}
             _ => {
                 todo!()
             }

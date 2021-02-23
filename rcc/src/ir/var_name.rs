@@ -12,3 +12,7 @@ pub fn temp_local_var(temp_count: u64, scope_id: u64) -> String {
 pub fn is_temp_var(var_name: &str) -> bool {
     var_name.starts_with('$')
 }
+
+pub fn branch_name(bb_id: usize) -> String{
+    format!(".L{}", bb_id)
+}

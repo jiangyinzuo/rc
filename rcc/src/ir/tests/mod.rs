@@ -180,6 +180,22 @@ fn test_if() {
 }
 
 #[test]
+fn test_cmp() {
+    let mut ir = ir_build(r#"
+fn max(a: i32, b: i32) -> i32 {
+    if a > b {
+        a
+    } else {
+        b
+    }
+}
+
+    "#).unwrap();
+    let expected = expected_from_file("test_cmp_ir.txt");
+    assert_pretty_fmt_eq(&expected, &ir.funcs.pop().unwrap().insts);
+}
+
+#[test]
 fn test_loop() {
     let mut ir = ir_build(
         r#"

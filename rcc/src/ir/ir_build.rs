@@ -1,7 +1,3 @@
-use std::cell::RefCell;
-use std::ops::Deref;
-use std::rc::Rc;
-
 use crate::analyser::scope::ScopeStack;
 use crate::analyser::sym_resolver::{TypeInfo, VarKind};
 use crate::ast::expr::{
@@ -21,6 +17,9 @@ use crate::ir::linear_ir::LinearIR;
 use crate::ir::Jump::*;
 use crate::ir::{IRInst, IRType, Jump, Operand, Place};
 use crate::rcc::{OptimizeLevel, RccError};
+use std::cell::RefCell;
+use std::ops::Deref;
+use std::rc::Rc;
 
 pub struct IRBuilder {
     ir_output: LinearIR,
@@ -52,7 +51,7 @@ impl IRBuilder {
         Ok(output)
     }
 
-    fn gen_temp_variable(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> Place {
+    fn gen_temp_var(&mut self, type_info: Rc<RefCell<TypeInfo>>) -> Place {
         let t = type_info.borrow();
         let tp = t.deref();
         let ir_type = IRType::from_type_info(tp).unwrap();
@@ -94,9 +93,10 @@ impl IRBuilder {
 
         let ret_info = TypeInfo::from_type_anno(&item_fn.ret_type, self.scope_stack.cur_scope());
         // visit function block
-        let dest = self.gen_temp_variable(Rc::new(RefCell::new(ret_info)));
+        let dest = self.gen_temp_var(Rc::new(RefCell::new(ret_info)));
         self.fn_ret_temp_var.push(dest.clone());
-        let operand = self.visit_block_expr(&mut item_fn.fn_block, Some(dest))?;
+
+        let operand = self.visit_block_expr(&mut item_fn.fn_block, Some(dest), false)?;
 
         if item_fn.fn_block.last_expr.is_none() && item_fn.fn_block.stmts.is_empty() {
             self.ir_output.add_instructions(IRInst::Ret(Operand::Unit));
@@ -118,7 +118,7 @@ impl IRBuilder {
             Stmt::Item(item) => self.visit_item(item),
             Stmt::Let(let_stmt) => self.visit_let_stmt(let_stmt),
             Stmt::ExprStmt(expr) => {
-                let operand = self.visit_expr(expr, None)?;
+                let operand = self.visit_expr(expr, None, false)?;
                 debug_assert!(operand.is_unit_or_never(), "{:?}", expr);
                 Ok(())
             }
@@ -139,26 +139,31 @@ impl IRBuilder {
                             VarKind::Local
                         },
                     );
-                    let rhs = self.visit_expr(rhs, Some(dest))?;
+                    let rhs = self.visit_expr(rhs, Some(dest), false)?;
                 }
             }
         }
         Ok(())
     }
 
-    fn visit_expr(&mut self, expr: &mut Expr, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn visit_expr(
+        &mut self,
+        expr: &mut Expr,
+        dest: Option<Place>,
+        remain_temp: bool,
+    ) -> Result<Operand, RccError> {
         let result = match expr {
-            Expr::Path(path_expr) => self.visit_path_expr(path_expr, dest),
-            Expr::LitNum(lit_num_expr) => self.visit_lit_num_expr(lit_num_expr, dest),
-            Expr::LitBool(lit_bool) => self.visit_lit_bool(lit_bool, dest),
-            Expr::LitChar(lit_char) => self.visit_lit_char(lit_char, dest),
-            Expr::LitStr(s) => self.visit_lit_str(s, dest),
-            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr, dest),
-            Expr::Block(block_expr) => self.visit_block_expr(block_expr, dest),
+            Expr::Path(path_expr) => self.visit_path_expr(path_expr, dest, remain_temp),
+            Expr::LitNum(lit_num_expr) => self.visit_lit_num_expr(lit_num_expr, dest, remain_temp),
+            Expr::LitBool(lit_bool) => self.visit_lit_bool(lit_bool, dest, remain_temp),
+            Expr::LitChar(lit_char) => self.visit_lit_char(lit_char, dest, remain_temp),
+            Expr::LitStr(s) => self.visit_lit_str(s, dest, remain_temp),
+            Expr::Unary(unary_expr) => self.visit_unary_expr(unary_expr, dest, remain_temp),
+            Expr::Block(block_expr) => self.visit_block_expr(block_expr, dest, remain_temp),
             Expr::Assign(assign_expr) => self.visit_assign_expr(assign_expr),
             // Expr::Range(range_expr) => self.visit_range_expr(range_expr),
             Expr::BinOp(bin_op_expr) => self.visit_bin_op_expr(bin_op_expr, dest),
-            Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr, dest),
+            Expr::Grouped(grouped_expr) => self.visit_grouped_expr(grouped_expr, dest, remain_temp),
             // Expr::Array(array_expr) => self.visit_array_expr(array_expr),
             // Expr::ArrayIndex(array_index_expr) => self.visit_array_index_expr(array_index_expr),
             // Expr::Tuple(tuple_expr) => self.visit_tuple_expr(tuple_expr),
@@ -184,7 +189,7 @@ impl IRBuilder {
 
     fn visit_lhs_expr(&mut self, lhs_expr: &mut LhsExpr) -> Result<Operand, RccError> {
         let r = match lhs_expr {
-            LhsExpr::Path(expr) => self.visit_path_expr(expr, None)?,
+            LhsExpr::Path(expr) => self.visit_path_expr(expr, None, false)?,
             _ => todo!("visit lhs expr"),
         };
         Ok(r)
@@ -194,8 +199,9 @@ impl IRBuilder {
         &mut self,
         grouped_expr: &mut GroupedExpr,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
-        self.visit_expr(grouped_expr, dest)
+        self.visit_expr(grouped_expr, dest, remain_temp)
     }
 
     fn visit_pattern(&mut self, pattern: &mut Pattern) -> Result<Operand, RccError> {
@@ -213,6 +219,7 @@ impl IRBuilder {
         &mut self,
         path_expr: &mut PathExpr,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
         // TODO path segmentation
         let ident = path_expr.segments.last().unwrap();
@@ -222,7 +229,7 @@ impl IRBuilder {
             let ir_type = IRType::from_var_info(var)?;
             let operand = Operand::Place(Place::variable(ident, scope_id, var.kind(), ir_type));
             if let Some(d) = dest {
-                if !d.is_temp() {
+                if !d.is_temp() || remain_temp {
                     self.ir_output
                         .add_instructions(IRInst::load_data(d, operand.clone()));
                 }
@@ -235,10 +242,15 @@ impl IRBuilder {
         }
     }
 
-    fn lit(&mut self, operand: Operand, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn lit(
+        &mut self,
+        operand: Operand,
+        dest: Option<Place>,
+        remain_temp: bool,
+    ) -> Result<Operand, RccError> {
         match dest {
             Some(d) => {
-                if !d.is_temp() {
+                if !d.is_temp() || remain_temp {
                     self.ir_output
                         .add_instructions(IRInst::load_data(d, operand.clone()));
                 }
@@ -252,6 +264,7 @@ impl IRBuilder {
         &mut self,
         lit_num_expr: &mut LitNumExpr,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
         let t = lit_num_expr.get_lit_type();
         let operand = match t {
@@ -270,47 +283,55 @@ impl IRBuilder {
             TypeLitNum::F32 => Operand::F32(lit_num_expr.value.parse()?),
             TypeLitNum::F | TypeLitNum::F64 => Operand::F64(lit_num_expr.value.parse()?),
         };
-        self.lit(operand, dest)
+        self.lit(operand, dest, remain_temp)
     }
 
     fn visit_lit_bool(
         &mut self,
         lit_bool: &mut bool,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
-        self.lit(Operand::Bool(*lit_bool), dest)
+        self.lit(Operand::Bool(*lit_bool), dest, remain_temp)
     }
 
     fn visit_lit_char(
         &mut self,
         lit_char: &mut char,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
-        self.lit(Operand::Char(*lit_char), dest)
+        self.lit(Operand::Char(*lit_char), dest, remain_temp)
     }
 
-    fn visit_lit_str(&mut self, s: &str, dest: Option<Place>) -> Result<Operand, RccError> {
+    fn visit_lit_str(
+        &mut self,
+        s: &str,
+        dest: Option<Place>,
+        remain_temp: bool,
+    ) -> Result<Operand, RccError> {
         let operand = self.ir_output.add_ro_local_str(s.to_string());
-        self.lit(operand, dest)
+        self.lit(operand, dest, remain_temp)
     }
 
     fn visit_unary_expr(
         &mut self,
         unary_expr: &mut UnAryExpr,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
         // let operand = self.visit_expr(&mut unary_expr.expr, d)?;
         match unary_expr.op {
             UnOp::Neg => {
-                let temp_dest = self.gen_temp_variable(unary_expr.expr.type_info());
-                let operand = self.visit_expr(&mut unary_expr.expr, Some(temp_dest))?;
+                let temp_dest = self.gen_temp_var(unary_expr.expr.type_info());
+                let operand = self.visit_expr(&mut unary_expr.expr, Some(temp_dest), false)?;
                 let operand = match operand {
                     Operand::I8(i) => Operand::I8(-i),
                     Operand::I16(i) => Operand::I16(-i),
                     Operand::I32(i) => Operand::I32(-i),
                     _ => todo!(),
                 };
-                self.lit(operand, dest)
+                self.lit(operand, dest, remain_temp)
             }
             _ => todo!(),
         }
@@ -320,6 +341,7 @@ impl IRBuilder {
         &mut self,
         block_expr: &mut BlockExpr,
         dest: Option<Place>,
+        remain_temp: bool,
     ) -> Result<Operand, RccError> {
         self.scope_stack.enter_scope(block_expr);
         for stmt in block_expr.stmts.iter_mut() {
@@ -328,7 +350,7 @@ impl IRBuilder {
 
         let result = Ok(if let Some(expr) = &mut block_expr.last_expr {
             let is_none = dest.is_none();
-            let res = self.visit_expr(&mut *expr, dest)?;
+            let res = self.visit_expr(&mut *expr, dest, remain_temp)?;
             if is_none && !res.is_unit_or_never() {
                 return Err(format!(
                     "error in visiting block expr: expected `()`, found {:?}",
@@ -353,8 +375,8 @@ impl IRBuilder {
 
         macro_rules! add_inst {
             ($bin_op:path) => {{
-                let rhs_dest = self.gen_temp_variable(assign_expr.lhs.type_info());
-                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(rhs_dest))?;
+                let rhs_dest = self.gen_temp_var(assign_expr.lhs.type_info());
+                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(rhs_dest), false)?;
                 self.ir_output.add_instructions(IRInst::bin_op(
                     $bin_op,
                     p.clone(),
@@ -365,7 +387,7 @@ impl IRBuilder {
         }
         match assign_expr.assign_op {
             AssignOp::Eq => {
-                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(p.clone()))?;
+                let rhs = self.visit_expr(&mut assign_expr.rhs, Some(p.clone()), false)?;
             }
             AssignOp::ShrEq => add_inst!(BinOperator::Shr),
             AssignOp::ShlEq => add_inst!(BinOperator::Shl),
@@ -402,10 +424,10 @@ impl IRBuilder {
         bin_op_expr: &mut BinOpExpr,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        let d = self.gen_temp_variable(bin_op_expr.lhs.type_info());
-        let lhs = self.visit_expr(&mut bin_op_expr.lhs, Some(d))?;
-        let d = self.gen_temp_variable(bin_op_expr.rhs.type_info());
-        let rhs = self.visit_expr(&mut bin_op_expr.rhs, Some(d))?;
+        let d = self.gen_temp_var(bin_op_expr.lhs.type_info());
+        let lhs = self.visit_expr(&mut bin_op_expr.lhs, Some(d), false)?;
+        let d = self.gen_temp_var(bin_op_expr.rhs.type_info());
+        let rhs = self.visit_expr(&mut bin_op_expr.rhs, Some(d), false)?;
 
         // TODO operator override
 
@@ -413,7 +435,7 @@ impl IRBuilder {
 
         match dest {
             Some(d) => match fold_option {
-                Some(operand) => self.lit(operand, Some(d)),
+                Some(operand) => self.lit(operand, Some(d), false),
                 None => self.bin_op(lhs, rhs, bin_op_expr.bin_op, d),
             },
             None => Ok(Operand::Unit),
@@ -512,13 +534,13 @@ impl IRBuilder {
         call_expr: &mut CallExpr,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        let callee_place = self.gen_temp_variable(call_expr.type_info());
-        let callee = self.visit_expr(&mut call_expr.expr, Some(callee_place))?;
+        let callee_place = self.gen_temp_var(call_expr.type_info());
+        let callee = self.visit_expr(&mut call_expr.expr, Some(callee_place), false)?;
 
         let mut params = vec![];
         for e in call_expr.call_params.iter_mut() {
-            let param_place = self.gen_temp_variable(e.type_info());
-            params.push(self.visit_expr(e, Some(param_place))?);
+            let param_place = self.gen_temp_var(e.type_info());
+            params.push(self.visit_expr(e, Some(param_place), false)?);
         }
         self.ir_output
             .add_instructions(IRInst::call(callee, params));
@@ -544,7 +566,7 @@ impl IRBuilder {
         loop_block: &mut BlockExpr,
         loop_start_id: usize,
     ) -> Result<(), RccError> {
-        let operand = self.visit_block_expr(loop_block, None)?;
+        let operand = self.visit_block_expr(loop_block, None, false)?;
         assert!(operand.is_unit_or_never());
         self.ir_output.add_instructions(IRInst::jump(loop_start_id));
         let (d, mut link) = self.loop_var_stack.pop().unwrap();
@@ -590,7 +612,7 @@ impl IRBuilder {
                     self.gen_jump_cond(e, JLt, &mut next_back_patch_link)?;
                 }
                 _ => {
-                    let d = self.gen_temp_variable(e.type_info());
+                    let d = self.gen_temp_var(e.type_info());
                     let operand = self.visit_bin_op_expr(e, Some(d))?;
 
                     next_back_patch_link = self.ir_output.next_inst_id();
@@ -600,8 +622,8 @@ impl IRBuilder {
             },
             // todo: unary expr, lit bool
             e => {
-                let d = self.gen_temp_variable(e.type_info());
-                let operand = self.visit_expr(e, Some(d))?;
+                let d = self.gen_temp_var(e.type_info());
+                let operand = self.visit_expr(e, Some(d), false)?;
 
                 next_back_patch_link = self.ir_output.next_inst_id();
                 let ir_inst = IRInst::jump_if_not(operand, 0);
@@ -735,7 +757,7 @@ impl IRBuilder {
 
         macro_rules! visit_block {
             ($i:ident, $ir_inst:ident) => {
-                self.visit_block_expr(if_expr.blocks.get_mut($i).unwrap(), dest.clone())?;
+                self.visit_block_expr(if_expr.blocks.get_mut($i).unwrap(), dest.clone(), true)?;
                 if $i != if_expr.blocks.len() - 1 {
                     self.ir_output
                         .add_instructions(IRInst::jump(next_back_patch_link));
@@ -778,7 +800,7 @@ impl IRBuilder {
                         visit_block!(i, ir_inst);
                     }
                     _ => {
-                        let d = self.gen_temp_variable(e.type_info());
+                        let d = self.gen_temp_var(e.type_info());
                         let operand = self.visit_bin_op_expr(e, Some(d))?;
                         let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
                         next_back_patch_link = self.ir_output.next_inst_id();
@@ -788,8 +810,8 @@ impl IRBuilder {
                 },
                 // todo: unary expr, lit bool
                 e => {
-                    let d = self.gen_temp_variable(e.type_info());
-                    let operand = self.visit_expr(e, Some(d))?;
+                    let d = self.gen_temp_var(e.type_info());
+                    let operand = self.visit_expr(e, Some(d), false)?;
                     let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
                     next_back_patch_link = self.ir_output.next_inst_id();
                     self.ir_output.add_instructions(ir_inst);
@@ -798,7 +820,7 @@ impl IRBuilder {
             }
         }
         if if_expr.blocks.len() == if_expr.conditions.len() + 1 {
-            self.visit_block_expr(if_expr.blocks.last_mut().unwrap(), dest.clone())?;
+            self.visit_block_expr(if_expr.blocks.last_mut().unwrap(), dest.clone(), true)?;
         }
         let next_idx = self.ir_output.next_inst_id();
         while next_back_patch_link != 0 {
@@ -818,10 +840,10 @@ impl IRBuilder {
         jump: Jump,
         next_back_patch_link: &mut usize,
     ) -> Result<(), RccError> {
-        let d = self.gen_temp_variable(e.type_info());
-        let lhs = self.visit_expr(&mut e.lhs, Some(d))?;
-        let d = self.gen_temp_variable(e.type_info());
-        let rhs = self.visit_expr(&mut e.rhs, Some(d))?;
+        let d = self.gen_temp_var(e.type_info());
+        let lhs = self.visit_expr(&mut e.lhs, Some(d), false)?;
+        let d = self.gen_temp_var(e.type_info());
+        let rhs = self.visit_expr(&mut e.rhs, Some(d), false)?;
         let ir_inst = IRInst::jump_if_cond(jump, lhs, rhs, *next_back_patch_link);
         *next_back_patch_link = self.ir_output.next_inst_id();
         self.ir_output.add_instructions(ir_inst);
@@ -834,10 +856,10 @@ impl IRBuilder {
         jump: Jump,
         next_back_patch_link: &mut usize,
     ) -> Result<(), RccError> {
-        let d = self.gen_temp_variable(e.type_info());
-        let lhs = self.visit_expr(&mut e.lhs, Some(d))?;
-        let d = self.gen_temp_variable(e.type_info());
-        let rhs = self.visit_expr(&mut e.rhs, Some(d))?;
+        let d = self.gen_temp_var(e.type_info());
+        let lhs = self.visit_expr(&mut e.lhs, Some(d), false)?;
+        let d = self.gen_temp_var(e.type_info());
+        let rhs = self.visit_expr(&mut e.rhs, Some(d), false)?;
         let ir_inst = IRInst::jump_if_cond(jump, rhs, lhs, *next_back_patch_link);
         *next_back_patch_link = self.ir_output.next_inst_id();
         self.ir_output.add_instructions(ir_inst);
@@ -852,7 +874,7 @@ impl IRBuilder {
         match &mut return_expr.0 {
             Some(e) => {
                 let ret_place = self.fn_ret_temp_var.last().unwrap();
-                let operand = self.visit_expr(e.as_mut(), Some(ret_place.clone()))?;
+                let operand = self.visit_expr(e.as_mut(), Some(ret_place.clone()), false)?;
                 self.ir_output.add_instructions(IRInst::Ret(operand));
             }
             None => {
@@ -879,8 +901,8 @@ impl IRBuilder {
             Some(e) => {
                 if let Some(p) = break_place {
                     let p = p.clone();
-                    let temp_v = self.gen_temp_variable(e.type_info());
-                    let rhs = self.visit_expr(e, Some(temp_v))?;
+                    let temp_v = self.gen_temp_var(e.type_info());
+                    let rhs = self.visit_expr(e, Some(temp_v), false)?;
                     self.ir_output.add_instructions(IRInst::load_data(p, rhs));
                 } else {
                     unreachable!("error in ir_builder: break expr has ret value");

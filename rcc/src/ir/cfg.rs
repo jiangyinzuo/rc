@@ -87,13 +87,8 @@ impl CFG {
         let mut unreachable_bb = vec![];
         let last_bb_id = basic_blocks.len() - 1;
         for i in 0..=last_bb_id {
-            if let Some(bs) = match basic_blocks
-                .get_mut(i)
-                .unwrap()
-                .instructions
-                .back_mut()
-                .unwrap()
-            {
+            let basic_block = basic_blocks.get_mut(i).unwrap();
+            if let Some(bs) = match basic_block.instructions.back_mut().unwrap() {
                 IRInst::Jump { label, .. } => {
                     *label = *label_map.get(label).unwrap();
                     Some(vec![*label])
