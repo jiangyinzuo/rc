@@ -13,6 +13,6 @@ pub fn is_temp_var(var_name: &str) -> bool {
     var_name.starts_with('$')
 }
 
-pub fn branch_name(bb_id: usize) -> String{
-    format!(".L{}", bb_id)
+pub fn branch_name(func_scope_id: u64, bb_id: usize) -> String{
+    format!(".L{}_{}",  func_scope_id,bb_id)
 }

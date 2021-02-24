@@ -547,7 +547,7 @@ impl IRBuilder {
         match dest {
             Some(d) => {
                 self.ir_output
-                    .add_instructions(IRInst::load_data(d.clone(), Operand::FnRetPlace));
+                    .add_instructions(IRInst::load_data(d.clone(), Operand::FnRetPlace(d.ir_type)));
                 Ok(Operand::Place(d))
             }
             None => Ok(Operand::Unit),

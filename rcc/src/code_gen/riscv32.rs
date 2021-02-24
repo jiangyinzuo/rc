@@ -5,8 +5,8 @@ use crate::analyser::sym_resolver::VarKind;
 use crate::ast::expr::BinOperator;
 use crate::code_gen::{create_allocator, Allocator};
 use crate::ir::cfg::{CFG, CFGIR};
-use crate::ir::var_name::{FP, RA, branch_name};
-use crate::ir::{IRInst, IRType, Operand, Place, Jump};
+use crate::ir::var_name::{branch_name, FP, RA};
+use crate::ir::{IRInst, IRType, Jump, Operand, Place};
 use crate::rcc::{OptimizeLevel, RccError};
 use std::io::{BufWriter, Write};
 
@@ -185,7 +185,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     fn gen_instructions(&mut self) -> Result<(), RccError> {
         for bb in self.cfg.basic_blocks.iter() {
             if !bb.predecessors.is_empty() {
-                writeln!(self.output, "{}:", branch_name(bb.id))?;
+                writeln!(self.output, "{}:", branch_name(self.cfg.func_scope_id, bb.id))?;
             }
             for inst in bb.instructions.iter() {
                 self.gen_instruction(inst)?;
@@ -222,22 +222,31 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                     self.bin_op(op, dest, "a4", "a5")?;
                 }
             }
-            IRInst::Call { callee, args } => {
-
-            }
+            IRInst::Call { callee, args } => match callee {
+                Operand::FnLabel(fn_name) => {
+                    self.pass_fn_args(args)?;
+                    writeln!(self.output, "\tcall\t{}", fn_name)?;
+                }
+                _ => unreachable!(),
+            },
             IRInst::Jump { label } => {
-                writeln!(self.output, "\tj\t{}", branch_name(*label))?;
+                writeln!(self.output, "\tj\t{}", branch_name(self.cfg.func_scope_id, *label))?;
             }
-            IRInst::JumpIfCond { cond, src1, src2, label } => {
+            IRInst::JumpIfCond {
+                cond,
+                src1,
+                src2,
+                label,
+            } => {
                 self.load_data("a4", src1)?;
                 self.load_data("a5", src2)?;
-                let inst  =match cond {
+                let inst = match cond {
                     Jump::JEq => "beq",
                     Jump::JGe => "ble",
                     Jump::JLt => "bgt",
                     Jump::JNe => "beq",
                 };
-                writeln!(self.output, "\t{}\ta5,a4,{}", inst, branch_name(*label))?;
+                writeln!(self.output, "\t{}\ta5,a4,{}", inst, branch_name(self.cfg.func_scope_id, *label))?;
             }
             IRInst::JumpIfNot { cond, label } => {
                 self.load_data("a5", cond)?;
@@ -251,14 +260,24 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
         Ok(())
     }
 
+    fn pass_fn_args(&mut self, args: &[Operand]) -> Result<(), RccError> {
+        for (i, arg) in args.iter().enumerate() {
+            // pass by registers
+            if i <= 7 {
+                self.load_data(&format!("a{}", i), arg)?;
+            }
+        }
+        Ok(())
+    }
+
     fn load_data(&mut self, reg_name: &str, operand: &Operand) -> Result<(), RccError> {
         let asm_operand = AsmOperand::from_operand(operand, &mut *self.allocator);
+        let size = operand.byte_size(RISCV32_ADDR_SIZE);
         match asm_operand {
             AsmOperand::Imm(s) => {
                 writeln!(self.output, "\tli\t{},{}", reg_name, s)?;
             }
             AsmOperand::FpOffset(offset) => {
-                let size = operand.byte_size(RISCV32_ADDR_SIZE);
                 let inst = match size {
                     4 => "lw",
                     _ => todo!(),
@@ -266,6 +285,14 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                 writeln!(self.output, "\t{}\t{},-{}(s0)", inst, reg_name, offset)?;
             }
             AsmOperand::Never | AsmOperand::Unit => {}
+            AsmOperand::FnRet(_ir_type) => match size {
+                4 => {
+                    if reg_name != "a0" {
+                        writeln!(self.output, "\tmv\t{},a0", reg_name)?;
+                    }
+                }
+                _ => todo!(),
+            },
             _ => unimplemented!("{:?}", asm_operand),
         }
         Ok(())
@@ -308,12 +335,10 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
                     BinOperator::Star => "mul",
                     BinOperator::Minus => "sub",
                     BinOperator::Slash => "div",
-                    BinOperator::Percent => {
-                        match dest.ir_type {
-                            IRType::I8 | IRType::I16 | IRType::I32 => "rem",
-                            IRType::U8 | IRType::U16 | IRType::U32 => "remu",
-                            _ => unimplemented!()
-                        }
+                    BinOperator::Percent => match dest.ir_type {
+                        IRType::I8 | IRType::I16 | IRType::I32 => "rem",
+                        IRType::U8 | IRType::U16 | IRType::U32 => "remu",
+                        _ => unimplemented!(),
                     },
                     _ => todo!(),
                 };
@@ -384,6 +409,7 @@ pub enum AsmOperand {
     FpOffset(u32),
     Never,
     Unit,
+    FnRet(IRType),
 }
 
 impl AsmOperand {
@@ -407,6 +433,7 @@ impl AsmOperand {
             }
             Operand::Unit => Self::Unit,
             Operand::Never => Self::Never,
+            Operand::FnRetPlace(ir_type) => Self::FnRet(ir_type.clone()),
             _ => unimplemented!("{:?}", operand),
         }
     }

@@ -45,7 +45,7 @@ pub enum Operand {
     FnLabel(String),
     Unit,
     Never,
-    FnRetPlace,
+    FnRetPlace(IRType),
 }
 
 impl Operand {
@@ -55,9 +55,8 @@ impl Operand {
             Self::Bool(_) | Self::Char(_) => 1,
             Self::I32(_) | Self::U32(_) => 4,
             Self::I64(_) | Self::U64(_) => 8,
-            Self::Place(p) => {
-                p.ir_type.byte_size(addr_size)
-            }
+            Self::Place(p) => p.ir_type.byte_size(addr_size),
+            Self::FnRetPlace(ir_type) => ir_type.byte_size(addr_size),
             _ => unimplemented!("{:?}", self),
         }
     }

@@ -29,3 +29,12 @@ fn foo() -> i32 {
     }
     b
 }
+
+pub fn main() -> i32 {
+    let f = fib10();
+    if f == 55 {
+        233
+    } else {
+        -44
+    }
+}
