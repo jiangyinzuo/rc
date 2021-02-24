@@ -1,0 +1,30 @@
+	.text
+add10:
+	addi	sp,sp,-16
+	sw	s0,12(sp)
+	addi	s0,sp,16
+	sw	a0,-8(s0)
+	lw	a5,-8(s0)
+	addi	a5,a5,10
+	sw	a5,-12(s0)
+	lw	a0,-12(s0)
+	lw	s0,12(sp)
+	addi	sp,sp,16
+	ret
+	.globl  main
+main:
+	addi	sp,sp,-16
+	sw	ra,12(sp)
+	sw	s0,8(sp)
+	addi	s0,sp,16
+	li	a0,87
+	call	add10
+	mv	a5,a0
+	sw	a5,-12(s0)
+	lw	a0,-12(s0)
+	call	putchar
+	li	a0,0
+	lw	ra,12(sp)
+	lw	s0,8(sp)
+	addi	sp,sp,16
+	ret

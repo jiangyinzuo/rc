@@ -1,12 +1,12 @@
+use crate::analyser::sym_resolver::SymbolResolver;
 use crate::ast::AST;
+use crate::code_gen::riscv32::Riscv32CodeGen;
 use crate::code_gen::TargetPlatform;
+use crate::ir::cfg::CFGIR;
+use crate::ir::ir_build::IRBuilder;
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use std::io::{BufReader, BufWriter, Read, Write};
-use crate::analyser::sym_resolver::SymbolResolver;
-use crate::ir::ir_build::IRBuilder;
-use crate::code_gen::riscv32::Riscv32CodeGen;
-use crate::ir::cfg::CFGIR;
 
 #[derive(Copy, Clone)]
 pub enum OptimizeLevel {
@@ -21,7 +21,12 @@ pub struct RcCompiler<R: Read, W: Write> {
 }
 
 impl<R: Read, W: Write> RcCompiler<R, W> {
-    pub fn new(target_platform: TargetPlatform, input: R, output: W, opt_level: OptimizeLevel) -> Self {
+    pub fn new(
+        target_platform: TargetPlatform,
+        input: R,
+        output: W,
+        opt_level: OptimizeLevel,
+    ) -> Self {
         RcCompiler {
             input: BufReader::new(input),
             output: BufWriter::new(output),
@@ -53,7 +58,9 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
                 let mut code_gen = Riscv32CodeGen::new(cfg_ir, &mut self.output, self.opt_level);
                 code_gen.run()?;
             }
-            OptimizeLevel::One => {todo!()}
+            OptimizeLevel::One => {
+                todo!()
+            }
         }
         Ok(())
     }

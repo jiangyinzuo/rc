@@ -450,11 +450,15 @@ fn local_mut_test() {
 fn external_block_test() {
     file_validate(&[r#"
 extern "C" {
-    fn getchar(i: i32);
+    fn putchar(i: i32);
+}
+
+fn main() {
+    putchar(97);
 }
     "#, r#"
 extern "C" {
-    fn getchar(i: i32) {
+    fn putchar(i: i32) {
         let i = 3;
     }
 }

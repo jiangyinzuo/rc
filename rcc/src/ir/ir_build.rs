@@ -81,6 +81,10 @@ impl IRBuilder {
         match item {
             Item::Fn(item_fn) => self.visit_item_fn(item_fn),
             Item::Struct(item_struct) => self.visit_item_struct(item_struct),
+            Item::ExternalBlock(item_block) => {
+                // do nothing
+                Ok(())
+            }
             _ => unimplemented!(),
         }
     }

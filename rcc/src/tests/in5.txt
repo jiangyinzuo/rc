@@ -1,0 +1,12 @@
+extern "C" {
+    fn putchar(c: i32);
+}
+
+fn add10(x: i32) -> i32 {
+    x + 10
+}
+
+pub fn main() -> i32 {
+    putchar(add10(87));
+    0
+}

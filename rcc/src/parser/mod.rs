@@ -26,22 +26,21 @@
 //!
 //! Static -> static ident TypeAnnotation eq semi
 
-use std::fmt::Debug;
-
+use crate::ast::FromToken;
 use crate::ast::{Visibility, AST};
 use crate::lexer::token::{LiteralKind, Token};
 use crate::rcc::RccError;
-use crate::ast::{FromToken};
+use std::fmt::Debug;
 
 pub mod expr;
 pub mod file;
 pub mod item;
 
+mod pattern;
+mod stmt;
 #[cfg(test)]
 mod tests;
 mod types;
-mod stmt;
-mod pattern;
 
 pub trait Parse: Sized + Debug + PartialEq {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError>;
@@ -51,7 +50,7 @@ pub trait Parse: Sized + Debug + PartialEq {
 pub struct ParseCursor<'a> {
     token_stream: Vec<Token<'a>>,
     token_idx: usize,
-    scope_count: u64
+    scope_count: u64,
 }
 
 impl<'a> ParseCursor<'a> {
@@ -59,7 +58,7 @@ impl<'a> ParseCursor<'a> {
         ParseCursor {
             token_stream,
             token_idx: 0,
-            scope_count: 1
+            scope_count: 1,
         }
     }
 
@@ -172,8 +171,6 @@ impl Parse for Visibility {
 impl Parse for AST {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, RccError> {
         let file = crate::ast::file::File::parse(cursor)?;
-        Ok(AST {
-            file
-        })
+        Ok(AST { file })
     }
 }
