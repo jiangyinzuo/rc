@@ -1,9 +1,9 @@
 #![feature(map_first_last)]
 
-use std::str::FromStr;
+use crate::rcc::{OptimizeLevel, RcCompiler, RccError};
 use clap::Clap;
 use code_gen::TargetPlatform;
-use crate::rcc::{OptimizeLevel, RccError, RcCompiler};
+use std::str::FromStr;
 
 mod analyser;
 mod ast;
