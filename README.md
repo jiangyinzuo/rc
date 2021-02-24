@@ -7,7 +7,7 @@ A rust-like toy language written in Rust. Available target is riscv32im.
 ## Quick Start
 
 ### Installation
-- rcc compiler
+- [rcc compiler](https://github.com/ChiangYintso/rc/releases)
 - [RISC-V GNU Compiler Toolchain](https://github.com/riscv/riscv-gnu-toolchain) or other assembler
 - Emulator like [QEMU](https://github.com/qemu/qemu)
 
