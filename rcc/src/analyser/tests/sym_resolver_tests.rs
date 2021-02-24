@@ -6,9 +6,17 @@ fn file_validate(inputs: &[&str], expecteds: &[Result<(), RccError>]) {
     assert_eq!(inputs.len(), expecteds.len());
     for (i, (input, expected)) in inputs.iter().zip(expecteds).enumerate() {
         let mut sym_resolver = SymbolResolver::new();
-        let mut ast_file = get_ast_file(input).expect("invalid ast file");
-        let actual = sym_resolver.visit_file(&mut ast_file);
-        assert_eq!(expected, &actual, "{}th test case", i);
+        let ast_file = get_ast_file(input);
+        match ast_file {
+            Ok(mut f) => {
+                let actual = sym_resolver.visit_file(&mut f);
+                assert_eq!(expected, &actual, "{}th test case", i);
+            }
+            Err(e) => {
+                assert_eq!(expected, &Err(e), "{}th test case", i);
+            }
+        }
+
     }
 }
 
@@ -436,4 +444,19 @@ fn local_mut_test() {
     }"#],
         &[Err("lhs is not mutable".into())],
     );
+}
+
+#[test]
+fn external_block_test() {
+    file_validate(&[r#"
+extern "C" {
+    fn getchar(i: i32);
+}
+    "#, r#"
+extern "C" {
+    fn getchar(i: i32) {
+        let i = 3;
+    }
+}
+    "#], &[Ok(()), Err("error in parsing: except ;".into())]);
 }

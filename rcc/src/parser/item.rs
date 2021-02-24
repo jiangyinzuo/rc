@@ -23,6 +23,7 @@ impl Parse for Item {
             Token::Static => unimplemented!(),
             Token::Const => unimplemented!(),
             Token::Impl => unimplemented!(),
+            Token::Extern => Ok(Self::ExternalBlock(ItemExternalBlock::parse(cursor)?)),
             _ => unreachable!("inner item must be fn, struct, enum, static, const or impl"),
         }
     }

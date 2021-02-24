@@ -2,7 +2,7 @@ use crate::analyser::sym_resolver::TypeInfo::*;
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
 use crate::ast::expr::BlockExpr;
 use crate::ast::file::File;
-use crate::ast::item::{Item, ItemFn, ItemStruct};
+use crate::ast::item::{Item, ItemFn, ItemStruct, ExternalItem, FnSignature};
 use crate::ast::types::TypeLitNum::*;
 use crate::ir::var_name::temp_local_var;
 use lazy_static::lazy_static;
@@ -142,17 +142,27 @@ impl Scope {
         }
     }
 
+    /// Add type definitions (functions, structs, etc.) to current scope.
     pub fn add_typedef(&mut self, item: &Item) {
         match item {
             Item::Fn(item_fn) => self.add_type_fn(item_fn),
             Item::Struct(item_struct) => self.add_type_struct(item_struct),
+            Item::ExternalBlock(item_external_block) => {
+               for item in &item_external_block.external_items {
+                   match item {
+                       ExternalItem::Fn(f) => {
+                           self.add_type_fn(f);
+                       }
+                   }
+               }
+            }
             _ => todo!(),
         }
     }
 
-    fn add_type_fn(&mut self, item_fn: &ItemFn) {
-        let type_info = TypeInfo::from_fn_signature(item_fn);
-        self.types.insert(item_fn.name.clone(), type_info);
+    fn add_type_fn(&mut self, fn_sig: &impl FnSignature) {
+        let type_info = TypeInfo::from_fn_signature(fn_sig);
+        self.types.insert(fn_sig.name(), type_info);
     }
 
     fn add_type_struct(&mut self, item_struct: &ItemStruct) {

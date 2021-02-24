@@ -59,6 +59,7 @@ impl NamedASTNode for Item {
 
 pub trait FnSignature {
     fn vis(&self) -> Visibility;
+    fn name(&self) -> String;
     fn params(&self) -> Vec<TypeAnnotation>;
     fn ret_type(&self) -> TypeAnnotation;
 }
@@ -94,6 +95,11 @@ impl FnSignature for ItemFn {
     fn vis(&self) -> Visibility {
         self.vis
     }
+
+    fn name(&self) -> String {
+        self.name.clone()
+    }
+
     fn params(&self) -> Vec<TypeAnnotation> {
         self.fn_params.type_annotations()
     }
@@ -242,7 +248,7 @@ pub struct TupleField {
 #[derive(Debug, PartialEq)]
 pub struct ItemExternalBlock {
     abi: ABI,
-    external_items: Vec<ExternalItem>,
+    pub external_items: Vec<ExternalItem>,
 }
 
 impl ItemExternalBlock {
@@ -300,6 +306,9 @@ impl ExternalItemFn {
 impl FnSignature for ExternalItemFn {
     fn vis(&self) -> Visibility {
         self.vis
+    }
+    fn name(&self) -> String {
+        self.name.clone()
     }
     fn params(&self) -> Vec<TypeAnnotation> {
         self.fn_params.type_annotations()
