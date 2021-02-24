@@ -89,7 +89,7 @@ impl IRBuilder {
         self.ir_output.add_func(item_fn)?;
 
         let info = self.scope_stack.cur_scope().find_fn(&item_fn.name);
-        assert_eq!(info, TypeInfo::from_item_fn(item_fn));
+        assert_eq!(info, TypeInfo::from_fn_signature(item_fn));
 
         let ret_info = TypeInfo::from_type_anno(&item_fn.ret_type, self.scope_stack.cur_scope());
         // visit function block

@@ -151,7 +151,7 @@ impl Scope {
     }
 
     fn add_type_fn(&mut self, item_fn: &ItemFn) {
-        let type_info = TypeInfo::from_item_fn(item_fn);
+        let type_info = TypeInfo::from_fn_signature(item_fn);
         self.types.insert(item_fn.name.clone(), type_info);
     }
 

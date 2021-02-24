@@ -52,7 +52,7 @@ impl Operand {
     pub fn byte_size(&self, addr_size: u32) -> u32 {
         match self {
             Self::Unit | Self::Never => 0,
-            Self::Bool(_) | Self::Char(_) => 1,
+            Self::Bool(_) | Self::Char(_)| Self::I8(_) | Self::U8(_) => 1,
             Self::I32(_) | Self::U32(_) => 4,
             Self::I64(_) | Self::U64(_) => 8,
             Self::Place(p) => p.ir_type.byte_size(addr_size),

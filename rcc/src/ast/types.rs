@@ -1,4 +1,4 @@
-use crate::ast::item::ItemFn;
+use crate::ast::item::{ExternalItemFn, ItemFn, FnSignature};
 use crate::ast::types::TypeAnnotation::{Identifier, Tuple};
 use std::fmt::{Debug, Formatter};
 use strenum::StrEnum;
@@ -88,9 +88,10 @@ impl TypeFnPtr {
         }
     }
 
-    pub fn from_item(item: &ItemFn) -> Self {
-        TypeFnPtr::new(item.fn_params.type_annotations(), item.ret_type.clone())
+    pub fn from_fn_signature(item: &impl FnSignature) -> TypeFnPtr {
+        TypeFnPtr::new(item.params(), item.ret_type())
     }
+    
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]

@@ -1,4 +1,4 @@
-use crate::ast::item::ItemFn;
+use crate::ast::item::{ItemFn, FnSignature};
 use crate::ast::pattern::Pattern;
 use crate::ast::Visibility;
 use crate::ir::{IRInst, IRType, Operand, Place};

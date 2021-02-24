@@ -57,6 +57,12 @@ impl NamedASTNode for Item {
     }
 }
 
+pub trait FnSignature {
+    fn vis(&self) -> Visibility;
+    fn params(&self) -> Vec<TypeAnnotation>;
+    fn ret_type(&self) -> TypeAnnotation;
+}
+
 #[derive(Debug, PartialEq)]
 pub struct ItemFn {
     vis: Visibility,
@@ -82,9 +88,18 @@ impl ItemFn {
             fn_block,
         }
     }
+}
 
-    pub fn vis(&self) -> Visibility {
-        self.vis.clone()
+impl FnSignature for ItemFn {
+    fn vis(&self) -> Visibility {
+        self.vis
+    }
+    fn params(&self) -> Vec<TypeAnnotation> {
+        self.fn_params.type_annotations()
+    }
+
+    fn ret_type(&self) -> TypeAnnotation {
+        self.ret_type.clone()
     }
 }
 
@@ -178,7 +193,7 @@ impl ItemStruct {
     }
 
     pub fn vis(&self) -> Visibility {
-        self.vis.clone()
+        self.vis
     }
 }
 
@@ -279,5 +294,18 @@ impl ExternalItemFn {
             fn_params,
             ret_type,
         }
+    }
+}
+
+impl FnSignature for ExternalItemFn {
+    fn vis(&self) -> Visibility {
+        self.vis
+    }
+    fn params(&self) -> Vec<TypeAnnotation> {
+        self.fn_params.type_annotations()
+    }
+
+    fn ret_type(&self) -> TypeAnnotation {
+        self.ret_type.clone()
     }
 }

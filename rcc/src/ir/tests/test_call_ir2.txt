@@ -15,7 +15,9 @@
             kind: Local,
             ir_type: Unit,
         },
-        src: FnRetPlace,
+        src: FnRetPlace(
+            Unit,
+        ),
     },
     Call {
         callee: FnLabel(

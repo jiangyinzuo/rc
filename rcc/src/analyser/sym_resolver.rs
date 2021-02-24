@@ -8,7 +8,7 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemExternalBlock, ItemFn, ItemStruct, TypeEnum};
+use crate::ast::item::{Fields, Item, ItemExternalBlock, ItemFn, ItemStruct, TypeEnum, ExternalItemFn, FnSignature};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
@@ -105,8 +105,8 @@ impl TypeInfo {
         }
     }
 
-    pub(crate) fn from_item_fn(item: &ItemFn) -> Self {
-        let tp_fn_ptr = TypeFnPtr::from_item(item);
+    pub(crate) fn from_fn_signature(item: &impl FnSignature) -> Self {
+        let tp_fn_ptr = TypeFnPtr::from_fn_signature(item);
         Self::Fn {
             vis: item.vis(),
             inner: tp_fn_ptr,

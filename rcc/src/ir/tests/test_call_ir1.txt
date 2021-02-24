@@ -11,7 +11,9 @@
             kind: Local,
             ir_type: I32,
         },
-        src: FnRetPlace,
+        src: FnRetPlace(
+            I32,
+        ),
     },
     BinOp {
         op: *,

@@ -42,7 +42,7 @@ pub trait FromToken: Sized {
 
 
 from_token! {
-    #[derive(Debug, PartialEq, Eq, Clone, Hash)]
+    #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
     pub enum Visibility {
         Pub,
         Priv,
