@@ -38,17 +38,18 @@ pub fn main() -> i32 {
 ```
 Compile `foo.rc` to RISC-V assembly language.
 ```shell
-./rcc foo.txt -o foo.S
+$ ./rcc foo.txt -o foo.S
 ```
 
 Assemble and link to executable file.
 ```shell
-riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 foo.S -o foo
+$ riscv64-unknown-elf-gcc -march=rv32im -mabi=ilp32 foo.S -o foo
 ```
 
 Run in QEMU
 ```shell
-qemu-riscv32 ./foo
+$ qemu-riscv32 ./foo
+hello
 ```
 
 ## References
