@@ -4,8 +4,8 @@ use crate::ast::item::{FnParam, FnParams, Item, ItemExternalBlock, ItemFn};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::types::TypeAnnotation;
 use crate::ast::Visibility::Priv;
-use crate::parser::tests::{parse_input, parse_validate};
-use crate::tests::{assert_pretty_fmt_eq, read_from_file};
+use crate::parser::tests::{expected_from_file, parse_input, parse_validate};
+use crate::tests::assert_pretty_fmt_eq;
 
 #[test]
 fn item_fn_test() {
@@ -57,10 +57,6 @@ fn item_fn_test() {
             ))),
         ],
     );
-}
-
-fn expected_from_file(file_name: &str) -> String {
-    read_from_file(file_name, "./src/parser/tests")
 }
 
 #[test]

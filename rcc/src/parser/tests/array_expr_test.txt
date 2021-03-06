@@ -1,0 +1,32 @@
+Array(
+    ArrayExpr {
+        elems: [
+            Path(
+                PathExpr {
+                    segments: [
+                        "b",
+                    ],
+                    type_info: RefCell {
+                        value: Unknown,
+                    },
+                    expr_kind: Unknown,
+                },
+            ),
+        ],
+        len_expr: ConstantExpr {
+            expr: Some(
+                LitNum(
+                    LitNumExpr {
+                        value: "5",
+                        type_info: RefCell {
+                            value: LitNum(
+                                #i,
+                            ),
+                        },
+                    },
+                ),
+            ),
+            const_value: None,
+        },
+    },
+)

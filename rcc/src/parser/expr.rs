@@ -437,7 +437,7 @@ pub mod primitive {
                         return if elems.len() == 1 {
                             let len = Expr::parse(cursor)?;
                             let len = ConstantExpr::<usize>::expr(len);
-                            cursor.eat_token_eq(Token::RightCurlyBraces)?;
+                            cursor.eat_token_eq(Token::RightSquareBrackets)?;
                             Ok(ArrayExpr::new(elems, len))
                         } else {
                             Err("length of elems should be 1".into())

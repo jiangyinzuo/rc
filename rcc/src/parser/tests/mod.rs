@@ -1,6 +1,7 @@
 use crate::lexer::Lexer;
 use crate::parser::{Parse, ParseCursor};
 use crate::rcc::RccError;
+use crate::tests::read_from_file;
 
 mod cursor_test;
 mod expr_tests;
@@ -33,4 +34,8 @@ fn parse_validate<T: Parse>(
             },
         }
     }
+}
+
+fn expected_from_file(file_name: &str) -> String {
+    read_from_file(file_name, "./src/parser/tests")
 }

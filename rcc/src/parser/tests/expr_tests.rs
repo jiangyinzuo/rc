@@ -8,8 +8,9 @@ use crate::ast::expr::{
 use crate::ast::expr::{LitNumExpr, UnAryExpr, UnOp};
 use crate::ast::stmt::Stmt;
 use crate::ast::types::TypeLitNum;
-use crate::parser::tests::parse_validate;
+use crate::parser::tests::{parse_validate, parse_input, expected_from_file};
 use crate::rcc::RccError;
+use crate::tests::assert_pretty_fmt_eq;
 
 #[test]
 fn path_expr_test() {
@@ -35,7 +36,10 @@ fn lit_expr_test() {
                 "2".to_string(),
                 TypeLitNum::F32,
             ))),
-            Ok(Expr::LitNum(LitNumExpr::new("123".to_string(), TypeLitNum::I))),
+            Ok(Expr::LitNum(LitNumExpr::new(
+                "123".to_string(),
+                TypeLitNum::I,
+            ))),
             Ok(Expr::LitChar('c')),
             Ok(Expr::LitStr("hello".to_string())),
         ],
@@ -152,19 +156,31 @@ fn bin_op_test() {
                 LitNum(6.into()),
             ))),
             Err("Chained comparison operator require parentheses".into()),
-            Ok(BinOp(BinOpExpr::new(LitNum(2.into()), BinOperator::Gt,
+            Ok(BinOp(BinOpExpr::new(
+                LitNum(2.into()),
+                BinOperator::Gt,
                 BinOp(BinOpExpr::new(
-                    BinOp(BinOpExpr::new(LitNum(3.into()), BinOperator::Plus, LitNum(4.into()))),
+                    BinOp(BinOpExpr::new(
+                        LitNum(3.into()),
+                        BinOperator::Plus,
+                        LitNum(4.into()),
+                    )),
                     BinOperator::Plus,
-                    LitNum(5.into())
-                ))
+                    LitNum(5.into()),
+                )),
             ))),
-            Ok(BinOp(BinOpExpr::new(LitNum(2.into()), BinOperator::Plus,
-                                    BinOp(BinOpExpr::new(
-                                        BinOp(BinOpExpr::new(LitNum(32.into()), BinOperator::Star, LitNum(4.into()))),
-                                        BinOperator::Slash,
-                                        LitNum(5.into())
-                                    ))
+            Ok(BinOp(BinOpExpr::new(
+                LitNum(2.into()),
+                BinOperator::Plus,
+                BinOp(BinOpExpr::new(
+                    BinOp(BinOpExpr::new(
+                        LitNum(32.into()),
+                        BinOperator::Star,
+                        LitNum(4.into()),
+                    )),
+                    BinOperator::Slash,
+                    LitNum(5.into()),
+                )),
             ))),
         ],
     );
@@ -208,4 +224,15 @@ fn place_expr_test() {
         ))),
     ];
     parse_validate(vec!["if true {1} else {3} = 3", "*a = 4"], expecteds);
+}
+
+#[test]
+fn array_expr_test() {
+    let result = parse_input::<Expr>(
+        r#"
+        [b; 5]
+    "#,
+    );
+    let expected = expected_from_file("array_expr_test.txt");
+    assert_pretty_fmt_eq(&expected, &result.unwrap());
 }
