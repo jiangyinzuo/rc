@@ -175,7 +175,7 @@ impl<'w: 'codegen, 'codegen, W: Write> FuncCodeGen<'w, 'codegen, W> {
     fn gen_save_args(&mut self) -> Result<(), RccError> {
         for i in 0..self.cfg.fn_args.len().min(8) {
             let arg_name = self.cfg.get_name_of_fn_arg(i).unwrap();
-            let (_, ir_type) = self.cfg.local_infos.get(&arg_name).unwrap();
+            let (_, ir_type) = self.cfg.local_variables.get(&arg_name).unwrap();
             let offset = self.allocator.get_fp_offset(&arg_name, ir_type);
             writeln!(self.output, "\tsw\ta{},-{}(s0)", i, offset)?;
         }

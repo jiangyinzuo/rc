@@ -1,0 +1,29 @@
+// File name: foo.rc
+extern "C" {
+    fn putchar(c: i32);
+}
+
+fn add10(x: i32) -> i32 {
+    x + 10
+}
+
+pub fn main() -> i32 {
+    putchar(103 + 1); // 'h'
+    putchar(101); // 'e'
+    let mut i = 0;
+    while i < 2 {
+        putchar(108); // 'l' 'l'
+        i += 1;
+    }
+    putchar(333 / 3i32); // 'o'
+    putchar(10); // '\n'
+    0
+}
+
+fn bar(b: i32) {
+    let mut a: i32;
+    if  b == 3 {
+        a = 3;
+    }
+    let b = a + 4i32;
+}

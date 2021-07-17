@@ -31,7 +31,7 @@
         src2: I32(
             7,
         ),
-        label: 22,
+        label: 6,
     },
     LoadData {
         dest: Place {
@@ -58,7 +58,7 @@
         src2: I32(
             9,
         ),
-        label: 22,
+        label: 9,
     },
     LoadData {
         dest: Place {
@@ -85,7 +85,7 @@
                 ir_type: I32,
             },
         ),
-        label: 22,
+        label: 12,
     },
     LoadData {
         dest: Place {
@@ -112,7 +112,7 @@
         src2: I32(
             2,
         ),
-        label: 22,
+        label: 15,
     },
     LoadData {
         dest: Place {
@@ -139,7 +139,7 @@
                 ir_type: I32,
             },
         ),
-        label: 22,
+        label: 18,
     },
     LoadData {
         dest: Place {
@@ -166,7 +166,7 @@
         src2: I32(
             50,
         ),
-        label: 22,
+        label: 21,
     },
     LoadData {
         dest: Place {

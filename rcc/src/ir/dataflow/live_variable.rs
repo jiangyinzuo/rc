@@ -1,23 +1,14 @@
-use crate::ir::cfg::{BasicBlock, CFG};
-use crate::ir::{IRInst, Operand, Place};
+use crate::ir::cfg::{BasicBlock, CFG, BasicBlockId};
+use crate::ir::{IRInst, Operand};
 use bit_vector::BitVector;
 use std::collections::VecDeque;
-
-trait AnalysisDomain {
-    fn bottom_value(cfg: &CFG) -> Self;
-}
+use crate::ir::dataflow::AnalysisDomain;
 
 pub struct LiveVariableAnalysis<'cfg> {
     cfg: &'cfg CFG,
     pub in_states: Vec<BitVector>,
     pub out_states: Vec<BitVector>,
     in_changed: bool,
-}
-
-impl AnalysisDomain for BitVector {
-    fn bottom_value(cfg: &CFG) -> Self {
-        BitVector::new(cfg.local_infos.len())
-    }
 }
 
 impl<'cfg> LiveVariableAnalysis<'cfg> {
@@ -31,22 +22,29 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
     }
 
     pub fn apply(&mut self) {
+
+        // variables for breadth-first search
         let mut visited = BitVector::new(self.cfg.basic_blocks.len());
         let mut queue = VecDeque::<usize>::new();
+
         while self.in_changed {
+
+            // initialize
             visited.set_all_false();
             self.in_changed = false;
             queue.clear();
             queue.push_back(self.cfg.basic_blocks.len() - 1);
+
+            // iterate all the basic block in CFG with breadth-first search
             while !queue.is_empty() {
-                let bid = queue.pop_front().unwrap();
-                let bb = self.cfg.basic_blocks.get(bid).unwrap();
+                let bb_id = queue.pop_front().unwrap();
+                let bb = self.cfg.basic_blocks.get(bb_id).unwrap();
 
-                visited.set(bid, true);
+                visited.set(bb_id, true);
 
-                self.out_states[bid] = self.join_succ(bb);
+                self.out_states[bb_id] = self.join_succ(bb);
                 for ir_inst in bb.instructions.iter() {
-                    self.gen_kill(bid, ir_inst);
+                    self.gen_kill(bb_id, ir_inst);
                 }
 
                 for p in bb.predecessors.iter() {
@@ -69,10 +67,10 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
     fn join_succ(&self, basic_block: &BasicBlock) -> BitVector {
         let bid = basic_block.id;
 
-        let succs = self.cfg.succ_of(bid);
+        let succs = self.cfg.successors_of(bid);
         let res = succs
             .iter()
-            .map(|s_bid| self.in_states.get(*s_bid).unwrap())
+            .map(|succ_bb_id| self.in_states.get(*succ_bb_id).unwrap())
             .fold(BitVector::bottom_value(self.cfg), |mut acc, x| {
                 acc.set_bitor(x);
                 acc
@@ -80,10 +78,10 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
         res
     }
 
-    fn gen_kill(&mut self, bid: usize, inst: &IRInst) {
+    fn gen_kill(&mut self, bb_id: BasicBlockId, inst: &IRInst) {
         macro_rules! gen {
             ($cxt:tt, $dest:tt, $in_state:ident) => {
-                let dest_id = $cxt.cfg.local_infos.get(&$dest.label).unwrap().0;
+                let dest_id = $cxt.cfg.local_variables.get(&$dest.label).unwrap().0;
                 $in_state.set(dest_id, true);
             };
         }
@@ -91,14 +89,14 @@ impl<'cfg> LiveVariableAnalysis<'cfg> {
         macro_rules! kill {
             ($cxt:tt, $src:tt, $in_state:ident) => {
                 if let Operand::Place(p) = $src {
-                    let src_id = $cxt.cfg.local_infos.get(&p.label).unwrap().0;
+                    let src_id = $cxt.cfg.local_variables.get(&p.label).unwrap().0;
                     $in_state.set(src_id, false);
                 }
             };
         }
 
-        let out_state = self.out_states.get_mut(bid).unwrap();
-        let in_state = self.in_states.get_mut(bid).unwrap();
+        let out_state = self.out_states.get_mut(bb_id).unwrap();
+        let in_state = self.in_states.get_mut(bb_id).unwrap();
         in_state.clone_from(out_state);
         match inst {
             IRInst::LoadAddr { .. } => {

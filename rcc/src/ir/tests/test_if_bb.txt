@@ -35,7 +35,7 @@
                 src2: I32(
                     7,
                 ),
-                label: 13,
+                label: 2,
             },
         ],
     },
@@ -62,7 +62,9 @@
     },
     BasicBlock {
         id: 2,
-        predecessors: [],
+        predecessors: [
+            0,
+        ],
         instructions: [
             JumpIfCond {
                 cond: JEq,
@@ -76,7 +78,7 @@
                 src2: I32(
                     9,
                 ),
-                label: 13,
+                label: 4,
             },
         ],
     },
@@ -103,7 +105,9 @@
     },
     BasicBlock {
         id: 4,
-        predecessors: [],
+        predecessors: [
+            2,
+        ],
         instructions: [
             JumpIfCond {
                 cond: JGe,
@@ -117,7 +121,7 @@
                         ir_type: I32,
                     },
                 ),
-                label: 13,
+                label: 6,
             },
         ],
     },
@@ -144,7 +148,9 @@
     },
     BasicBlock {
         id: 6,
-        predecessors: [],
+        predecessors: [
+            4,
+        ],
         instructions: [
             JumpIfCond {
                 cond: JGe,
@@ -158,7 +164,7 @@
                 src2: I32(
                     2,
                 ),
-                label: 13,
+                label: 8,
             },
         ],
     },
@@ -185,7 +191,9 @@
     },
     BasicBlock {
         id: 8,
-        predecessors: [],
+        predecessors: [
+            6,
+        ],
         instructions: [
             JumpIfCond {
                 cond: JLt,
@@ -199,7 +207,7 @@
                         ir_type: I32,
                     },
                 ),
-                label: 13,
+                label: 10,
             },
         ],
     },
@@ -226,7 +234,9 @@
     },
     BasicBlock {
         id: 10,
-        predecessors: [],
+        predecessors: [
+            8,
+        ],
         instructions: [
             JumpIfCond {
                 cond: JLt,
@@ -240,7 +250,7 @@
                 src2: I32(
                     50,
                 ),
-                label: 13,
+                label: 12,
             },
         ],
     },
@@ -267,7 +277,9 @@
     },
     BasicBlock {
         id: 12,
-        predecessors: [],
+        predecessors: [
+            10,
+        ],
         instructions: [
             LoadData {
                 dest: Place {
@@ -284,17 +296,11 @@
     BasicBlock {
         id: 13,
         predecessors: [
-            0,
             1,
-            2,
             3,
-            4,
             5,
-            6,
             7,
-            8,
             9,
-            10,
             11,
             12,
         ],

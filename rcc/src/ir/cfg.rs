@@ -2,12 +2,14 @@ use crate::ir::linear_ir::{Func, LinearIR};
 use crate::ir::var_name::local_var;
 use crate::ir::{IRInst, IRType};
 use std::collections::{BTreeSet, HashMap, LinkedList};
+use crate::rcc::RccError;
+use crate::ir::dataflow::reaching_definitions::ReachingDefinitionsAnalysis;
 
 /// Control FLow Graph's immediate representation
 pub struct CFGIR {
     pub cfgs: Vec<CFG>,
 
-    /// label, value
+    /// read only local strings, <label, value>
     pub ro_local_strs: HashMap<String, String>,
 }
 
@@ -19,27 +21,42 @@ impl CFGIR {
             ro_local_strs: linear_ir.ro_local_strs,
         }
     }
+
+    pub fn reaching_definitions_analysis(&self) -> Result<(), RccError>{
+        for cfg in &self.cfgs {
+            let mut analysis =ReachingDefinitionsAnalysis::new(cfg);
+            analysis.apply()?;
+        }
+        Ok(())
+    }
 }
 
 /// Control Flow Graph
 pub struct CFG {
     pub basic_blocks: Vec<BasicBlock>,
-    pub local_infos: HashMap<String, (usize, IRType)>,
+
+    /// Information of local variables
+    /// <variable name, (variable id, variable's IRType)>
+    pub local_variables: HashMap<String, (usize, IRType)>,
 
     /// function information
     pub func_name: String,
     pub func_scope_id: u64,
     pub func_is_global: bool,
     pub fn_args: Vec<(String, IRType)>,
+    pub fn_args_local_var: Vec<String>,
     pub is_leaf: bool,
 }
+
+pub type BasicBlockId = usize;
 
 /// number of successors less equal than 2 (the next leader or goto label)
 #[derive(Debug)]
 pub struct BasicBlock {
     /// start from 0
-    pub id: usize,
-    pub predecessors: Vec<usize>,
+    pub id: BasicBlockId,
+    /// Predecessors of this `BasicBlock` in CFG
+    pub predecessors: Vec<BasicBlockId>,
     pub instructions: LinkedList<IRInst>,
 }
 
@@ -47,7 +64,7 @@ impl CFG {
     /// Instructions like `(n) if cond goto n+1` will be deleted in this pass.
     pub fn new(mut func: Func) -> CFG {
         let (leaders, is_leaf) = get_leaders_and_is_leaf(&func);
-        let local_infos = get_local_infos(&func);
+        let local_variables = get_local_variables(&func);
 
         // generate basic blocks and label map
         let mut label_map = HashMap::new();
@@ -90,50 +107,59 @@ impl CFG {
         let last_bb_id = basic_blocks.len() - 1;
         for i in 0..=last_bb_id {
             let basic_block = basic_blocks.get_mut(i).unwrap();
-            if let Some(bs) = match basic_block.instructions.back_mut().unwrap() {
-                IRInst::Jump { label, .. } => {
-                    *label = *label_map.get(label).unwrap();
-                    Some(vec![*label])
-                }
-                IRInst::JumpIfNot { label, .. }
-                | IRInst::JumpIf { label, .. }
-                | IRInst::JumpIfCond { label, .. } => {
-                    *label = *label_map.get(label).unwrap();
-                    if i < last_bb_id {
-                        Some(vec![*label, i + 1])
-                    } else {
+            if let Some(inst) = basic_block.instructions.back_mut() {
+                if let Some(bs) = match inst {
+                    IRInst::Jump { label, .. } => {
+                        *label = *label_map.get(label).unwrap();
                         Some(vec![*label])
                     }
-                }
-                _ => {
-                    if i < last_bb_id {
-                        Some(vec![i + 1])
-                    } else {
-                        if i != 0 {
-                            unreachable_bb.push(i);
+                    IRInst::JumpIfNot { label, .. }
+                    | IRInst::JumpIf { label, .. }
+                    | IRInst::JumpIfCond { label, .. } => {
+                        *label = *label_map.get(label).unwrap();
+                        if i < last_bb_id {
+                            Some(vec![*label, i + 1])
+                        } else {
+                            Some(vec![*label])
                         }
-                        None
                     }
-                }
-            } {
-                for b in bs {
-                    basic_blocks.get_mut(b).unwrap().predecessors.push(i);
+                    _ => {
+                        if i < last_bb_id {
+                            Some(vec![i + 1])
+                        } else {
+                            if i != 0 {
+                                unreachable_bb.push(i);
+                            }
+                            None
+                        }
+                    }
+                } {
+                    for b in bs {
+                        basic_blocks.get_mut(b).unwrap().predecessors.push(i);
+                    }
                 }
             }
         }
 
+        let mut fn_args_local_var = Vec::with_capacity(func.fn_args.len());
+        for (arg, _) in &func.fn_args {
+            fn_args_local_var.push(local_var(arg, func.block_scope_id));
+        }
+
         CFG {
             basic_blocks,
-            local_infos,
+            local_variables,
             func_name: func.name,
             func_scope_id: func.block_scope_id,
             func_is_global: func.is_global,
             fn_args: func.fn_args,
+            fn_args_local_var,
             is_leaf,
         }
     }
 
-    pub fn succ_of(&self, bb_id: usize) -> Vec<usize> {
+    /// Get all successors of BasicBlock with id `bb_id`
+    pub fn successors_of(&self, bb_id: BasicBlockId) -> Vec<usize> {
         debug_assert!(bb_id < self.basic_blocks.len(), "bb_id out of range");
 
         match self
@@ -200,12 +226,12 @@ fn get_leaders_and_is_leaf(func: &Func) -> (BTreeSet<usize>, bool) {
     (leaders, is_leaf)
 }
 
-fn get_local_infos(func: &Func) -> HashMap<String, (usize, IRType)> {
-    let mut local_infos = HashMap::new();
+fn get_local_variables(func: &Func) -> HashMap<String, (usize, IRType)> {
+    let mut local_variables = HashMap::new();
     let mut next_id: usize = 0;
     for arg in &func.fn_args {
         let var_name = local_var(&arg.0, func.block_scope_id);
-        local_infos.insert(var_name, (next_id, arg.1));
+        local_variables.insert(var_name, (next_id, arg.1));
     }
 
     for inst in func.insts.iter() {
@@ -213,15 +239,15 @@ fn get_local_infos(func: &Func) -> HashMap<String, (usize, IRType)> {
             IRInst::BinOp { dest, .. }
             | IRInst::LoadData { dest, .. }
             | IRInst::LoadAddr { dest, .. } => {
-                if !local_infos.contains_key(&dest.label) {
-                    local_infos.insert(dest.label.clone(), (next_id, dest.ir_type));
+                if !local_variables.contains_key(&dest.label) {
+                    local_variables.insert(dest.label.clone(), (next_id, dest.ir_type));
                     next_id += 1;
                 }
             }
             _ => {}
         }
     }
-    local_infos
+    local_variables
 }
 
 impl BasicBlock {

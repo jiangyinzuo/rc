@@ -757,18 +757,19 @@ impl IRBuilder {
         if_expr: &mut IfExpr,
         dest: Option<Place>,
     ) -> Result<Operand, RccError> {
-        let mut next_back_patch_link = 0usize;
+        let mut direct_jump_link = 0usize;
+        let mut last_cond_jump = 0usize;
 
         macro_rules! visit_block {
             ($i:ident, $ir_inst:ident) => {
                 self.visit_block_expr(if_expr.blocks.get_mut($i).unwrap(), dest.clone(), true)?;
                 if $i != if_expr.blocks.len() - 1 {
                     self.ir_output
-                        .add_instructions(IRInst::jump(next_back_patch_link));
-                    next_back_patch_link = self.ir_output.next_inst_id() - 1;
+                        .add_instructions(IRInst::jump(direct_jump_link));
+                    direct_jump_link = self.ir_output.next_inst_id() - 1;
                 }
             };
-        };
+        }
 
         for (i, cond) in if_expr.conditions.iter_mut().enumerate() {
             match cond {
@@ -780,34 +781,33 @@ impl IRBuilder {
                         todo!()
                     }
                     BinOperator::Ne => {
-                        self.gen_jump_cond(e, JEq, &mut next_back_patch_link)?;
+                        self.gen_jump_cond(e, JEq, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     BinOperator::EqEq => {
-                        self.gen_jump_cond(e, JNe, &mut next_back_patch_link)?;
+                        self.gen_jump_cond(e, JNe, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     BinOperator::Le => {
-                        self.gen_jump_cond_reverse(e, JLt, &mut next_back_patch_link)?;
+                        self.gen_jump_cond_reverse(e, JLt, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     BinOperator::Lt => {
-                        self.gen_jump_cond(e, JGe, &mut next_back_patch_link)?;
+                        self.gen_jump_cond(e, JGe, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     BinOperator::Gt => {
-                        self.gen_jump_cond_reverse(e, JGe, &mut next_back_patch_link)?;
+                        self.gen_jump_cond_reverse(e, JGe, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     BinOperator::Ge => {
-                        self.gen_jump_cond(e, JLt, &mut next_back_patch_link)?;
+                        self.gen_jump_cond(e, JLt, &mut last_cond_jump)?;
                         visit_block!(i, ir_inst);
                     }
                     _ => {
                         let d = self.gen_temp_var(e.type_info());
                         let operand = self.visit_bin_op_expr(e, Some(d))?;
-                        let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
-                        next_back_patch_link = self.ir_output.next_inst_id();
+                        let ir_inst = IRInst::jump_if_not(operand, last_cond_jump);
                         self.ir_output.add_instructions(ir_inst);
                         visit_block!(i, ir_inst);
                     }
@@ -816,22 +816,35 @@ impl IRBuilder {
                 e => {
                     let d = self.gen_temp_var(e.type_info());
                     let operand = self.visit_expr(e, Some(d), false)?;
-                    let ir_inst = IRInst::jump_if_not(operand, next_back_patch_link);
-                    next_back_patch_link = self.ir_output.next_inst_id();
+                    let ir_inst = IRInst::jump_if_not(operand, last_cond_jump);
+                    last_cond_jump = self.ir_output.next_inst_id();
                     self.ir_output.add_instructions(ir_inst);
                     visit_block!(i, ir_inst);
                 }
             }
         }
+
+        // back patch the last jump condition
+        if last_cond_jump != 0 {
+            let jump_label = self.ir_output.next_inst_id();
+            let inst_to_backpatch = self.ir_output.get_inst_by_id(last_cond_jump);
+            inst_to_backpatch.set_jump_label(jump_label);
+        }
+
+        // visit else block
         if if_expr.blocks.len() == if_expr.conditions.len() + 1 {
             self.visit_block_expr(if_expr.blocks.last_mut().unwrap(), dest.clone(), true)?;
         }
-        let next_idx = self.ir_output.next_inst_id();
-        while next_back_patch_link != 0 {
-            let inst = self.ir_output.get_inst_by_id(next_back_patch_link);
-            next_back_patch_link = inst.jump_label();
-            inst.set_jump_label(next_idx);
+
+        let jump_label = self.ir_output.next_inst_id();
+
+        // back patch all the direct jump
+        while direct_jump_link != 0 {
+            let inst_to_backpatch = self.ir_output.get_inst_by_id(direct_jump_link);
+            direct_jump_link = inst_to_backpatch.jump_label();
+            inst_to_backpatch.set_jump_label(jump_label);
         }
+
         match dest {
             Some(d) => Ok(Operand::Place(d)),
             None => Ok(Operand::Unit),
@@ -842,14 +855,19 @@ impl IRBuilder {
         &mut self,
         e: &mut BinOpExpr,
         jump: Jump,
-        next_back_patch_link: &mut usize,
+        last_condition_jump: &mut usize,
     ) -> Result<(), RccError> {
         let d = self.gen_temp_var(e.type_info());
         let lhs = self.visit_expr(&mut e.lhs, Some(d), false)?;
         let d = self.gen_temp_var(e.type_info());
         let rhs = self.visit_expr(&mut e.rhs, Some(d), false)?;
-        let ir_inst = IRInst::jump_if_cond(jump, lhs, rhs, *next_back_patch_link);
-        *next_back_patch_link = self.ir_output.next_inst_id();
+        if *last_condition_jump != 0 {
+            let jump_label = self.ir_output.next_inst_id();
+            let inst_to_backpatch = self.ir_output.get_inst_by_id(*last_condition_jump);
+            inst_to_backpatch.set_jump_label(jump_label);
+        }
+        let ir_inst = IRInst::jump_if_cond(jump, lhs, rhs, 0);
+        *last_condition_jump = self.ir_output.next_inst_id();
         self.ir_output.add_instructions(ir_inst);
         Ok(())
     }
@@ -864,9 +882,14 @@ impl IRBuilder {
         let lhs = self.visit_expr(&mut e.lhs, Some(d), false)?;
         let d = self.gen_temp_var(e.type_info());
         let rhs = self.visit_expr(&mut e.rhs, Some(d), false)?;
-        let ir_inst = IRInst::jump_if_cond(jump, rhs, lhs, *next_back_patch_link);
-        *next_back_patch_link = self.ir_output.next_inst_id();
+        if *next_back_patch_link != 0 {
+            let jump_label = self.ir_output.next_inst_id();
+            let inst_to_backpatch = self.ir_output.get_inst_by_id(*next_back_patch_link);
+            inst_to_backpatch.set_jump_label(jump_label);
+        }
+        let ir_inst = IRInst::jump_if_cond(jump, rhs, lhs, 0);
         self.ir_output.add_instructions(ir_inst);
+        *next_back_patch_link = self.ir_output.next_inst_id() - 1;
         Ok(())
     }
 

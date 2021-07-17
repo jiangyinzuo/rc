@@ -24,7 +24,7 @@ pub trait ExprVisit {
     fn is_callable(&self) -> bool {
         let type_info = self.type_info();
         let t = type_info.deref().borrow();
-        matches!(t.deref(), &TypeInfo::Fn {..} | &TypeInfo::FnPtr(_))
+        matches!(t.deref(), &TypeInfo::Fn { .. } | &TypeInfo::FnPtr(_))
     }
 }
 
@@ -74,9 +74,16 @@ pub enum Expr {
 
 impl Expr {
     pub fn with_block(&self) -> bool {
-        matches!(self,
-            Self::Block(_) | Self::Struct(_) | Self::While(_) |
-            Self::Loop(_)  | Self::If(_) | Self::Match | Self::For)
+        matches!(
+            self,
+            Self::Block(_)
+                | Self::Struct(_)
+                | Self::While(_)
+                | Self::Loop(_)
+                | Self::If(_)
+                | Self::Match
+                | Self::For
+        )
     }
     pub fn is_with_block_token_start(tk: &Token) -> bool {
         matches!(
@@ -165,7 +172,7 @@ impl TypeInfoSetter for Expr {
     }
     fn set_type_info_ref(&mut self, type_info: Rc<RefCell<TypeInfo>>) {
         match self {
-            Self::Path(p) => {}
+            Self::Path(p) => p.set_type_info_ref(type_info),
             Self::LitNum(l) => {
                 l.set_type_info_ref(type_info);
             }
@@ -263,12 +270,24 @@ impl<V> ConstantExpr<V> {
 
 impl TokenStart for Expr {
     fn is_token_start(tk: &Token) -> bool {
-        matches!(tk,
-            Token::Identifier(_) | Token::Literal {..} |Token::LitString(_) | Token::True | Token::False |
-            Token::DotDot |
-            Token::LeftCurlyBraces | Token::LeftParen | Token::LeftSquareBrackets |
-            Token::For | Token::Loop | Token::While |
-            Token::If | Token::Match | Token::Break | Token::Return
+        matches!(
+            tk,
+            Token::Identifier(_)
+                | Token::Literal { .. }
+                | Token::LitString(_)
+                | Token::True
+                | Token::False
+                | Token::DotDot
+                | Token::LeftCurlyBraces
+                | Token::LeftParen
+                | Token::LeftSquareBrackets
+                | Token::For
+                | Token::Loop
+                | Token::While
+                | Token::If
+                | Token::Match
+                | Token::Break
+                | Token::Return
         ) || UnAryExpr::is_token_start(tk)
             || RangeExpr::is_token_start(tk)
     }

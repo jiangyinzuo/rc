@@ -58,7 +58,7 @@ fn test_ir_builder() {
     assert_eq!(0, bb.id);
     assert!(bb.predecessors.is_empty());
     assert_eq!(2, bb.instructions.len());
-    assert!(cfg.succ_of(0).is_empty());
+    assert!(cfg.successors_of(0).is_empty());
 
     test_cfg_iter(&expected, &cfg);
 }

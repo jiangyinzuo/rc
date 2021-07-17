@@ -3,7 +3,7 @@ use crate::ir::tests::ir_build;
 use crate::rcc::RccError;
 use crate::ir::dataflow::live_variable::LiveVariableAnalysis;
 
-fn get_cfg(input: &str) -> Result<CFG, RccError> {
+pub(super) fn get_cfg(input: &str) -> Result<CFG, RccError> {
     let mut ir = ir_build(input)?;
     let cfg = CFG::new(ir.funcs.pop().unwrap());
     Ok(cfg)
@@ -19,12 +19,12 @@ fn one_block_test() {
             let c = a + b;
         }
     "#).unwrap();
-    assert_eq!(3, cfg.local_infos.len());
+    assert_eq!(3, cfg.local_variables.len());
     let mut analysis = LiveVariableAnalysis::new(&cfg);
     analysis.apply();
 
-    assert_eq!("[BitVector { inner: [0], size: 3 }]", format!("{:?}", analysis.in_states));
-    assert_eq!("[BitVector { inner: [0], size: 3 }]", format!("{:?}", analysis.out_states));
+    assert_eq!("[BitVector { inner: [0], len: 3 }]", format!("{:?}", analysis.in_states));
+    assert_eq!("[BitVector { inner: [0], len: 3 }]", format!("{:?}", analysis.out_states));
 }
 
 #[test]
@@ -43,7 +43,7 @@ fn multiple_blocks_test() {
             }
         }
     "#).unwrap();
-    assert_eq!(3, cfg.local_infos.len());
+    assert_eq!(3, cfg.local_variables.len());
     let mut analysis = LiveVariableAnalysis::new(&cfg);
     analysis.apply();
     println!("{:?}", analysis.in_states);

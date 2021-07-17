@@ -30,7 +30,7 @@ impl<'cfg> Allocator for SimpleAllocator<'cfg> {
             frame_size *= 2;
         }
         // locals
-        for (_id, ir_type) in self.cfg.local_infos.values() {
+        for (_id, ir_type) in self.cfg.local_variables.values() {
             frame_size += ir_type.byte_size(self.addr_size);
         }
         if frame_size % 8 == 0 {

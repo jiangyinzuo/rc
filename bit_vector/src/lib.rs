@@ -2,16 +2,16 @@ mod tests;
 
 const WORD_BITS: usize = 64;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BitVector {
     inner: Vec<u64>,
-    size: usize,
+    len: usize,
 }
 
 impl BitVector {
     pub fn new(size: usize) -> BitVector {
         let inner = vec![0; (size + WORD_BITS - 1) / WORD_BITS];
-        BitVector { inner, size }
+        BitVector { inner, len: size }
     }
 
     pub fn set_all_true(&mut self) {
@@ -27,7 +27,7 @@ impl BitVector {
     }
 
     pub fn set(&mut self, idx: usize, value: bool) {
-        if idx >= self.size {
+        if idx >= self.len {
             panic!("out of range");
         }
         let vec_idx = idx / WORD_BITS;
@@ -42,7 +42,7 @@ impl BitVector {
     }
 
     pub fn get(&self, idx: usize) -> Option<bool> {
-        if idx >= self.size {
+        if idx >= self.len {
             None
         } else {
             let vec_idx = idx / WORD_BITS;
@@ -54,9 +54,19 @@ impl BitVector {
     }
     
     pub fn set_bitor(&mut self, other: &BitVector) {
-        assert_eq!(self.size, other.size);
+        assert_eq!(self.len, other.len);
         for (i, o) in self.inner.iter_mut().zip(other.inner.iter()) {
             *i |= *o;
         }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }

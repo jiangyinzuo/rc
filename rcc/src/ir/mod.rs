@@ -208,6 +208,8 @@ impl IRType {
 /// Immediate Presentation's Instructions
 #[derive(Debug, PartialEq)]
 pub enum IRInst {
+
+    /// dest = src1 op src2
     BinOp {
         op: BinOperator,
         dest: Place,
@@ -236,11 +238,13 @@ pub enum IRInst {
         label: usize,
     },
 
+    /// dest = src
     LoadData {
         dest: Place,
         src: Operand,
     },
 
+    /// dest = *symbol
     LoadAddr {
         dest: Place,
         symbol: Operand,

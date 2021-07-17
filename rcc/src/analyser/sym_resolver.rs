@@ -8,13 +8,17 @@ use crate::ast::expr::{
 };
 use crate::ast::expr::{ExprVisit, TypeInfoSetter};
 use crate::ast::file::File;
-use crate::ast::item::{Fields, Item, ItemExternalBlock, ItemFn, ItemStruct, TypeEnum, ExternalItemFn, FnSignature, ExternalItem};
+use crate::ast::item::{
+    ExternalItem, ExternalItemFn, Fields, FnSignature, Item, ItemExternalBlock, ItemFn, ItemStruct,
+    TypeEnum,
+};
 use crate::ast::pattern::{IdentPattern, Pattern};
 use crate::ast::stmt::{LetStmt, Stmt};
 use crate::ast::types::{PtrKind, TypeAnnotation, TypeFnPtr, TypeLitNum};
 use crate::ast::Visibility;
 use crate::rcc::RccError;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::Deref;
 use std::ptr::NonNull;
@@ -84,6 +88,8 @@ pub enum TypeInfo {
     Bool,
     Char,
     LitNum(TypeLitNum),
+
+    /// top type, can not exist in the end.
     Unknown,
 }
 
@@ -196,6 +202,58 @@ impl TypeInfo {
     }
 }
 
+impl PartialOrd for TypeInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self == other {
+            return Some(Ordering::Equal);
+        }
+        match (self, other) {
+            (TypeInfo::Unknown, _) => Some(Ordering::Greater),
+            (TypeInfo::Never, _) => Some(Ordering::Less),
+            (_, TypeInfo::Unknown) => Some(Ordering::Less),
+            (_, TypeInfo::Never) => Some(Ordering::Greater),
+            (TypeInfo::LitNum(lit_num), TypeInfo::LitNum(other_lit_num)) => {
+                match (lit_num, other_lit_num) {
+                    (TypeLitNum::F, TypeLitNum::F32 | TypeLitNum::F64) => Some(Ordering::Greater),
+                    (TypeLitNum::F32 | TypeLitNum::F64, TypeLitNum::F) => Some(Ordering::Less),
+                    (
+                        TypeLitNum::I,
+                        TypeLitNum::I8
+                        | TypeLitNum::I16
+                        | TypeLitNum::I32
+                        | TypeLitNum::I64
+                        | TypeLitNum::I128
+                        | TypeLitNum::Isize
+                        | TypeLitNum::U8
+                        | TypeLitNum::U16
+                        | TypeLitNum::U32
+                        | TypeLitNum::U64
+                        | TypeLitNum::U128
+                        | TypeLitNum::Usize,
+                    ) => Some(Ordering::Greater),
+                    (
+                        TypeLitNum::I8
+                        | TypeLitNum::I16
+                        | TypeLitNum::I32
+                        | TypeLitNum::I64
+                        | TypeLitNum::I128
+                        | TypeLitNum::Isize
+                        | TypeLitNum::U8
+                        | TypeLitNum::U16
+                        | TypeLitNum::U32
+                        | TypeLitNum::U64
+                        | TypeLitNum::U128
+                        | TypeLitNum::Usize,
+                        TypeLitNum::I,
+                    ) => Some(Ordering::Less),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum LoopKind {
     NotIn,
@@ -235,61 +293,78 @@ impl SymbolResolver {
         }
     }
 
+    fn may_update_variable_type(
+        &self,
+        place_expr: &Expr,
+        new_type: Rc<RefCell<TypeInfo>>,
+    ) -> Result<(), RccError> {
+        match place_expr {
+            Expr::Path(path_expr) => {
+                let ident = path_expr.segments.last().unwrap();
+                self.scope_stack
+                    .cur_scope()
+                    .update_variable_type(ident, new_type)?;
+            }
+            Expr::ArrayIndex(_) | Expr::TupleIndex(_) | Expr::FieldAccess(_) => todo!(),
+            _ => {}
+        }
+        Ok(())
+    }
+
     /// return `TypeInfo::Unknown` if bin_op expr is invalid
     fn primitive_bin_ops(
+        &self,
         lhs: &mut Expr,
         bin_op: BinOperator,
         rhs: &mut Expr,
-    ) -> Rc<RefCell<TypeInfo>> {
+    ) -> Result<Rc<RefCell<TypeInfo>>, RccError> {
         let l_type: Rc<RefCell<TypeInfo>> = lhs.type_info();
         let r_type: Rc<RefCell<TypeInfo>> = rhs.type_info();
         match bin_op {
             // 3i64 << 2i32
-            BinOperator::Shl | BinOperator::Shr => {
+            BinOperator::Shl | BinOperator::Shr => Ok(
                 if l_type.borrow().deref().is_integer() && r_type.borrow().deref().is_integer() {
                     l_type
                 } else {
                     Rc::new(RefCell::new(Unknown))
-                }
-            }
+                },
+            ),
             BinOperator::Plus | BinOperator::Minus | BinOperator::Star | BinOperator::Slash => {
-                if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
-                    if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
-                        return if l_lit == r_lit {
-                            l_type.clone()
-                        } else if l_lit == &TypeLitNum::I && r_lit.is_integer()
-                            || l_lit == &TypeLitNum::F && r_lit.is_float()
-                        {
-                            if let Expr::LitNum(expr) = lhs {
-                                expr.set_type_info_ref(r_type.clone());
-                            }
-                            r_type.clone()
-                        } else if r_lit == &TypeLitNum::I && l_lit.is_integer()
-                            || r_lit == &TypeLitNum::F && l_lit.is_float()
-                        {
-                            if let Expr::LitNum(expr) = rhs {
-                                expr.set_type_info_ref(l_type.clone());
-                            }
-                            l_type.clone()
-                        } else {
-                            Rc::new(RefCell::new(Unknown))
-                        };
-                    }
+                match l_type.partial_cmp(&r_type) {
+                    Some(o) => match o {
+                        Ordering::Equal => Ok(l_type),
+                        Ordering::Greater => {
+                            self.may_update_variable_type(lhs, r_type.clone())?;
+                            lhs.set_type_info_ref(r_type.clone());
+                            Ok(r_type)
+                        }
+                        Ordering::Less => {
+                            self.may_update_variable_type(rhs, l_type.clone())?;
+                            rhs.set_type_info_ref(l_type.clone());
+                            Ok(l_type)
+                        }
+                    },
+                    None => Err(format!(
+                        "invalid operand type `{:?}` and `{:?}` for `{:?}`",
+                        l_type.borrow().deref(),
+                        r_type.borrow().deref(),
+                        bin_op
+                    )
+                    .into()),
                 }
-                Rc::new(RefCell::new(Unknown))
             }
             BinOperator::Percent => match (l_type.borrow().deref(), r_type.borrow().deref()) {
                 (TypeInfo::LitNum(l_lit), TypeInfo::LitNum(r_lit)) => {
                     if l_lit == &TypeLitNum::I && r_lit.is_integer() {
                         lhs.set_type_info_ref(r_type.clone());
-                    } else if r_lit == &TypeLitNum::I && l_lit.is_integer()  {
+                    } else if r_lit == &TypeLitNum::I && l_lit.is_integer() {
                         rhs.set_type_info_ref(l_type.clone())
                     } else if l_lit != r_lit || !l_lit.is_integer() {
-                        return Rc::new(RefCell::new(Unknown))
+                        return Ok(Rc::new(RefCell::new(Unknown)));
                     }
-                    lhs.type_info()
+                    Ok(lhs.type_info())
                 }
-                _ => Rc::new(RefCell::new(Unknown)),
+                _ => Ok(Rc::new(RefCell::new(Unknown))),
             },
             BinOperator::Lt
             | BinOperator::Gt
@@ -299,7 +374,7 @@ impl SymbolResolver {
             | BinOperator::Ne => {
                 if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
                     if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
-                        return if l_lit == r_lit {
+                        return Ok(if l_lit == r_lit {
                             Rc::new(RefCell::new(TypeInfo::Bool))
                         } else if l_lit == &TypeLitNum::I && r_lit.is_integer()
                             || l_lit == &TypeLitNum::F && r_lit.is_float()
@@ -317,15 +392,15 @@ impl SymbolResolver {
                             Rc::new(RefCell::new(TypeInfo::Bool))
                         } else {
                             Rc::new(RefCell::new(Unknown))
-                        };
+                        });
                     }
                 }
-                Rc::new(RefCell::new(Unknown))
+                Ok(Rc::new(RefCell::new(Unknown)))
             }
             BinOperator::And | BinOperator::Or | BinOperator::Caret => {
                 if let TypeInfo::LitNum(l_lit) = l_type.borrow().deref() {
                     if let TypeInfo::LitNum(r_lit) = r_type.borrow().deref() {
-                        return if l_lit == r_lit {
+                        return Ok(if l_lit == r_lit {
                             l_type.clone()
                         } else if l_lit == &TypeLitNum::I && r_lit.is_integer() {
                             if let Expr::LitNum(expr) = lhs {
@@ -339,23 +414,23 @@ impl SymbolResolver {
                             l_type.clone()
                         } else {
                             Rc::new(RefCell::new(Unknown))
-                        };
+                        });
                     }
                 } else if l_type.borrow().deref() == &TypeInfo::Bool
                     && r_type.borrow().deref() == &TypeInfo::Bool
                 {
-                    return Rc::new(RefCell::new(TypeInfo::Bool));
+                    return Ok(Rc::new(RefCell::new(TypeInfo::Bool)));
                 }
-                Rc::new(RefCell::new(Unknown))
+                Ok(Rc::new(RefCell::new(Unknown)))
             }
             BinOperator::AndAnd | BinOperator::OrOr => {
                 // if loop {} && true {}
                 if l_type.borrow().deref().is(&TypeInfo::Bool)
                     && r_type.borrow().deref().is(&TypeInfo::Bool)
                 {
-                    return Rc::new(RefCell::new(TypeInfo::Bool));
+                    return Ok(Rc::new(RefCell::new(TypeInfo::Bool)));
                 }
-                Rc::new(RefCell::new(Unknown))
+                Ok(Rc::new(RefCell::new(Unknown)))
             }
             BinOperator::As => {
                 todo!()
@@ -533,7 +608,10 @@ impl SymbolResolver {
         Ok(())
     }
 
-    fn visit_external_item_fn(&mut self, _external_item_fn: &mut ExternalItemFn) -> Result<(), RccError> {
+    fn visit_external_item_fn(
+        &mut self,
+        _external_item_fn: &mut ExternalItemFn,
+    ) -> Result<(), RccError> {
         // do nothing
         Ok(())
     }
@@ -728,6 +806,7 @@ impl SymbolResolver {
         self.visit_lhs_expr(&mut assign_expr.lhs)?;
 
         // check the mutability of place expr lhs
+
         match assign_expr.lhs.kind() {
             ExprKind::Place => return Err("lhs is not mutable".into()),
             ExprKind::Value => return Err("can not assign to lhs".into()),
@@ -737,7 +816,11 @@ impl SymbolResolver {
                 let l_type = assign_expr.lhs.type_info();
                 let r_type = assign_expr.rhs.type_info();
 
-                debug_assert!(!r_type.borrow().deref().is_unknown());
+                debug_assert!(
+                    !r_type.borrow().deref().is_unknown(),
+                    "{:#?}",
+                    assign_expr.rhs
+                );
 
                 if matches!(assign_expr.assign_op, AssignOp::ShlEq | AssignOp::ShrEq) {
                     return if l_type.borrow().deref().is_integer()
@@ -750,38 +833,42 @@ impl SymbolResolver {
                 }
 
                 // set type_info of lhs or rhs
-
-                // let mut a; a = 32;
-                if l_type.borrow().deref().is_unknown() {
-                    assign_expr.lhs.set_type_info_ref(r_type);
-                } else if !r_type.borrow().deref().is(l_type.borrow().deref()) {
-                    if l_type.borrow().deref().is_integer() && r_type.borrow().deref().is_integer()
-                    {
-                        // let mut a = 32; a = 64i128;
-                        if l_type.borrow().deref().is_i() {
+                match l_type.partial_cmp(&r_type) {
+                    Some(o) => match o {
+                        Ordering::Equal => {}
+                        // let mut a; a = 3i32;
+                        Ordering::Greater => {
+                            match &assign_expr.lhs {
+                                LhsExpr::Path(path_expr) => {
+                                    let ident = path_expr.segments.last().unwrap();
+                                    self.scope_stack
+                                        .cur_scope()
+                                        .update_variable_type(ident, r_type.clone())?;
+                                }
+                                _ => {
+                                    todo!()
+                                }
+                            }
                             assign_expr.lhs.set_type_info_ref(r_type);
-                        } else {
-                            // let mut a: i64; a = 32;
+                        }
+                        // let mut b: i32; b = 4;
+                        Ordering::Less => {
+                            self.may_update_variable_type(&*assign_expr.rhs, l_type.clone())?;
                             assign_expr.rhs.set_type_info_ref(l_type);
                         }
-                    } else if l_type.borrow().deref().is_float()
-                        && r_type.borrow().deref().is_float()
-                    {
-                        // let mut a = 32.3; a = 33f32;
-                        if l_type.borrow().deref().is_f() {
-                            assign_expr.lhs.set_type_info_ref(r_type);
-                        } else {
-                            // let mut a: f32; a = 33.2;
-                            assign_expr.rhs.set_type_info_ref(l_type);
-                        }
-                    } else {
+                    },
+                    None => {
                         return invalid_type_error(l_type.borrow().deref(), assign_expr);
                     }
                 }
             }
         }
-
-        debug_assert_eq!(assign_expr.lhs.type_info(), assign_expr.rhs.type_info());
+        debug_assert!(
+            assign_expr.rhs.type_info().borrow().is_never()
+                || assign_expr.lhs.type_info() == assign_expr.rhs.type_info(),
+            "{:#?}",
+            assign_expr
+        );
 
         let t = assign_expr.lhs.type_info();
         let tp = t.borrow();
@@ -819,11 +906,11 @@ impl SymbolResolver {
         self.visit_expr(&mut bin_op_expr.lhs)?;
         self.visit_expr(&mut bin_op_expr.rhs)?;
 
-        let t = Self::primitive_bin_ops(
+        let t = self.primitive_bin_ops(
             &mut bin_op_expr.lhs,
             bin_op_expr.bin_op,
             &mut bin_op_expr.rhs,
-        );
+        )?;
         bin_op_expr.set_type_info_ref(t.clone());
         // primitive bin_op || override bin_op
         let tp = t.borrow();

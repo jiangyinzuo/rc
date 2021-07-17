@@ -15,7 +15,7 @@
                 ir_type: I32,
             },
         ),
-        label: 5,
+        label: 4,
     },
     LoadData {
         dest: Place {

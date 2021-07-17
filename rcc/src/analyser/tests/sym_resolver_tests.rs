@@ -353,7 +353,7 @@ fn never_type_test() {
             Ok(()),
             Ok(()),
             Err("invalid operand type `Never` and `Bool` for `&`".into()),
-            Err("invalid operand type `Never` and `LitNum(#i)` for `+`".into()),
+            Ok(()),
         ],
     );
 }
@@ -463,4 +463,30 @@ extern "C" {
     }
 }
     "#], &[Ok(()), Err("error in parsing: except ;".into())]);
+}
+
+#[test]
+fn unknown_type_test() {
+    file_validate(&[r#"
+    fn foo() {
+        let mut a;
+        a = 4;
+        let b = a + 5i64;
+    }
+    "#, r#"
+    fn foo() {
+        let mut a;
+        a = 4;
+        let b = a + 5i128;
+        a = 3i32;
+    }
+    "#, r#"
+    fn undefined() {
+        let a: i32 = loop {};
+        let mut b: i64 = 7;
+        b = 88;
+        b = loop {};
+    }
+    "#], &[Ok(()), Err("invalid type `LitNum(i128)` for `=`".into()), Ok(())]);
+
 }

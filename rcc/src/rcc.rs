@@ -51,7 +51,9 @@ impl<R: Read, W: Write> RcCompiler<R, W> {
 
         let mut ir_builder = IRBuilder::new(self.opt_level);
         let linear_ir = ir_builder.generate_ir(&mut ast)?;
+
         let cfg_ir = CFGIR::new(linear_ir);
+        cfg_ir.reaching_definitions_analysis()?;
 
         match self.opt_level {
             OptimizeLevel::Zero => {

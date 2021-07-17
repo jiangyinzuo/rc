@@ -38,7 +38,7 @@ pub fn main() -> i32 {
 ```
 Compile `foo.rc` to RISC-V assembly language.
 ```shell
-$ ./rcc foo.txt -o foo.S
+$ ./rcc foo.rc -o foo.S
 ```
 
 Assemble and link to executable file.

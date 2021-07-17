@@ -2,11 +2,13 @@ use crate::analyser::sym_resolver::TypeInfo::*;
 use crate::analyser::sym_resolver::{TypeInfo, VarInfo, VarKind};
 use crate::ast::expr::BlockExpr;
 use crate::ast::file::File;
-use crate::ast::item::{Item, ItemFn, ItemStruct, ExternalItem, FnSignature};
+use crate::ast::item::{ExternalItem, FnSignature, Item, ItemStruct};
 use crate::ast::types::TypeLitNum::*;
 use crate::ir::var_name::temp_local_var;
+use crate::rcc::RccError;
 use lazy_static::lazy_static;
 use std::cell::RefCell;
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::ops::Deref;
 use std::ptr::NonNull;
@@ -36,8 +38,10 @@ lazy_static! {
     };
 }
 
+pub type ScopeID = u64;
+
 pub struct Scope {
-    pub scope_id: u64,
+    pub scope_id: ScopeID,
     father: Option<NonNull<Scope>>,
     pub(crate) types: HashMap<String, TypeInfo>,
     variables: HashMap<String, Vec<VarInfo>>,
@@ -48,7 +52,7 @@ pub struct Scope {
 unsafe impl std::marker::Sync for Scope {}
 
 impl Scope {
-    pub fn new(scope_id: u64) -> Scope {
+    pub fn new(scope_id: ScopeID) -> Scope {
         Scope {
             scope_id,
             father: None,
@@ -76,16 +80,43 @@ impl Scope {
         }
     }
 
-    /// Return (var info, scope id)
-    pub fn find_variable(&self, ident: &str) -> Option<(&VarInfo, u64)> {
-        let mut cur_scope: *const Scope = self;
+    /// ```
+    /// let mut a;
+    /// ...
+    /// a = 32i32;
+    /// ```
+    pub fn update_variable_type(
+        &self,
+        ident: &str,
+        new_type_info: Rc<RefCell<TypeInfo>>,
+    ) -> Result<(), RccError> {
+        match self.find_variable_mut(ident) {
+            Some((var_info, _)) => match var_info.type_info.partial_cmp(&new_type_info) {
+                Some(o) => match o {
+                    Ordering::Greater | Ordering::Equal => {
+                        if !new_type_info.borrow().is_never() {
+                            var_info.type_info = new_type_info;
+                        }
+                        Ok(())
+                    }
+                    Ordering::Less => Err(RccError::from("invalid type")),
+                },
+                None => Err(RccError::from("invalid type")),
+            },
+            None => Err(RccError::from(format!("variable `{}` not found", ident))),
+        }
+    }
+
+    // Return (var info, scope id)
+    fn find_variable_mut(&self, ident: &str) -> Option<(&mut VarInfo, ScopeID)> {
+        let mut cur_scope: *mut Scope = self as *const Scope as *mut _;
         loop {
-            let s = unsafe { &*cur_scope };
-            if let Some(v) = s.variables.get(ident) {
+            let s = unsafe { &mut *cur_scope };
+            if let Some(v) = s.variables.get_mut(ident) {
                 let mut left = 0;
                 let mut right = v.len();
                 if right == 1 {
-                    return Some((unsafe { v.get_unchecked(0) }, s.scope_id));
+                    return Some((unsafe { v.get_unchecked_mut(0) }, s.scope_id));
                 }
                 while left < right {
                     let mid = (left + right + 1) / 2;
@@ -97,6 +128,39 @@ impl Scope {
                     } else {
                         left = mid;
                     }
+                }
+                return Some((unsafe { v.get_unchecked_mut(left) }, s.scope_id));
+            } else if let Some(f) = s.father {
+                cur_scope = f.as_ptr();
+            } else {
+                return None;
+            }
+        }
+    }
+
+    /// Return (var info, scope id)
+    pub fn find_variable(&self, ident: &str) -> Option<(&VarInfo, ScopeID)> {
+        let mut cur_scope: *const Scope = self;
+        loop {
+            let s = unsafe { &*cur_scope };
+            if let Some(v) = s.variables.get(ident) {
+                let mut left = 0;
+                let mut right = v.len() - 1;
+                if right == 0 {
+                    return Some((unsafe { v.get_unchecked(0) }, s.scope_id));
+                }
+                while left < right {
+                    let mid = (left + right + 1) / 2;
+                    let stmt_id = unsafe { (*v.get_unchecked(mid)).stmt_id() };
+                    // `Let stmt` and `variable use stmt` is impossible to be the same.
+                    match self.cur_stmt_id.cmp(&stmt_id) {
+                        Ordering::Less => {
+                            right = mid - 1;
+                        }
+                        Ordering::Equal => unreachable!(),
+                        Ordering::Greater => {left = mid;}
+                    }
+                    debug_assert_ne!(stmt_id, self.cur_stmt_id);
                 }
                 return Some((unsafe { v.get_unchecked(left) }, s.scope_id));
             } else if let Some(f) = s.father {
@@ -148,13 +212,13 @@ impl Scope {
             Item::Fn(item_fn) => self.add_type_fn(item_fn),
             Item::Struct(item_struct) => self.add_type_struct(item_struct),
             Item::ExternalBlock(item_external_block) => {
-               for item in &item_external_block.external_items {
-                   match item {
-                       ExternalItem::Fn(f) => {
-                           self.add_type_fn(f);
-                       }
-                   }
-               }
+                for item in &item_external_block.external_items {
+                    match item {
+                        ExternalItem::Fn(f) => {
+                            self.add_type_fn(f);
+                        }
+                    }
+                }
             }
             _ => todo!(),
         }
